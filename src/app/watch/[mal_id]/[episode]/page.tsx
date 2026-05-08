@@ -11,7 +11,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Anime, StreamResponse } from "@/lib/types";
-import { posterOf, rememberedAnime, rememberedProgress, rememberProgress, titleOf } from "@/lib/utils";
+import { posterOf, progressOf, rememberedAnime, rememberedProgress, rememberProgress, titleOf } from "@/lib/utils";
 
 const servers = [
   { id: "mega", label: "MegaPlay" },
@@ -50,7 +50,7 @@ export default function WatchPage({ params, searchParams }: { params: Promise<{ 
     const id = window.setTimeout(() => {
       setKnown(rememberedAnime(malId));
       const saved = rememberedProgress(malId, episodeNum);
-      setLocalResumeTime(Number(saved?.progress || saved?.timestamp || 0));
+      setLocalResumeTime(progressOf(saved));
     }, 0);
     return () => window.clearTimeout(id);
   }, [episodeNum, malId]);
@@ -103,9 +103,11 @@ export default function WatchPage({ params, searchParams }: { params: Promise<{ 
         mal_id: malId,
         anime_id: malId,
         title: animeTitle,
+        image_url: animePoster,
         poster: animePoster,
         episode: episodeNum,
         episode_num: episodeNum,
+        playback_pos: Math.floor(currentTime),
         progress: Math.floor(currentTime),
         timestamp: Math.floor(currentTime),
         duration: Math.floor(duration || 0),
@@ -125,9 +127,11 @@ export default function WatchPage({ params, searchParams }: { params: Promise<{ 
         mal_id: malId,
         anime_id: malId,
         title: animeTitle,
+        image_url: animePoster,
         poster: animePoster,
         episode: episodeNum,
         episode_num: episodeNum,
+        playback_pos: Math.floor(initialTime || 0),
         progress: Math.floor(initialTime || 0),
         timestamp: Math.floor(initialTime || 0),
         watched_at: new Date().toISOString(),
@@ -270,7 +274,7 @@ export default function WatchPage({ params, searchParams }: { params: Promise<{ 
         <div id="episode-list" className="mt-5 rounded-md border border-white/10 bg-panel p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="font-black">Episodes</h2>
-            <span className="text-sm text-muted">{maxEpisode || "?"} total</span>
+            <span className="text-sm text-muted">{maxEpisode ? `${maxEpisode} total` : "Episodes loading"}</span>
           </div>
           <div className="grid max-h-72 grid-cols-5 gap-2 overflow-y-auto pr-1 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-[repeat(16,minmax(0,1fr))]">
             {episodes.isLoading

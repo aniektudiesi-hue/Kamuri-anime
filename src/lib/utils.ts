@@ -46,6 +46,15 @@ export function episodeCount(anime: Anime | undefined) {
   return Number(anime?.num_episodes || anime?.episode_count || anime?.episodes || 0);
 }
 
+export function episodeLabel(anime: Anime | undefined, prefix = "Ep") {
+  const count = episodeCount(anime);
+  return count > 0 ? `${prefix} ${count}` : `${prefix} TBA`;
+}
+
+export function progressOf(item: LibraryItem | undefined) {
+  return Number(item?.playback_pos || item?.progress || item?.timestamp || 0);
+}
+
 export function displayStatus(status?: string) {
   if (!status) return "Unknown";
   return status.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
@@ -103,7 +112,11 @@ export function rememberProgress(item: LibraryItem) {
   const id = String(item.mal_id || item.anime_id || "");
   const episode = item.episode || item.episode_num || 1;
   if (!id || typeof window === "undefined") return;
-  window.localStorage.setItem(historyKey(id, episode), JSON.stringify(item));
+  const playbackPos = progressOf(item);
+  window.localStorage.setItem(
+    historyKey(id, episode),
+    JSON.stringify({ ...item, playback_pos: playbackPos, progress: playbackPos, timestamp: playbackPos }),
+  );
 }
 
 export function rememberedProgress(malId: string, episode: string | number) {

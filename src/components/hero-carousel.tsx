@@ -36,7 +36,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
           <div className="mb-4 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide text-accent-2">
             <span>Featured</span>
             <span>Score {current.score || "NA"}</span>
-            <span>{episodeCount(current) || "?"} Episodes</span>
+            <span>{episodeCount(current) ? `${episodeCount(current)} Episodes` : "Episodes TBA"}</span>
           </div>
           <h1 className="text-4xl font-black leading-tight sm:text-6xl">{titleOf(current)}</h1>
           <p className="mt-4 max-w-xl text-sm leading-6 text-muted sm:text-base">

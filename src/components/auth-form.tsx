@@ -40,7 +40,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   return (
     <form onSubmit={submit} className="mx-auto mt-12 w-full max-w-md rounded-md border border-white/10 bg-panel p-6">
       <h1 className="text-3xl font-black">{mode === "login" ? "Login" : "Create account"}</h1>
-      <p className="mt-2 text-sm text-muted">Use your RO-ANIME account to sync watchlist, history, and downloads metadata.</p>
+      <p className="mt-2 text-sm text-muted">Use your RO-ANIME account to sync watchlist and exact watch history.</p>
       <div className="mt-6 grid gap-4">
         {mode === "register" ? (
           <label className="grid gap-2 text-sm font-semibold">

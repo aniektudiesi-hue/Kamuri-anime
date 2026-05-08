@@ -8,7 +8,7 @@ import { AnimeRow, LazyAnimeRow } from "@/components/anime-row";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { api } from "@/lib/api";
 import type { Anime } from "@/lib/types";
-import { animeId, episodeCount, posterOf, rememberAnime, titleOf } from "@/lib/utils";
+import { animeId, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
 
 export default function Home() {
   const [banners, thumbnails, recent, topRated] = useQueries({
@@ -59,7 +59,7 @@ function HomeDashboard({ popular, recent, loading }: { popular?: Anime[]; recent
                   </span>
                   <span className="min-w-0">
                     <span className="line-clamp-1 font-bold group-hover:text-accent-2">{titleOf(anime)}</span>
-                    <span className="mt-1 block text-xs text-muted">TV • Ep {episodeCount(anime) || "?"} • Sub</span>
+                    <span className="mt-1 block text-xs text-muted">TV • {episodeLabel(anime)} • Sub</span>
                   </span>
                   <span className="rounded bg-accent/15 px-2 py-1 text-xs font-black text-accent-2">Watch</span>
                 </Link>
@@ -90,11 +90,12 @@ function HomeDashboard({ popular, recent, loading }: { popular?: Anime[]; recent
             ? Array.from({ length: 12 }).map((_, index) => <div key={index} className="h-12 animate-pulse rounded bg-panel-strong" />)
             : latestItems.map((anime, index) => {
                 const id = animeId(anime);
+                const count = episodeCount(anime);
                 return (
-                  <Link key={`${id}-${index}`} href={`/watch/${id}/${Math.max(episodeCount(anime), 1)}`} onClick={() => rememberAnime(anime)} className="flex items-center justify-between gap-3 rounded-md bg-panel-strong px-3 py-2 hover:bg-white/10">
+                  <Link key={`${id}-${index}`} href={count > 0 ? `/watch/${id}/${count}` : `/anime/${id}`} onClick={() => rememberAnime(anime)} className="flex items-center justify-between gap-3 rounded-md bg-panel-strong px-3 py-2 hover:bg-white/10">
                     <span className="min-w-0">
                       <span className="line-clamp-1 text-sm font-bold">{titleOf(anime)}</span>
-                      <span className="text-xs text-muted">Episode {episodeCount(anime) || "?"}</span>
+                      <span className="text-xs text-muted">{count > 0 ? `Episode ${count}` : "Episode TBA"}</span>
                     </span>
                     <span className="rounded bg-black/35 px-2 py-1 text-xs font-bold text-accent-2">Sub</span>
                   </Link>

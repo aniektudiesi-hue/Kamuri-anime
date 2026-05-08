@@ -10,7 +10,7 @@ import { Button, ButtonLink } from "@/components/button";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { posterOf, rememberedAnime, rememberedProgress, titleOf } from "@/lib/utils";
+import { posterOf, progressOf, rememberedAnime, rememberedProgress, titleOf } from "@/lib/utils";
 
 type LibraryKind = "history" | "watchlist";
 
@@ -79,7 +79,7 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
   const [saved, setSaved] = useState<LibraryItem | undefined>();
   const episode = item.episode || item.episode_num || 1;
   const displayItem = { ...savedAnime, ...item };
-  const progress = Number(item.progress || item.timestamp || saved?.progress || saved?.timestamp || 0);
+  const progress = progressOf(item) || progressOf(saved);
   const href = kind === "history" ? `/watch/${id}/${episode}${progress > 1 ? `?t=${Math.floor(progress)}` : ""}` : `/anime/${id}`;
 
   useEffect(() => {

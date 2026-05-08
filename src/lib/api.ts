@@ -5,6 +5,41 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-s
 
 type RequestOptions = RequestInit & { token?: string | null };
 
+function numberFrom(value: unknown, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function stringFrom(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function normalizeHistoryBody(body: Record<string, unknown>) {
+  const id = stringFrom(body.mal_id, stringFrom(body.anime_id));
+  const playbackPos = numberFrom(body.playback_pos ?? body.progress ?? body.timestamp, 0);
+  return {
+    ...body,
+    mal_id: id,
+    title: stringFrom(body.title, id ? `Anime ${id}` : "Anime"),
+    image_url: stringFrom(body.image_url, stringFrom(body.poster, stringFrom(body.image, stringFrom(body.thumbnail)))),
+    episode: numberFrom(body.episode ?? body.episode_num, 1),
+    playback_pos: playbackPos,
+    progress: playbackPos,
+    timestamp: playbackPos,
+  };
+}
+
+function normalizeWatchlistBody(body: Record<string, unknown>) {
+  const id = stringFrom(body.mal_id, stringFrom(body.anime_id));
+  return {
+    ...body,
+    mal_id: id,
+    title: stringFrom(body.title, id ? `Anime ${id}` : "Anime"),
+    image_url: stringFrom(body.image_url, stringFrom(body.poster, stringFrom(body.image, stringFrom(body.thumbnail)))),
+    episodes: numberFrom(body.episodes ?? body.episode_count ?? body.num_episodes, 0),
+  };
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
@@ -41,11 +76,11 @@ export const api = {
   register: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   me: (token: string) => request<User>("/auth/me", { token }),
   addHistory: (token: string, body: Record<string, unknown>) =>
-    request("/user/history", { method: "POST", token, body: JSON.stringify(body) }),
+    request("/user/history", { method: "POST", token, body: JSON.stringify(normalizeHistoryBody(body)) }),
   history: async (token: string) => listFromPayload<LibraryItem>(await request("/user/history", { token })),
   clearHistory: (token: string) => request("/user/history", { method: "DELETE", token }),
   addWatchlist: (token: string, body: Record<string, unknown>) =>
-    request("/user/watchlist", { method: "POST", token, body: JSON.stringify(body) }),
+    request("/user/watchlist", { method: "POST", token, body: JSON.stringify(normalizeWatchlistBody(body)) }),
   watchlist: async (token: string) => listFromPayload<LibraryItem>(await request("/user/watchlist", { token })),
   removeWatchlist: (token: string, malId: string) => request(`/user/watchlist/${malId}`, { method: "DELETE", token }),
   addDownload: (token: string, body: Record<string, unknown>) =>

@@ -6,7 +6,7 @@ import { Play, Star } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Anime } from "@/lib/types";
-import { animeId, episodeCount, posterOf, rememberAnime, titleOf } from "@/lib/utils";
+import { animeId, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
 
 export function AnimeCard({ anime, priority = false }: { anime: Anime; priority?: boolean }) {
   const queryClient = useQueryClient();
@@ -35,7 +35,7 @@ export function AnimeCard({ anime, priority = false }: { anime: Anime; priority?
             {anime.score ? anime.score.toFixed(1) : "NA"}
           </div>
           <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
-            <span className="rounded bg-white/12 px-2 py-1 text-xs font-semibold backdrop-blur">Ep {episodes || "?"}</span>
+            <span className="rounded bg-white/12 px-2 py-1 text-xs font-semibold backdrop-blur">{episodeLabel(anime)}</span>
             <span className="grid h-9 w-9 place-items-center rounded-full bg-accent text-white shadow-lg transition group-hover:scale-110">
               <Play size={15} fill="currentColor" />
             </span>

@@ -54,7 +54,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const inWatchlist = Boolean(watchlist.data?.some((item) => String(item.mal_id || item.anime_id) === malId));
 
   const addWatchlist = useMutation({
-    mutationFn: () => api.addWatchlist(token!, { mal_id: malId, anime_id: malId, title: titleOf(known), poster: posterOf(known), episode_count: hint }),
+    mutationFn: () => api.addWatchlist(token!, { mal_id: malId, anime_id: malId, title: titleOf(known), image_url: posterOf(known), episodes: hint }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["watchlist"] }),
   });
 
@@ -65,6 +65,8 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       staleTime: 1000 * 60 * 3,
     });
   }
+
+  const episodeTotal = episodes.data?.num_episodes || hint;
 
   return (
     <AppShell>
@@ -80,7 +82,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           <div className="self-end pb-2">
             <div className="mb-3 flex flex-wrap gap-2 text-xs font-bold uppercase text-accent-2">
               <span>{displayStatus(known?.status)}</span>
-              <span>{episodes.data?.num_episodes || hint || "?"} Episodes</span>
+              <span>{episodeTotal ? `${episodeTotal} Episodes` : "Episodes TBA"}</span>
               <span className="flex items-center gap-1"><Star size={13} className="fill-accent-2" /> {known?.score || "NA"}</span>
             </div>
             <h1 className="max-w-4xl text-4xl font-black leading-tight sm:text-6xl">{titleOf(known) || `Anime ${malId}`}</h1>

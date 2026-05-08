@@ -71,9 +71,11 @@ export type LibraryItem = Anime & {
   mal_id?: string;
   episode?: number;
   episode_num?: number;
+  playback_pos?: number;
   progress?: number;
   timestamp?: number;
   duration?: number;
+  added_at?: string;
   watched_at?: string;
   created_at?: string;
 };
