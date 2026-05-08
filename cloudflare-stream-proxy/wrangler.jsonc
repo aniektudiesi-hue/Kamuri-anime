@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "anime-tv-stream-proxy",
+  "main": "src/index.js",
+  "compatibility_date": "2026-05-07",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "ORIGIN_BASE": "https://anime-search-api-burw.onrender.com",
+    "MEGAPLAY_BASE": "https://megaplay.buzz",
+    "VIDWISH_BASE": "https://vidwish.live"
+  }
+}
