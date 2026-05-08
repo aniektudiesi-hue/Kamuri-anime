@@ -22,6 +22,8 @@ const worker = {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/health") return json({ ok: true, worker: "anime-tv-stream-proxy" });
+      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return proxyMoonM3u8(request, env);
+      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/chunk")) return proxyMoonChunk(request, env);
       if (url.pathname === "/proxy/m3u8") return proxyM3u8(request, env);
       if (url.pathname === "/proxy/chunk") return proxyChunk(request, env);
       if (url.pathname === "/proxy/vtt") return proxyVtt(request, env);
@@ -79,6 +81,67 @@ async function proxyM3u8(request, env) {
       "cache-control": "no-cache",
     },
   });
+}
+
+async function proxyMoonM3u8(request, env) {
+  const videoId = new URL(request.url).pathname.split("/")[3];
+  if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
+  const variant = new URL(request.url).searchParams.get("variant");
+  const playback = await fetchMoonPlayback(videoId);
+  const master = await fetchMoonText(playback.url, env);
+
+  if (variant) {
+    const variantUrl = findPlaylistEntry(master.text, playback.url, variant);
+    if (!variantUrl) return json({ error: "Moon variant missing", variant }, 404, cacheHeaders("no-store"));
+    const child = await fetchMoonText(variantUrl, env);
+    const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, new URL(request.url).origin, videoId, variant);
+    return new Response(rewrittenChild, {
+      status: 200,
+      headers: {
+        ...corsHeaders(),
+        "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
+        "cache-control": "no-cache",
+      },
+    });
+  }
+
+  const rewritten = rewriteMoonMaster(master.text, playback.url, new URL(request.url).origin, videoId);
+  return new Response(rewritten, {
+    status: 200,
+    headers: {
+      ...corsHeaders(),
+      "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
+      "cache-control": "no-cache",
+    },
+  });
+}
+
+async function proxyMoonChunk(request, env) {
+  const url = new URL(request.url);
+  const videoId = url.pathname.split("/")[3];
+  const variant = url.searchParams.get("variant") || "";
+  const segment = url.searchParams.get("segment") || "";
+  if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
+  if (!variant || !segment) return json({ error: "Missing Moon segment info" }, 400);
+
+  const playback = await fetchMoonPlayback(videoId);
+  const master = await fetchMoonText(playback.url, env);
+  const variantUrl = findPlaylistEntry(master.text, playback.url, variant);
+  if (!variantUrl) return json({ error: "Moon variant missing", variant }, 404, cacheHeaders("no-store"));
+  const child = await fetchMoonText(variantUrl, env);
+  const segmentUrl = findPlaylistEntry(child.text, variantUrl, segment);
+  if (!segmentUrl) return json({ error: "Moon segment missing", segment }, 404, cacheHeaders("no-store"));
+
+  const headers = upstreamHeaders(segmentUrl, env);
+  const range = request.headers.get("range");
+  if (range) headers.set("range", range);
+  const upstream = await fetch(segmentUrl, {
+    headers,
+    redirect: "follow",
+    cf: { cacheTtl: range ? 0 : 3600, cacheEverything: !range },
+  });
+  if (!upstream.ok && upstream.status !== 206) return upstreamError(upstream);
+  return streamUpstream(upstream, detectMime(segmentUrl));
 }
 
 async function proxyChunk(request, env) {
@@ -179,6 +242,188 @@ function rewriteStreamPayload(value, workerOrigin) {
     });
   }
   return copy;
+}
+
+async function fetchMoonPlayback(videoId) {
+  const headers = {
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.9,en-IN;q=0.8",
+    "Content-Type": "application/json",
+    "Origin": "https://398fitus.com",
+    "Referer": `https://398fitus.com/ed4/${videoId}`,
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-Storage-Access": "active",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 Edg/147.0.0.0",
+    "X-Embed-Origin": "9animetv.org.lv",
+    "X-Embed-Parent": `https://bysesayeveum.com/e/${videoId}`,
+    "X-Embed-Referer": "https://9animetv.org.lv/",
+    "sec-ch-ua": "\"Microsoft Edge\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+  };
+  const fingerprint = {
+    token: crypto.randomUUID().replaceAll("-", ""),
+    viewer_id: crypto.randomUUID().replaceAll("-", ""),
+    device_id: crypto.randomUUID().replaceAll("-", ""),
+    confidence: 1,
+  };
+
+  const response = await fetch(`https://398fitus.com/api/videos/${videoId}/embed/playback`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ fingerprint }),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Moon playback ${response.status}: ${text.slice(0, 120)}`);
+
+  const playback = (JSON.parse(text).playback || {});
+  const keys = [
+    concatBytes((playback.key_parts || []).map(base64UrlBytes)),
+    ...Object.values(playback.decrypt_keys || {}).map(base64UrlBytes),
+  ];
+
+  for (const key of keys) {
+    try {
+      const raw = await decryptMoonPayload(playback.payload, key, base64UrlBytes(playback.iv));
+      const url = findDeepUrl(JSON.parse(raw));
+      if (url) return { url };
+    } catch {
+      // Try the next key; Moon sometimes returns alternates.
+    }
+  }
+  throw new Error("Moon playback decrypt failed");
+}
+
+async function fetchMoonText(url, env) {
+  const upstream = await fetch(url, {
+    headers: upstreamHeaders(url, env),
+    redirect: "follow",
+    cf: { cacheTtl: 0, cacheEverything: false },
+  });
+  const text = await upstream.text();
+  if (!upstream.ok) throw new Error(`Moon CDN ${upstream.status}: ${text.slice(0, 80)}`);
+  return { text };
+}
+
+function rewriteMoonMaster(text, originalUrl, workerOrigin, videoId) {
+  const base = new URL(originalUrl);
+  let nextIsPlaylist = false;
+  const out = [];
+
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    if (!line || line.startsWith("#")) {
+      out.push(line);
+      if (line.startsWith("#EXT-X-STREAM-INF")) nextIsPlaylist = true;
+      if (line.startsWith("#EXT-X-I-FRAME-STREAM-INF")) {
+        out[out.length - 1] = rewriteMoonAttributeUri(line, base, workerOrigin, videoId, "");
+      }
+      continue;
+    }
+    if (nextIsPlaylist) {
+      const absolute = new URL(line, base).toString();
+      const variant = new URL(absolute).pathname.split("/").pop() || line;
+      out.push(`${workerOrigin}/proxy/moon/${encodeURIComponent(videoId)}/m3u8?variant=${encodeURIComponent(variant)}`);
+      nextIsPlaylist = false;
+      continue;
+    }
+    out.push(line);
+  }
+  return `${out.join("\n")}\n`;
+}
+
+function rewriteMoonVariant(text, originalUrl, workerOrigin, videoId, variant) {
+  const base = new URL(originalUrl);
+  const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    if (line.startsWith("#EXT-X-KEY") || line.startsWith("#EXT-X-MAP")) {
+      out.push(rewriteMoonAttributeUri(line, base, workerOrigin, videoId, variant));
+      continue;
+    }
+    if (!line || line.startsWith("#")) {
+      out.push(line);
+      continue;
+    }
+    const absolute = new URL(line, base).toString();
+    const segment = new URL(absolute).pathname.split("/").pop() || line;
+    out.push(`${workerOrigin}/proxy/moon/${encodeURIComponent(videoId)}/chunk?variant=${encodeURIComponent(variant)}&segment=${encodeURIComponent(segment)}`);
+  }
+  return `${out.join("\n")}\n`;
+}
+
+function rewriteMoonAttributeUri(line, base, workerOrigin, videoId, variant) {
+  return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
+    const absolute = new URL(uri, base).toString();
+    const segment = new URL(absolute).pathname.split("/").pop() || uri;
+    return `URI="${workerOrigin}/proxy/moon/${encodeURIComponent(videoId)}/chunk?variant=${encodeURIComponent(variant)}&segment=${encodeURIComponent(segment)}"`;
+  });
+}
+
+function findPlaylistEntry(text, baseUrl, name) {
+  const target = decodeURIComponent(name).split("?")[0];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const absolute = new URL(line, baseUrl).toString();
+    const filename = new URL(absolute).pathname.split("/").pop() || "";
+    if (filename === target || filename.startsWith(target.split("?")[0])) return absolute;
+  }
+  const attrMatch = text.match(new RegExp(`URI="([^"]*${escapeRegExp(target)}[^"]*)"`, "i"));
+  return attrMatch ? new URL(attrMatch[1], baseUrl).toString() : null;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function decryptMoonPayload(payload, keyBytes, ivBytes) {
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
+  const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ivBytes }, key, base64UrlBytes(payload));
+  return new TextDecoder().decode(clear);
+}
+
+function base64UrlBytes(value) {
+  let normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  while (normalized.length % 4) normalized += "=";
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function concatBytes(parts) {
+  const bytes = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    bytes.set(part, offset);
+    offset += part.length;
+  }
+  return bytes;
+}
+
+function findDeepUrl(value) {
+  if (typeof value === "string") {
+    return value.startsWith("http") && (value.includes(".m3u8") || value.includes("stream") || value.includes("video")) ? value : null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findDeepUrl(item);
+      if (found) return found;
+    }
+  }
+  if (value && typeof value === "object") {
+    for (const key of ["url", "stream", "src", "file", "hls", "source"]) {
+      if (typeof value[key] === "string" && value[key].startsWith("http")) return value[key];
+    }
+    for (const nested of Object.values(value)) {
+      const found = findDeepUrl(nested);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 function streamProxyUrl(workerOrigin, value) {
