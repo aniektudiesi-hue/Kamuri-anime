@@ -17,12 +17,14 @@ export function VideoPlayer({
   initialTime = 0,
   nextHref,
   onProgress,
+  onFatalError,
 }: {
   stream?: StreamResponse;
   title: string;
   initialTime?: number;
   nextHref?: string;
   onProgress?: (progress: { currentTime: number; duration: number }) => void;
+  onFatalError?: (message: string) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastTimeRef = useRef(0);
@@ -38,6 +40,7 @@ export function VideoPlayer({
   const [muted, setMuted] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(true);
   const [controlsOpen, setControlsOpen] = useState(true);
+  const [playbackError, setPlaybackError] = useState("");
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
   const subtitles = useMemo(() => preferredSubtitles(stream?.subtitles), [stream?.subtitles]);
   const activeSubtitleUrl = subtitles[0]?.file ?? "";
@@ -109,6 +112,7 @@ export function VideoPlayer({
     if (!video || !src) return;
     let hls: Hls | null = null;
     setActiveCaption("");
+    setPlaybackError("");
     setIsBuffering(true);
     restoredRef.current = false;
     lastTimeRef.current = initialTime;
@@ -172,8 +176,21 @@ export function VideoPlayer({
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (!data.fatal) return;
           rememberTime();
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls?.startLoad();
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls?.recoverMediaError();
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            const message = "This server blocked the playlist.";
+            setPlaybackError(message);
+            setIsBuffering(false);
+            onFatalError?.(message);
+            return;
+          }
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls?.recoverMediaError();
+            return;
+          }
+          const message = "This stream cannot be played.";
+          setPlaybackError(message);
+          setIsBuffering(false);
+          onFatalError?.(message);
         });
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = src;
@@ -196,7 +213,7 @@ export function VideoPlayer({
       video.removeEventListener("waiting", markWaiting);
       video.removeEventListener("stalled", markWaiting);
     };
-  }, [hideControlsSoon, initialTime, onProgress, src, syncCaptionAt]);
+  }, [hideControlsSoon, initialTime, onFatalError, onProgress, src, syncCaptionAt]);
 
   const progress = useMemo(() => (duration ? (currentTime / duration) * 100 : 0), [currentTime, duration]);
 
@@ -287,6 +304,14 @@ export function VideoPlayer({
           <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center">
             <div className="grid place-items-center gap-3 rounded-full bg-black/45 px-6 py-5 backdrop-blur-sm">
               <span className="h-12 w-12 animate-spin rounded-full border-[3px] border-slate-300/25 border-t-slate-100 shadow-[0_0_28px_rgba(226,232,240,0.45)]" />
+            </div>
+          </div>
+        ) : null}
+        {playbackError ? (
+          <div className="absolute inset-0 z-40 grid place-items-center bg-black/72 px-4 text-center backdrop-blur-sm">
+            <div className="max-w-md rounded-md border border-white/10 bg-[#11131d] p-5 shadow-2xl">
+              <p className="text-base font-black text-white">Server unavailable</p>
+              <p className="mt-2 text-sm text-muted">{playbackError} Try another server below.</p>
             </div>
           </div>
         ) : null}
