@@ -1,14 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Clock3, Heart, LogOut, Menu, Search, UserRound, X } from "lucide-react";
+import { Clock3, Heart, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { SearchBox } from "./search-box";
 
 const nav = [
-  { href: "/history", label: "History", icon: Clock3 },
-  { href: "/watchlist", label: "Watchlist", icon: Heart },
+  { href: "/search?q=trending", label: "Browse" },
+  { href: "/search?q=spring+2026", label: "New Releases" },
+  { href: "/search?q=top+rated", label: "Top Rated" },
 ];
 
 export function Header() {
@@ -16,75 +18,137 @@ export function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-background/88 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <AnimeTvLogo />
-          <span className="hidden text-lg font-black tracking-wide sm:block">animeTv</span>
-        </Link>
+    <header className="sticky top-0 z-50">
+      {/* Main bar — single blur layer, never repaints */}
+      <div className="border-b border-white/[0.06] bg-[#06070d]/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 max-w-screen-2xl items-center gap-4 px-4 lg:px-6">
 
-        <div className="hidden flex-1 md:block">
-          <SearchBox />
-        </div>
-
-        <nav className="ml-auto hidden items-center gap-1 lg:flex">
-          {nav.map((item) => (
-            <Link key={item.href} href={item.href} className="flex h-10 items-center gap-2 rounded-md px-3 text-sm text-muted hover:bg-white/10 hover:text-white">
-              <item.icon size={16} />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        {isLoggedIn ? (
-          <button onClick={logout} className="hidden h-10 items-center gap-2 rounded-md px-3 text-sm text-muted hover:bg-white/10 hover:text-white sm:flex">
-            <LogOut size={16} />
-            {user?.username || user?.email || "Logout"}
-          </button>
-        ) : (
-          <Link href="/login" className="hidden h-10 items-center gap-2 rounded-md bg-panel-strong px-3 text-sm font-semibold hover:bg-white/10 sm:flex">
-            <UserRound size={16} />
-            Login
+          {/* Logo */}
+          <Link href="/" className="flex shrink-0 items-center gap-2.5">
+            <Image src="/logo.svg" alt="animeTv" width={32} height={32} priority />
+            <span className="hidden text-[15px] font-black tracking-tight text-white sm:block">
+              anime<span className="text-[#e8336a]">Tv</span>
+            </span>
           </Link>
-        )}
 
-        <button aria-label="Open menu" onClick={() => setOpen((v) => !v)} className="grid h-10 w-10 place-items-center rounded-md bg-panel-strong lg:hidden">
-          {open ? <X size={18} /> : <Menu size={18} />}
-        </button>
-      </div>
-
-      <div className="px-4 pb-3 md:hidden">
-        <SearchBox />
-      </div>
-
-      {open ? (
-        <div className="border-t border-white/10 bg-panel px-4 py-3 lg:hidden">
-          <div className="grid gap-2">
+          {/* Desktop nav */}
+          <nav className="hidden items-center gap-0.5 lg:flex">
             {nav.map((item) => (
-              <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="flex h-10 items-center gap-2 rounded-md px-3 text-sm text-muted hover:bg-white/10 hover:text-white">
-                <item.icon size={16} />
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/45 transition-colors hover:bg-white/[0.05] hover:text-white"
+              >
                 {item.label}
               </Link>
             ))}
-            <Link href="/search" className="flex h-10 items-center gap-2 rounded-md px-3 text-sm text-muted hover:bg-white/10 hover:text-white">
-              <Search size={16} />
-              Search
+          </nav>
+
+          {/* Search */}
+          <div className="flex-1 max-w-lg mx-auto">
+            <SearchBox />
+          </div>
+
+          {/* Right actions */}
+          <div className="hidden items-center gap-0.5 sm:flex">
+            <Link
+              href="/history"
+              title="Watch History"
+              className="grid h-8 w-8 place-items-center rounded-lg text-white/40 transition-colors hover:bg-white/[0.05] hover:text-white"
+            >
+              <Clock3 size={17} />
             </Link>
+            <Link
+              href="/watchlist"
+              title="My Watchlist"
+              className="grid h-8 w-8 place-items-center rounded-lg text-white/40 transition-colors hover:bg-white/[0.05] hover:text-white"
+            >
+              <Heart size={17} />
+            </Link>
+
+            {isLoggedIn ? (
+              <button
+                onClick={logout}
+                className="ml-1 flex h-8 items-center gap-2 rounded-lg bg-white/[0.05] px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/[0.09] hover:text-white"
+              >
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-[#e8336a] text-[9px] font-black text-white">
+                  {(user?.username || user?.email || "U")[0].toUpperCase()}
+                </span>
+                <span className="hidden max-w-[80px] truncate lg:block">
+                  {user?.username || user?.email || "Account"}
+                </span>
+                <LogOut size={12} className="text-white/30" />
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="ml-1 flex h-8 items-center gap-2 rounded-lg bg-[#e8336a] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                <UserRound size={14} />
+                Sign In
+              </Link>
+            )}
+          </div>
+
+          {/* Mobile toggle */}
+          <button
+            aria-label="Toggle menu"
+            onClick={() => setOpen((v) => !v)}
+            className="grid h-8 w-8 place-items-center rounded-lg bg-white/[0.05] text-white/60 lg:hidden"
+          >
+            {open ? <X size={17} /> : <Menu size={17} />}
+          </button>
+        </div>
+
+        {/* Mobile search — same layer, no extra blur */}
+        <div className="border-t border-white/[0.06] px-4 py-2.5 sm:hidden">
+          <SearchBox />
+        </div>
+      </div>
+
+      {/* Mobile nav drawer — solid, no backdrop-blur */}
+      {open ? (
+        <div className="border-b border-white/[0.06] bg-[#0a0c16] lg:hidden">
+          <div className="space-y-0.5 px-4 py-3">
+            {nav.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white"
+              >
+                {item.label}
+              </Link>
+            ))}
+            <Link
+              href="/history"
+              onClick={() => setOpen(false)}
+              className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white"
+            >
+              <Clock3 size={15} />
+              History
+            </Link>
+            <Link
+              href="/watchlist"
+              onClick={() => setOpen(false)}
+              className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white"
+            >
+              <Heart size={15} />
+              Watchlist
+            </Link>
+            {!isLoggedIn && (
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#e8336a] text-sm font-semibold text-white"
+              >
+                <UserRound size={14} />
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       ) : null}
     </header>
-  );
-}
-
-function AnimeTvLogo() {
-  return (
-    <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-md border border-white/10 bg-[#11131d] shadow-[0_0_24px_rgba(255,83,112,0.28)]">
-      <span className="absolute inset-0 bg-[radial-gradient(circle_at_35%_25%,rgba(255,255,255,0.28),transparent_28%),linear-gradient(135deg,#ff3f6e,#7c5cff_55%,#28d6ff)]" />
-      <span className="absolute bottom-1 left-1 right-1 h-3 rounded-full bg-black/35" />
-      <span className="relative grid h-6 w-6 place-items-center rounded-full bg-white text-[11px] font-black text-[#11131d]">
-        TV
-      </span>
-    </span>
   );
 }

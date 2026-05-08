@@ -1,54 +1,153 @@
 @import "tailwindcss";
 
 :root {
-  --background: #090a10;
-  --foreground: #f7f7fb;
-  --muted: #a7adbe;
-  --panel: #11131d;
-  --panel-strong: #181b28;
-  --accent: #e94f8b;
-  --accent-2: #25d6c8;
+  /* Core backgrounds — layered depth */
+  --background: #06070d;
+  --background-2: #0a0c16;
+  --foreground: #eaedf8;
+  --muted: #6b7494;
+  --subtle: #38405c;
+
+  /* Surfaces — glass-like layering */
+  --panel: #0d1020;
+  --panel-strong: #141828;
+  --surface-3: #1b2036;
+
+  /* Borders */
+  --border: rgba(255,255,255,0.055);
+  --border-hover: rgba(255,255,255,0.11);
+
+  /* Brand accents */
+  --accent: #e8336a;          /* vivid rose-pink */
+  --accent-dim: rgba(232,51,106,0.14);
+  --accent-glow: rgba(232,51,106,0.38);
+  --accent-2: #1ed9cc;        /* cyan-teal */
+  --accent-2-dim: rgba(30,217,204,0.12);
+  --accent-2-glow: rgba(30,217,204,0.32);
+  --purple: #7c4dff;
+  --purple-dim: rgba(124,77,255,0.15);
+  --gold: #f0b429;
+  --gold-dim: rgba(240,180,41,0.15);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
   --color-panel: var(--panel);
   --color-panel-strong: var(--panel-strong);
   --color-accent: var(--accent);
   --color-accent-2: var(--accent-2);
+  --color-purple: var(--purple);
+  --color-gold: var(--gold);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
+
+/* ── Base ─────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
 
 body {
   background: var(--background);
   color: var(--foreground);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-button,
-a,
-input {
-  outline-color: color-mix(in oklab, var(--accent), white 20%);
-}
+button, a, input { outline-color: var(--accent); }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
+/* ── Scrollbars ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #2b3040;
+  background: #252a42;
   border-radius: 999px;
 }
+::-webkit-scrollbar-thumb:hover { background: #323859; }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Custom grid columns ─────────────────────────────── */
+.grid-cols-14 { grid-template-columns: repeat(14, minmax(0, 1fr)); }
+.grid-cols-16 { grid-template-columns: repeat(16, minmax(0, 1fr)); }
+
+/* ── Glass panel ─────────────────────────────────────── */
+.glass {
+  background: rgba(13,16,32,0.96);
+  border: 1px solid var(--border);
 }
 
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.glass-strong {
+  background: rgba(20,24,40,0.98);
+  border: 1px solid var(--border-hover);
+}
+
+/* ── Gradient text ───────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #e8336a 0%, #7c4dff 55%, #1ed9cc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Glow utilities ─────────────────────────────────── */
+.glow-accent  { box-shadow: 0 0 32px var(--accent-glow); }
+.glow-accent-2 { box-shadow: 0 0 32px var(--accent-2-glow); }
+.glow-purple  { box-shadow: 0 0 32px rgba(124,77,255,0.4); }
+
+/* ── Animated gradient border ────────────────────────── */
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #e8336a, #7c4dff, #1ed9cc);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Card hover lift — compositor-only (no repaint) ─── */
+.card-lift {
+  transition: transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94),
+              filter 0.25s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.card-lift:hover {
+  transform: translateY(-4px) scale(1.015);
+  filter: drop-shadow(0 16px 32px rgba(0,0,0,0.55));
+}
+
+/* ── Shine overlay on hover ──────────────────────────── */
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+.shine:hover::after {
+  transform: translateX(100%);
+}
+
+/* ── Volume range ────────────────────────────────────── */
+input[type="range"] { accent-color: var(--accent-2); }
+
+/* ── Seek flash animation ────────────────────────────── */
+@keyframes fadeInOut {
+  0%   { opacity: 0; transform: scale(0.85); }
+  20%  { opacity: 1; transform: scale(1); }
+  70%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.05); }
 }

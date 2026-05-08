@@ -46,15 +46,28 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 12_000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    window.clearTimeout(timeout);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("timeout");
+    }
+    throw err;
+  }
+  window.clearTimeout(timeout);
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(text || `Request failed with ${res.status}`);
+    throw new Error(text || `${res.status}`);
   }
 
   return (await res.json()) as T;

@@ -18,9 +18,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setError("");
     setLoading(true);
     const form = new FormData(event.currentTarget);
+    const username = String(form.get("username") || "");
     const body = {
-      username: String(form.get("username") || form.get("email") || ""),
-      email: String(form.get("email") || ""),
+      username,
+      email: `${username}@animetv.app`,
       password: String(form.get("password") || ""),
     };
 
@@ -42,19 +43,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       <h1 className="text-3xl font-black">{mode === "login" ? "Login" : "Create account"}</h1>
       <p className="mt-2 text-sm text-muted">Use your RO-ANIME account to sync watchlist and exact watch history.</p>
       <div className="mt-6 grid gap-4">
-        {mode === "register" ? (
-          <label className="grid gap-2 text-sm font-semibold">
-            Username
-            <input name="username" required className="h-11 rounded-md border border-white/10 bg-panel-strong px-3 text-white" />
-          </label>
-        ) : null}
         <label className="grid gap-2 text-sm font-semibold">
-          Email
-          <input name="email" type="email" required className="h-11 rounded-md border border-white/10 bg-panel-strong px-3 text-white" />
+          Username
+          <input name="username" required autoComplete="username" className="h-11 rounded-md border border-white/10 bg-panel-strong px-3 text-white" />
         </label>
         <label className="grid gap-2 text-sm font-semibold">
           Password
-          <input name="password" type="password" required className="h-11 rounded-md border border-white/10 bg-panel-strong px-3 text-white" />
+          <input name="password" type="password" required autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder="••••••••" className="h-11 rounded-md border border-white/10 bg-panel-strong px-3 text-white" />
         </label>
       </div>
       {error ? <p className="mt-4 rounded-md border border-red-400/30 bg-red-950/20 p-3 text-sm text-red-200">{error}</p> : null}

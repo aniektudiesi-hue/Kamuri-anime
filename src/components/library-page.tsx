@@ -14,6 +14,39 @@ import { posterOf, progressOf, rememberedAnime, rememberedProgress, titleOf } fr
 
 type LibraryKind = "history" | "watchlist";
 
+// Fetch title + poster from AniList when the API item is missing them
+async function enrichFromAniList(malId: number): Promise<Partial<Anime>> {
+  const gql = `
+    query Enrich($id: Int!) {
+      Media(idMal: $id, type: ANIME) {
+        title { romaji english }
+        coverImage { large }
+        averageScore episodes status
+      }
+    }
+  `;
+  try {
+    const res = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ query: gql, variables: { id: malId } }),
+    });
+    if (!res.ok) return {};
+    type R = { data?: { Media?: { title: { romaji: string; english: string | null }; coverImage: { large: string }; averageScore: number | null; episodes: number | null; status: string } } };
+    const json = await res.json() as R;
+    const m = json.data?.Media;
+    if (!m) return {};
+    return {
+      title: m.title.english || m.title.romaji,
+      image_url: m.coverImage.large,
+      score: m.averageScore ? m.averageScore / 10 : undefined,
+      episodes: m.episodes ?? undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export function LibraryPage({ kind }: { kind: LibraryKind }) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
@@ -40,7 +73,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-black">{title}</h1>
-        <p className="mt-2 text-muted">{kind === "history" ? "Resume from the exact timestamp you left." : "Saved anime ready for your next session."}</p>
+            <p className="mt-2 text-muted">{kind === "history" ? "Resume from the exact timestamp you left." : "Saved anime ready for your next session."}</p>
           </div>
           {kind === "history" && query.data?.length ? (
             <Button onClick={() => clear.mutate(undefined)} variant="panel">
@@ -78,7 +111,7 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
   const [savedAnime, setSavedAnime] = useState<Anime | undefined>();
   const [saved, setSaved] = useState<LibraryItem | undefined>();
   const episode = item.episode || item.episode_num || 1;
-  const displayItem = { ...savedAnime, ...item };
+  const baseItem = { ...savedAnime, ...item };
   const progress = progressOf(item) || progressOf(saved);
   const href = kind === "history" ? `/watch/${id}/${episode}${progress > 1 ? `?t=${Math.floor(progress)}` : ""}` : `/anime/${id}`;
 
@@ -90,13 +123,39 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
     return () => window.clearTimeout(timer);
   }, [episode, id]);
 
+  // Enrich from AniList when title or poster is missing
+  const hasMissingData = !posterOf(baseItem) || titleOf(baseItem) === "Untitled";
+  const malIdNum = Number(id);
+  const enrich = useQuery({
+    queryKey: ["anilist-enrich", id],
+    queryFn: () => enrichFromAniList(malIdNum),
+    enabled: hasMissingData && Number.isFinite(malIdNum) && malIdNum > 0,
+    staleTime: 1000 * 60 * 60,
+    gcTime: 1000 * 60 * 120,
+  });
+
+  // Merge: item from API wins over localStorage, AniList fills remaining gaps
+  const displayItem = {
+    ...(enrich.data ?? {}),
+    ...savedAnime,
+    ...item,
+  } as Anime & LibraryItem;
+
+  const displayTitle = titleOf(displayItem) === "Untitled"
+    ? (enrich.data as { title?: string })?.title || `Anime ${id}`
+    : titleOf(displayItem);
+  const displayPoster = posterOf(displayItem) || (enrich.data as { image_url?: string })?.image_url || "";
+
   return (
     <div className="grid grid-cols-[72px_1fr_auto] items-center gap-4 rounded-md border border-white/10 bg-panel p-3">
       <Link href={href} className="relative h-24 overflow-hidden rounded bg-panel-strong">
-        {posterOf(displayItem) ? <Image src={posterOf(displayItem)} alt="" width={72} height={108} className="h-full w-full object-cover" /> : null}
+        {displayPoster
+          ? <Image src={displayPoster} alt="" width={72} height={108} className="h-full w-full object-cover" />
+          : <div className="h-full w-full bg-gradient-to-br from-[#141828] to-[#0d1020]" />
+        }
       </Link>
       <div className="min-w-0">
-        <Link href={`/anime/${id}`} className="line-clamp-1 font-bold hover:text-accent-2">{titleOf(displayItem) || `Anime ${id}`}</Link>
+        <Link href={`/anime/${id}`} className="line-clamp-1 font-bold hover:text-accent-2">{displayTitle}</Link>
         <Link href={href} className="mt-1 inline-block text-sm text-muted hover:text-white">
           Episode {episode}{progress > 1 ? ` at ${formatClock(progress)}` : ""}
         </Link>

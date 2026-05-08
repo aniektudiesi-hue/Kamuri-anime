@@ -8,10 +8,19 @@ import { api } from "@/lib/api";
 import type { Anime } from "@/lib/types";
 import { animeId, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
 
-export function AnimeCard({ anime, priority = false }: { anime: Anime; priority?: boolean }) {
+const STATUS_DOT: Record<string, string> = {
+  currently_airing: "bg-emerald-400",
+  not_yet_aired: "bg-blue-400",
+  finished_airing: "bg-white/30",
+};
+
+export function AnimeCard({ anime, priority = false, className }: { anime: Anime; priority?: boolean; className?: string }) {
   const queryClient = useQueryClient();
   const id = animeId(anime);
   const episodes = episodeCount(anime);
+  const poster = posterOf(anime);
+  const title = titleOf(anime);
+  const statusKey = (anime.status || "").toLowerCase();
 
   function prefetch() {
     if (!id) return;
@@ -23,25 +32,67 @@ export function AnimeCard({ anime, priority = false }: { anime: Anime; priority?
   }
 
   return (
-    <article onMouseEnter={prefetch} onFocus={prefetch} className="group w-[150px] shrink-0 sm:w-[170px]">
+    <article
+      onMouseEnter={prefetch}
+      onFocus={prefetch}
+      className={`card-lift group ${className ?? "w-[160px] shrink-0 sm:w-[180px]"}`}
+    >
       <Link href={`/anime/${id}`} onClick={() => rememberAnime(anime)} className="block">
-        <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-panel-strong">
-          {posterOf(anime) ? (
-            <Image src={posterOf(anime)} alt={titleOf(anime)} fill sizes="180px" priority={priority} className="object-cover transition duration-300 group-hover:scale-105" />
+
+        {/* Poster container */}
+        <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828]">
+          {poster ? (
+            <Image
+              src={poster}
+              alt={title}
+              fill
+              sizes="190px"
+              priority={priority}
+              className="object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-br from-[#141828] to-[#0d1020]" />
+          )}
+
+          {/* Always-present bottom gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+
+          {/* Score badge — top left */}
+          {anime.score ? (
+            <div className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-xl bg-black/70 px-2 py-1 text-[11px] font-bold backdrop-blur-sm">
+              <Star size={10} className="fill-[#f0b429] text-[#f0b429]" />
+              <span className="text-[#f0b429]">{Number(anime.score).toFixed(1)}</span>
+            </div>
           ) : null}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-90" />
-          <div className="absolute left-2 top-2 flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-xs font-bold">
-            <Star size={12} className="fill-accent-2 text-accent-2" />
-            {anime.score ? anime.score.toFixed(1) : "NA"}
-          </div>
-          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
-            <span className="rounded bg-white/12 px-2 py-1 text-xs font-semibold backdrop-blur">{episodeLabel(anime)}</span>
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-accent text-white shadow-lg transition group-hover:scale-110">
-              <Play size={15} fill="currentColor" />
-            </span>
+
+          {/* Status dot — top right */}
+          {statusKey ? (
+            <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded-xl bg-black/70 px-2 py-1 backdrop-blur-sm">
+              <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[statusKey] || "bg-white/30"} ${statusKey === "currently_airing" ? "animate-pulse" : ""}`} />
+            </div>
+          ) : null}
+
+          {/* Hover overlay */}
+          <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/60 to-black/20 p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <p className="mb-2 text-[11px] font-semibold text-white/60">{episodeLabel(anime)}</p>
+            {/* Play button */}
+            <div className="flex items-center justify-center rounded-xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] py-2.5 text-sm font-bold text-white shadow-lg shadow-[#e8336a]/30 transition hover:opacity-90">
+              <Play size={14} fill="currentColor" className="mr-1.5" />
+              Watch Now
+            </div>
           </div>
         </div>
-        <h3 className="mt-2 line-clamp-2 min-h-10 text-sm font-semibold leading-5">{titleOf(anime)}</h3>
+
+        {/* Title + meta */}
+        <div className="mt-3 px-0.5">
+          <h3 className="line-clamp-2 text-[13px] font-semibold leading-5 text-white/85 transition-colors group-hover:text-white">
+            {title}
+          </h3>
+          <p className="mt-1 text-[11px] text-white/30">
+            {episodeLabel(anime)}
+            {statusKey === "currently_airing" ? " · Airing" : statusKey === "finished_airing" ? " · Completed" : ""}
+          </p>
+        </div>
       </Link>
     </article>
   );
