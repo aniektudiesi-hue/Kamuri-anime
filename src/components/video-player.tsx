@@ -67,6 +67,12 @@ export function VideoPlayer({
   const [bufferedRanges, setBufferedRanges] = useState<Array<{ start: number; end: number }>>([]);
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
+  const isHlsStream = Boolean(
+    src &&
+      (/\.m3u8(?:$|[?#])/i.test(src) ||
+        /\/m3u8(?:$|[?#])/i.test(src) ||
+        /\/proxy\/(?:m3u8|moon)\b/i.test(src)),
+  );
   const subtitles = useMemo(() => preferredSubtitles(stream?.subtitles), [stream?.subtitles]);
   const activeSubtitleUrl = subtitles[0]?.file ?? "";
   const subtitleCount = subtitles.length;
@@ -218,7 +224,7 @@ export function VideoPlayer({
     video.addEventListener("stalled", markWaiting);
     video.addEventListener("progress", updateBuffered);
 
-    if (src.includes(".m3u8") || src.includes("/proxy/m3u8")) {
+    if (isHlsStream) {
       if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
@@ -297,7 +303,7 @@ export function VideoPlayer({
     };
   // onProgress and onFatalError are accessed via refs — omitting from deps is intentional
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hideControlsSoon, initialTime, src, syncCaptionAt]);
+  }, [hideControlsSoon, initialTime, isHlsStream, src, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
