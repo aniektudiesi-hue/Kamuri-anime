@@ -11,7 +11,7 @@ import { EpisodeDownloadButton } from "@/components/episode-download-button";
 import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { createOfflinePlayable, prefetchOfflineDownload, type OfflinePlayable } from "@/lib/offline-downloads";
+import { startProgressiveOfflinePlayback, type OfflinePlayable } from "@/lib/offline-downloads";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, rememberedProgress, rememberProgress, titleOf } from "@/lib/utils";
@@ -208,7 +208,7 @@ export default function WatchPage({
       return undefined;
     });
 
-    prefetchOfflineDownload(
+    startProgressiveOfflinePlayback(
       selectedStream,
       {
         malId,
@@ -221,13 +221,19 @@ export default function WatchPage({
       (progress, message) => {
         setPrefetchState({ progress, message, ready: progress >= 100 });
       },
+      (playable) => {
+        if (controller.signal.aborted) {
+          playable.revoke();
+          return;
+        }
+        setOfflinePlayable((current) => {
+          current?.revoke();
+          return playable;
+        });
+      },
     )
       .then((download) => {
         if (controller.signal.aborted) return;
-        setOfflinePlayable((current) => {
-          current?.revoke();
-          return createOfflinePlayable(download);
-        });
         setPrefetchState({ progress: 100, message: "Cached playback ready", ready: true });
       })
       .catch((error) => {
@@ -289,7 +295,7 @@ export default function WatchPage({
               <div className="grid aspect-video w-full place-items-center bg-black px-6 text-center">
                 <div className="w-full max-w-xs">
                   <div className="mx-auto mb-4 h-11 w-11 animate-spin rounded-full border-[3px] border-white/15 border-t-white/90" />
-                  <p className="text-sm font-bold text-white">Preparing cached playback</p>
+                  <p className="text-sm font-bold text-white">Starting cached playback</p>
                   <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
                     <div
                       className="h-full rounded-full bg-white transition-all"

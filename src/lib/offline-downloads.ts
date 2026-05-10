@@ -97,6 +97,92 @@ export async function prefetchOfflineDownload(
   return buildOfflineDownload(stream, metadata, signal, onProgress, PREFETCH_STORE);
 }
 
+export async function startProgressiveOfflinePlayback(
+  stream: StreamResponse,
+  metadata: OfflineMetadata,
+  signal: AbortSignal,
+  onProgress: (progress: number, message: string) => void,
+  onReady: (playable: OfflinePlayable) => void,
+) {
+  const src = stream.m3u8_url || stream.stream_url || stream.url;
+  if (!src) throw new Error("No stream URL available");
+  if (!isPlaylist(src)) throw new Error("Progressive cache needs an HLS stream");
+
+  await ensureOfflineStreamWorker(signal);
+  const cache = await caches.open("anime-tv-progressive-stream-v1");
+  const id = offlineId(metadata.malId, metadata.episode);
+  const mediaPlaylistUrl = await resolveMediaPlaylist(src, signal);
+  const playlistText = await fetchText(mediaPlaylistUrl, signal);
+  const { playlistText: progressivePlaylist, resources } = rewritePlaylistForProgressiveCache(playlistText, mediaPlaylistUrl, id);
+  if (!resources.length) throw new Error("No video chunks found");
+
+  const urls: string[] = [];
+  const playlistUrl = URL.createObjectURL(new Blob([progressivePlaylist], { type: "application/vnd.apple.mpegurl" }));
+  urls.push(playlistUrl);
+
+  let completed = 0;
+  let size = 0;
+  const segments = new Array<Blob>(resources.length);
+  const localRequests = resources.map((resource) => new Request(resource.placeholder));
+
+  async function cacheOne(index: number) {
+    const resource = resources[index];
+    const response = await fetchWithRetry(resource.url, signal);
+    if (!response.ok) throw new Error(`Chunk ${index + 1} failed (${response.status})`);
+    const blob = await response.blob();
+    segments[index] = blob;
+    size += blob.size;
+    await cache.put(localRequests[index], new Response(blob, {
+      headers: { "Content-Type": blob.type || "video/mp2t", "Cache-Control": "no-store" },
+    }));
+    completed += 1;
+    onProgress(1 + (completed / resources.length) * 94, `Cached ${completed}/${resources.length} chunks`);
+  }
+
+  onProgress(1, "Preparing cached playback");
+  await Promise.all(localRequests.map((request) => cache.delete(request).catch(() => false)));
+  await cacheOne(0);
+
+  onReady({
+    stream: {
+      m3u8_url: playlistUrl,
+      subtitles: stream.subtitles,
+      intro: stream.intro,
+    },
+    revoke: () => urls.forEach((url) => URL.revokeObjectURL(url)),
+  });
+
+  let cursor = 1;
+  const concurrency = Math.min(6, Math.max(1, resources.length - 1));
+  async function worker() {
+    while (cursor < resources.length) {
+      const index = cursor++;
+      await cacheOne(index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  onProgress(96, "Saving subtitles");
+  const subtitles = await fetchSubtitles(stream.subtitles, signal);
+
+  const item: OfflineDownload = {
+    id,
+    malId: metadata.malId,
+    episode: metadata.episode,
+    title: metadata.title,
+    poster: metadata.poster,
+    server: metadata.server,
+    playlistText: rewritePlaylistForOffline(playlistText, mediaPlaylistUrl).playlistText,
+    segments,
+    subtitles,
+    size,
+    downloadedAt: new Date().toISOString(),
+  };
+  await putStoredDownload(PREFETCH_STORE, item);
+  onProgress(100, "Ready to save offline");
+  return item;
+}
+
 export async function saveOfflineDownload(
   stream: StreamResponse,
   metadata: OfflineMetadata,
@@ -319,6 +405,56 @@ function rewritePlaylistForOffline(playlistText: string, playlistUrl: string) {
   });
 
   return { playlistText: lines.join("\n"), resources };
+}
+
+function rewritePlaylistForProgressiveCache(playlistText: string, playlistUrl: string, id: string) {
+  const resources: SegmentResource[] = [];
+  const basePath = `${window.location.origin}/__anime-cache/${encodeURIComponent(id)}`;
+  const lines = playlistText.split(/\r?\n/).map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+
+    if (trimmed.startsWith("#EXT-X-MAP")) {
+      return line.replace(/URI="([^"]+)"/, () => {
+        const index = resources.length;
+        const placeholder = `${basePath}/${index}`;
+        const match = trimmed.match(/URI="([^"]+)"/);
+        if (match?.[1]) resources.push({ placeholder, url: new URL(match[1], playlistUrl).toString() });
+        return `URI="${placeholder}"`;
+      });
+    }
+
+    if (trimmed.startsWith("#")) return line;
+
+    const index = resources.length;
+    const placeholder = `${basePath}/${index}`;
+    resources.push({ placeholder, url: new URL(trimmed, playlistUrl).toString() });
+    return placeholder;
+  });
+
+  return { playlistText: lines.join("\n"), resources };
+}
+
+async function ensureOfflineStreamWorker(signal: AbortSignal) {
+  if (!("serviceWorker" in navigator) || !("caches" in window)) {
+    throw new Error("Progressive offline playback is not supported in this browser");
+  }
+  await navigator.serviceWorker.register("/offline-stream-sw.js");
+  await navigator.serviceWorker.ready;
+  if (navigator.serviceWorker.controller) return;
+  await new Promise<void>((resolve, reject) => {
+    const abort = () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", done);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const done = () => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    navigator.serviceWorker.addEventListener("controllerchange", done, { once: true });
+    window.setTimeout(done, 1500);
+  });
 }
 
 async function fetchSubtitles(subtitles: Subtitle[] | undefined, signal: AbortSignal) {
