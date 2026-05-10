@@ -139,9 +139,8 @@ export async function startProgressiveOfflinePlayback(
     onProgress(1 + (completed / resources.length) * 94, `Cached ${completed}/${resources.length} chunks`);
   }
 
-  onProgress(1, "Preparing cached playback");
+  onProgress(1, "Starting cached playback");
   await Promise.all(localRequests.map((request) => cache.delete(request).catch(() => false)));
-  await cacheOne(0);
 
   onReady({
     stream: {
@@ -152,8 +151,8 @@ export async function startProgressiveOfflinePlayback(
     revoke: () => urls.forEach((url) => URL.revokeObjectURL(url)),
   });
 
-  let cursor = 1;
-  const concurrency = Math.min(6, Math.max(1, resources.length - 1));
+  let cursor = 0;
+  const concurrency = Math.min(6, resources.length);
   async function worker() {
     while (cursor < resources.length) {
       const index = cursor++;
