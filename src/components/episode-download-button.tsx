@@ -55,27 +55,32 @@ export function EpisodeDownloadButton({
         setMessage(nextMessage);
       });
 
+      setState("done");
+      setProgress(100);
+      setMessage("Saved offline");
+
       if (token) {
         setState("saving");
-        setMessage("Saving to your account");
+        setMessage("Saved offline, syncing account");
         await api.addDownload(token, {
-          mal_id: malId,
-          anime_id: malId,
-          title,
-          image_url: poster,
-          poster,
-          episode,
-          episode_num: episode,
-          server,
-          offline_id: item.id,
-          size: item.size,
-          downloaded_at: new Date().toISOString(),
-        });
+            mal_id: malId,
+            anime_id: malId,
+            title,
+            image_url: poster,
+            poster,
+            episode,
+            episode_num: episode,
+            server,
+            offline_id: item.id,
+            size: item.size,
+            downloaded_at: new Date().toISOString(),
+          })
+          .then(() => setMessage("Saved offline and synced"))
+          .catch(() => setMessage("Saved offline"));
       }
 
       setState("done");
       setProgress(100);
-      setMessage(token ? "Downloaded and saved" : "Downloaded");
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         setState("idle");

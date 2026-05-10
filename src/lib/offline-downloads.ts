@@ -93,7 +93,7 @@ export async function saveOfflineDownload(
   async function worker() {
     while (cursor < resources.length) {
       const resource = resources[cursor++];
-      const response = await fetch(resource.url, { signal });
+      const response = await fetchWithRetry(resource.url, signal);
       if (!response.ok) throw new Error(`Chunk ${completed + 1} failed (${response.status})`);
       const blob = await response.blob();
       const index = Number(resource.placeholder.replace("__SEGMENT_", "").replace("__", ""));
@@ -244,9 +244,40 @@ async function fetchSubtitles(subtitles: Subtitle[] | undefined, signal: AbortSi
 }
 
 async function fetchText(url: string, signal: AbortSignal) {
-  const response = await fetch(url, { signal });
+  const response = await fetchWithRetry(url, signal);
   if (!response.ok) throw new Error(`Playlist failed (${response.status})`);
   return response.text();
+}
+
+async function fetchWithRetry(url: string, signal: AbortSignal, tries = 3) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try {
+      const response = await fetch(url, { signal });
+      if (response.ok || response.status < 500 || attempt === tries) return response;
+      lastError = new Error(`${response.status}`);
+    } catch (error) {
+      if ((error as Error).name === "AbortError") throw error;
+      lastError = error;
+      if (attempt === tries) throw error;
+    }
+    await delay(350 * attempt, signal);
+  }
+  throw lastError instanceof Error ? lastError : new Error("Failed to fetch");
+}
+
+function delay(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const id = window.setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        window.clearTimeout(id);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
 }
 
 function isPlaylist(url: string) {
