@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Clock3, Download, Heart, LogOut, Menu, Moon, Sun, UserRound, Wifi, X } from "lucide-react";
+import { Clock3, Download, Heart, LogOut, Menu, Moon, Repeat2, Sun, UserRound, Wifi, X } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
@@ -154,6 +154,24 @@ export function Header() {
               Downloads
             </Link>
             <div className="my-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
+              {isLoggedIn ? (
+                <>
+                  <div className="mb-1 flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/65">
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e8336a] text-[10px] font-black text-white">
+                      {(user?.username || user?.email || "U")[0].toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{user?.username || user?.email || "Account"}</span>
+                  </div>
+                  <Link
+                    href="/login"
+                    onClick={() => setOpen(false)}
+                    className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white"
+                  >
+                    <Repeat2 size={15} />
+                    Switch username
+                  </Link>
+                </>
+              ) : null}
               <button
                 type="button"
                 onClick={() => settings.setAutoFetchWhileWatching(!settings.autoFetchWhileWatching)}
