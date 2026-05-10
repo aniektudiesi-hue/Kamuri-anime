@@ -228,13 +228,17 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
 
   if (loading) {
     return (
-      <section className="px-4 pb-5 pt-3 sm:hidden">
-        <div className="relative h-[360px] overflow-hidden rounded-3xl bg-[#101322]">
-          <div className="absolute inset-0 animate-pulse bg-[#141828]" />
-          <div className="absolute inset-x-5 bottom-5 space-y-3">
-            <div className="h-3 w-24 rounded-full bg-white/[0.08]" />
-            <div className="h-8 w-4/5 rounded-xl bg-white/[0.08]" />
-            <div className="h-10 w-32 rounded-2xl bg-white/[0.08]" />
+      <section className="relative -mt-1 min-h-[420px] overflow-hidden pb-6 sm:hidden">
+        <div className="absolute inset-0 animate-pulse bg-[#141828]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/35 to-transparent" />
+        <div className="relative flex min-h-[420px] items-end px-4">
+          <div className="w-full rounded-[28px] border border-white/[0.1] bg-white/[0.07] p-4 shadow-2xl shadow-black/35 backdrop-blur-2xl">
+            <div className="mb-3 h-3 w-24 rounded-full bg-white/[0.12]" />
+            <div className="h-8 w-4/5 rounded-xl bg-white/[0.12]" />
+            <div className="mt-4 flex gap-2">
+              <div className="h-11 flex-1 rounded-2xl bg-white/[0.12]" />
+              <div className="h-11 w-24 rounded-2xl bg-white/[0.08]" />
+            </div>
           </div>
         </div>
       </section>
@@ -250,8 +254,8 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const count = episodeCount(current);
 
   return (
-    <section className="px-4 pb-5 pt-3 sm:hidden">
-      <div className="relative h-[360px] overflow-hidden rounded-3xl bg-[#080a12] shadow-2xl shadow-black/40 ring-1 ring-white/[0.07]">
+    <section className="relative -mt-1 min-h-[430px] overflow-hidden pb-6 sm:hidden">
+      <div className="absolute inset-0 bg-[#080a12]">
         {banner || poster ? (
           <Image
             key={`${id}-${index}`}
@@ -260,19 +264,21 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             fill
             priority
             sizes="100vw"
-            className="object-cover opacity-75"
+            className="object-cover opacity-85"
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/45 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#06070d]/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/42 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#06070d]/80 to-transparent" />
+      </div>
 
-        <div className="absolute inset-x-0 bottom-0 p-5">
+      <div className="relative flex min-h-[430px] items-end px-4">
+        <div className="w-full rounded-[28px] border border-white/[0.12] bg-[#090b13]/35 p-4 shadow-2xl shadow-black/45 backdrop-blur-2xl">
           <div className="mb-3 flex items-center gap-2">
-            <span className="rounded-full bg-[#e8336a]/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#ff7aa6] ring-1 ring-[#e8336a]/25">
+            <span className="rounded-full bg-[#e8336a]/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#ff8db2] ring-1 ring-[#e8336a]/30">
               Featured
             </span>
             {count > 0 ? (
-              <span className="rounded-full bg-white/[0.09] px-2.5 py-1 text-[10px] font-bold text-white/60 ring-1 ring-white/10">
+              <span className="rounded-full bg-white/[0.12] px-2.5 py-1 text-[10px] font-bold text-white/70 ring-1 ring-white/15">
                 {count} Episodes
               </span>
             ) : null}
@@ -292,7 +298,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             </Link>
             <Link
               href={`/anime/${id}`}
-              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/[0.12] bg-white/[0.08] px-4 text-sm font-bold text-white/80"
+              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/[0.16] bg-white/[0.12] px-4 text-sm font-bold text-white/85 backdrop-blur-xl"
             >
               Details
             </Link>

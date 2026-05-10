@@ -136,15 +136,15 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -bottom-12">
           {poster ? (
-            <Image src={poster} alt="" fill sizes="100vw" className="scale-110 object-cover object-top opacity-15" />
+            <Image src={poster} alt="" fill sizes="100vw" className="scale-110 object-cover object-top opacity-25 sm:opacity-15" />
           ) : null}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/30 via-[#06070d]/85 to-[#06070d]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#06070d]/90 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/10 via-[#06070d]/70 to-[#06070d] sm:from-[#06070d]/30 sm:via-[#06070d]/85" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#06070d]/45 to-transparent sm:from-[#06070d]/90" />
         </div>
 
-        <div className="relative mx-auto max-w-screen-2xl px-4 py-10 lg:px-6 lg:py-14">
+        <div className="relative mx-auto max-w-screen-2xl px-4 py-6 sm:py-10 lg:px-6 lg:py-14">
           {/* Breadcrumb */}
-          <div className="mb-6 flex items-center gap-1.5 text-xs text-white/30">
+          <div className="mb-4 flex items-center gap-1.5 text-xs text-white/35 sm:mb-6">
             <Link href="/" className="transition-colors hover:text-white">Home</Link>
             <ChevronRight size={12} />
             <span className="text-white/50">TV</span>
@@ -152,10 +152,10 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
             <span className="line-clamp-1 max-w-[200px] text-white/50">{title}</span>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-[200px_1fr]">
+          <div className="grid gap-5 rounded-[30px] border border-white/[0.12] bg-[#090b13]/38 p-4 shadow-2xl shadow-black/45 backdrop-blur-2xl sm:gap-8 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-0 md:grid-cols-[200px_1fr]">
             {/* Poster */}
-            <div className="mx-auto w-[160px] md:mx-0 md:w-auto">
-              <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-2xl shadow-black/70 ring-1 ring-white/[0.08]">
+            <div className="mx-auto w-[142px] sm:w-[160px] md:mx-0 md:w-auto">
+              <div className="relative aspect-[2/3] overflow-hidden rounded-[22px] bg-[#141828] shadow-2xl shadow-black/70 ring-1 ring-white/[0.12] sm:rounded-2xl sm:ring-white/[0.08]">
                 {poster ? (
                   <Image src={poster} alt={title} fill priority sizes="200px" className="object-cover" />
                 ) : (
@@ -165,8 +165,8 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
             </div>
 
             {/* Info panel */}
-            <div className="flex flex-col justify-end pb-2">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="flex flex-col justify-end pb-1 text-center sm:pb-2 sm:text-left">
+              <div className="mb-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 {statusCfg ? (
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ring-1 ${statusCfg.color}`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`} />
@@ -195,7 +195,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                 ) : null}
               </div>
 
-              <h1 className="mb-1 text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
+              <h1 className="mb-1 text-2xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
                 {title}
               </h1>
               {known?.title_jp && known.title_jp !== title ? (
@@ -206,7 +206,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
 
               {/* Progress bar */}
               {last && localProgress > 1 ? (
-                <div className="mb-5 max-w-xs">
+                <div className="mx-auto mb-5 max-w-xs sm:mx-0">
                   <div className="mb-1.5 flex items-center justify-between text-[11px] text-white/30">
                     <span>Episode {lastEp} in progress</span>
                     <span>{formatClock(localProgress)}</span>
@@ -220,10 +220,10 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
                 <Link
                   href={resumeHref}
-                  className="shine inline-flex h-11 items-center gap-2.5 rounded-xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] px-6 text-sm font-bold text-white shadow-xl shadow-[#e8336a]/25 transition hover:opacity-90"
+                  className="shine inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] px-6 text-sm font-bold text-white shadow-xl shadow-[#e8336a]/25 transition hover:opacity-90 sm:rounded-xl"
                 >
                   <Play size={16} fill="currentColor" />
                   {last ? "Continue Watching" : "Watch Episode 1"}
@@ -231,10 +231,10 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                 <button
                   disabled={!isLoggedIn || inWatchlist || addWatchlist.isPending}
                   onClick={() => addWatchlist.mutate()}
-                  className={`inline-flex h-11 items-center gap-2.5 rounded-xl border px-5 text-sm font-bold transition disabled:cursor-not-allowed ${
+                  className={`inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl border px-5 text-sm font-bold transition disabled:cursor-not-allowed sm:rounded-xl ${
                     inWatchlist
                       ? "border-[#1ed9cc]/30 bg-[#1ed9cc]/10 text-[#1ed9cc]"
-                      : "border-white/[0.1] bg-white/[0.05] text-white/70 hover:border-white/20 hover:bg-white/10 hover:text-white disabled:opacity-40"
+                      : "border-white/[0.14] bg-white/[0.1] text-white/78 hover:border-white/20 hover:bg-white/10 hover:text-white disabled:opacity-40 sm:bg-white/[0.05]"
                   }`}
                 >
                   {addWatchlist.isPending ? (
