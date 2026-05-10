@@ -11,7 +11,7 @@ import { EpisodeDownloadButton } from "@/components/episode-download-button";
 import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { prefetchOfflineDownload } from "@/lib/offline-downloads";
+import { createOfflinePlayable, prefetchOfflineDownload, type OfflinePlayable } from "@/lib/offline-downloads";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, rememberedProgress, rememberProgress, titleOf } from "@/lib/utils";
@@ -64,6 +64,7 @@ export default function WatchPage({
   const [failedServers, setFailedServers] = useState<ServerId[]>([]);
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [prefetchState, setPrefetchState] = useState({ progress: 0, message: "", ready: false });
+  const [offlinePlayable, setOfflinePlayable] = useState<OfflinePlayable | undefined>();
   const { token } = useAuth();
   const settings = useSettings();
   const queryClient = useQueryClient();
@@ -193,11 +194,19 @@ export default function WatchPage({
   useEffect(() => {
     if (!settings.autoFetchWhileWatching || !selectedStream || !activeServerId) {
       setPrefetchState({ progress: 0, message: "", ready: false });
+      setOfflinePlayable((current) => {
+        current?.revoke();
+        return undefined;
+      });
       return;
     }
 
     const controller = new AbortController();
     setPrefetchState({ progress: 0, message: "Caching while you watch", ready: false });
+    setOfflinePlayable((current) => {
+      current?.revoke();
+      return undefined;
+    });
 
     prefetchOfflineDownload(
       selectedStream,
@@ -212,12 +221,27 @@ export default function WatchPage({
       (progress, message) => {
         setPrefetchState({ progress, message, ready: progress >= 100 });
       },
-    ).catch((error) => {
+    )
+      .then((download) => {
+        if (controller.signal.aborted) return;
+        setOfflinePlayable((current) => {
+          current?.revoke();
+          return createOfflinePlayable(download);
+        });
+        setPrefetchState({ progress: 100, message: "Playing from local cache", ready: true });
+      })
+      .catch((error) => {
       if ((error as Error).name === "AbortError") return;
       setPrefetchState({ progress: 0, message: "Offline cache paused", ready: false });
     });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      setOfflinePlayable((current) => {
+        current?.revoke();
+        return undefined;
+      });
+    };
   }, [activeServerId, animePoster, displayTitle, episodeNum, malId, selectedStream, settings.autoFetchWhileWatching]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -263,8 +287,8 @@ export default function WatchPage({
               <div className="aspect-video w-full animate-pulse bg-[#141828]" />
             ) : (
               <VideoPlayer
-                key={`${activeServerId}-${type}-${selectedStream?.m3u8_url || selectedStream?.url || selectedStream?.stream_url}`}
-                stream={selectedStream}
+                key={`${activeServerId}-${type}-${offlinePlayable?.stream.m3u8_url || selectedStream?.m3u8_url || selectedStream?.url || selectedStream?.stream_url}`}
+                stream={offlinePlayable?.stream || selectedStream}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
                 autoPlay={settings.autoResume}
