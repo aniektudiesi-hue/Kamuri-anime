@@ -89,9 +89,9 @@ export default function WatchPage({
       queryKey: ["stream", malId, episode, s.id, s.id === "mega" ? type : "any"],
       queryFn: () => fetchServer(s.id, malId, episode, type),
       enabled: Boolean(malId) && Number.isFinite(episodeNum),
-      retry: false,
-      staleTime: 1000 * 60 * 2,
-      gcTime: 1000 * 60 * 10,
+      retry: s.id === "moon" ? 1 : false,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 20,
     })),
   });
 
@@ -174,6 +174,7 @@ export default function WatchPage({
     if (!malId || !Number.isFinite(episodeNum)) return;
     queryClient.prefetchQuery({ queryKey: ["episodes", malId, 0], queryFn: () => api.episodes(malId), staleTime: 1000 * 60 * 20 });
     queryClient.prefetchQuery({ queryKey: ["stream", malId, episodeNum + 1, "mega", type], queryFn: () => api.stream(malId, episodeNum + 1, type), staleTime: 1000 * 60 * 2 });
+    queryClient.prefetchQuery({ queryKey: ["stream", malId, episodeNum + 1, "moon", "any"], queryFn: () => api.moon(malId, episodeNum + 1), staleTime: 1000 * 60 * 5 });
     router.prefetch(`/watch/${malId}/${episodeNum + 1}`);
   }, [episodeNum, malId, queryClient, router, type]);
 

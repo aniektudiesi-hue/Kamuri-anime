@@ -1,7 +1,7 @@
 "use client";
 
 import Hls from "hls.js";
-import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, Play, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StreamResponse, Subtitle } from "@/lib/types";
 
@@ -83,6 +83,7 @@ export function VideoPlayer({
   const introEnd = stream?.intro?.end ?? 90;
   const showSkipIntro = currentTime >= introStart && currentTime < introEnd && currentTime > 0;
   const progress = useMemo(() => (duration ? (currentTime / duration) * 100 : 0), [currentTime, duration]);
+  const isMoonLikeStream = Boolean(src && /moon|sprintcdn|r66nv9ed/i.test(src));
 
   const showControls = useCallback(
     (sticky = false) => {
@@ -201,6 +202,9 @@ export function VideoPlayer({
       setPlaying(true);
       setControlsOpen(true);
       hideControlsSoon();
+      if (hlsRef.current?.autoLevelEnabled) {
+        hlsRef.current.nextLevel = -1;
+      }
       rememberTime();
     };
     const markPause = () => {
@@ -226,23 +230,27 @@ export function VideoPlayer({
     video.addEventListener("waiting", markWaiting);
     video.addEventListener("stalled", markWaiting);
     video.addEventListener("progress", updateBuffered);
+    video.preload = "auto";
 
     if (isHlsStream) {
       if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
           lowLatencyMode: false,
-          // Fetch the entire episode as fast as bandwidth allows
-          maxBufferLength: 7200,
-          maxMaxBufferLength: 7200,
-          maxBufferSize: 300 * 1000 * 1000,
-          backBufferLength: 30,
-          // Start bandwidth estimate high so HLS picks a good quality immediately
-          abrEwmaDefaultEstimate: 8 * 1000 * 1000,
-          // Fetch next segment immediately after the previous one lands
-          maxLoadingDelay: 1,
+          autoStartLoad: true,
+          startFragPrefetch: true,
+          testBandwidth: false,
+          maxBufferLength: isMoonLikeStream ? 90 : 150,
+          maxMaxBufferLength: isMoonLikeStream ? 180 : 240,
+          maxBufferSize: 160 * 1000 * 1000,
+          backBufferLength: 45,
+          abrEwmaDefaultEstimate: isMoonLikeStream ? 3 * 1000 * 1000 : 5 * 1000 * 1000,
+          maxLoadingDelay: 0.5,
+          fragLoadingTimeOut: 18_000,
           fragLoadingMaxRetry: 6,
           manifestLoadingMaxRetry: 4,
+          levelLoadingMaxRetry: 4,
+          capLevelOnFPSDrop: true,
         });
         hlsRef.current = hls;
         hls.loadSource(src);
@@ -260,6 +268,11 @@ export function VideoPlayer({
             })
             .map((l) => ({ hlsIndex: l.hlsIndex, height: l.height, label: `${l.height}p` }));
           setQualityLevels(levels);
+          if (data.levels.length > 1) {
+            hls!.startLevel = 0;
+            hls!.nextLevel = 0;
+          }
+          hls!.startLoad(Math.max(0, initialTime || -1));
           playWhenReady();
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
@@ -443,6 +456,16 @@ export function VideoPlayer({
     lastTimeRef.current = t;
   }
 
+  function seekBy(seconds: number) {
+    const video = videoRef.current;
+    if (!video) return;
+    const target = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + seconds));
+    video.currentTime = target;
+    lastTimeRef.current = target;
+    setCurrentTime(target);
+    flashSeek(seconds > 0 ? "forward" : "backward", Math.abs(seconds));
+  }
+
   function handleSeekPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.currentTarget.setPointerCapture(e.pointerId);
     seekToFraction(clientXToFraction(e.clientX));
@@ -527,7 +550,7 @@ export function VideoPlayer({
       ref={containerRef}
       tabIndex={0}
       aria-label={`Video player: ${title}`}
-      className="group relative aspect-video w-full overflow-hidden bg-black outline-none"
+      className="group relative aspect-video w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black shadow-2xl shadow-black/50 outline-none"
       style={{ cursor: controlsOpen ? "default" : "none" }}
       onMouseMove={() => showControls()}
       onMouseLeave={() => {
@@ -562,7 +585,7 @@ export function VideoPlayer({
       {/* Buffering spinner */}
       {isBuffering && !playbackError ? (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center">
-          <div className="h-11 w-11 animate-spin rounded-full border-[3px] border-white/20 border-t-white/90" />
+          <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/15 border-t-white/85 shadow-[0_0_28px_rgba(255,255,255,0.18)]" />
         </div>
       ) : null}
 
@@ -629,8 +652,8 @@ export function VideoPlayer({
           onClick={togglePlay}
           className="absolute inset-0 z-10 flex items-center justify-center"
         >
-          <span className="grid h-16 w-16 place-items-center rounded-full bg-black/60 text-white shadow-2xl  transition hover:scale-110 hover:bg-black/80">
-            <Play size={30} fill="currentColor" />
+          <span className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-black/45 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105 hover:bg-black/65">
+            <Play size={26} fill="currentColor" />
           </span>
         </button>
       ) : null}
@@ -646,9 +669,9 @@ export function VideoPlayer({
         }}
       >
         {/* Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
 
-        <div className="relative px-4 pb-4 pt-10">
+        <div className="relative px-3 pb-3 pt-10 sm:px-4 sm:pb-4">
           {/* Custom seek bar */}
           <div
             ref={seekBarRef}
@@ -657,7 +680,7 @@ export function VideoPlayer({
             aria-valuenow={Math.round(progress)}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="group/seek relative mb-4 h-1 cursor-pointer rounded-full bg-white/[0.15] transition-[height] duration-150 hover:h-[5px]"
+            className="group/seek relative mb-3 h-1 cursor-pointer rounded-full bg-white/[0.13] transition-[height] duration-150 hover:h-[5px] sm:mb-4"
             onPointerDown={handleSeekPointerDown}
             onPointerMove={handleSeekPointerMove}
           >
@@ -665,7 +688,7 @@ export function VideoPlayer({
             {duration > 0 && bufferedRanges.map((range, i) => (
               <div
                 key={i}
-                className="absolute inset-y-0 rounded-full bg-green-500/50 pointer-events-none"
+                className="absolute inset-y-0 rounded-full bg-white/25 pointer-events-none"
                 style={{
                   left: `${(range.start / duration) * 100}%`,
                   width: `${Math.min(100, ((range.end - range.start) / duration) * 100)}%`,
@@ -685,18 +708,34 @@ export function VideoPlayer({
           </div>
 
           {/* Control row */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 rounded-2xl border border-white/[0.08] bg-black/35 px-2 py-1.5 shadow-xl shadow-black/30 backdrop-blur-xl sm:gap-2">
             {/* Play/Pause */}
             <button
               aria-label={playing ? "Pause" : "Play"}
               onClick={togglePlay}
-              className="grid h-8 w-8 shrink-0 place-items-center text-white transition-colors hover:text-accent-2"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white transition-colors hover:bg-white/10 hover:text-white"
             >
               {playing ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
             </button>
 
+            <button
+              aria-label="Rewind 10 seconds"
+              onClick={() => seekBy(-10)}
+              className="hidden h-8 w-8 shrink-0 place-items-center rounded-xl text-white/65 transition hover:bg-white/10 hover:text-white sm:grid"
+            >
+              <RotateCcw size={17} />
+            </button>
+
+            <button
+              aria-label="Forward 10 seconds"
+              onClick={() => seekBy(10)}
+              className="hidden h-8 w-8 shrink-0 place-items-center rounded-xl text-white/65 transition hover:bg-white/10 hover:text-white sm:grid"
+            >
+              <RotateCw size={17} />
+            </button>
+
             {/* Time */}
-            <span className="font-mono text-xs tabular-nums text-white/75">
+            <span className="min-w-[76px] font-mono text-[11px] tabular-nums text-white/70 sm:min-w-[100px] sm:text-xs">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
 
@@ -707,7 +746,7 @@ export function VideoPlayer({
               <button
                 aria-label={muted ? "Unmute" : "Mute"}
                 onClick={toggleMute}
-                className="grid h-8 w-8 shrink-0 place-items-center text-white transition-colors hover:text-accent-2"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/70 transition-colors hover:bg-white/10 hover:text-white"
               >
                 {muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
@@ -728,8 +767,8 @@ export function VideoPlayer({
                 aria-label="Toggle captions"
                 onClick={() => setCaptionsOn((v) => !v)}
                 title={captionsOn ? "Hide captions" : "Show captions"}
-                className={`grid h-8 w-8 place-items-center rounded transition-colors ${
-                  captionsOn ? "text-accent-2" : "text-white/40 hover:text-white"
+                className={`grid h-8 w-8 place-items-center rounded-xl transition-colors ${
+                  captionsOn ? "bg-white/10 text-white" : "text-white/45 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Captions size={18} />
@@ -743,10 +782,10 @@ export function VideoPlayer({
                 aria-expanded={showSpeedMenu}
                 onClick={() => { setShowSpeedMenu((v) => !v); setShowQualityMenu(false); }}
                 title="Playback speed (< / >)"
-                className={`flex h-8 items-center gap-1 rounded px-2 text-xs font-bold transition-colors ${
+                className={`flex h-8 items-center gap-1 rounded-xl px-2 text-xs font-bold transition-colors ${
                   showSpeedMenu || playbackRate !== 1
-                    ? "bg-accent-2/20 text-accent-2"
-                    : "text-white/60 hover:text-white"
+                    ? "bg-white/10 text-white"
+                    : "text-white/60 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Gauge size={13} />
@@ -781,10 +820,10 @@ export function VideoPlayer({
                   aria-label="Quality"
                   aria-expanded={showQualityMenu}
                   onClick={() => setShowQualityMenu((v) => !v)}
-                  className={`h-8 rounded px-2 text-xs font-bold transition-colors ${
+                  className={`h-8 rounded-xl px-2 text-xs font-bold transition-colors ${
                     showQualityMenu || selectedQuality !== -1
-                      ? "bg-accent-2/20 text-accent-2"
-                      : "text-white/60 hover:text-white"
+                      ? "bg-white/10 text-white"
+                      : "text-white/60 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {qualityLabel}
@@ -839,7 +878,7 @@ export function VideoPlayer({
             <button
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               onClick={fullscreen}
-              className="grid h-8 w-8 place-items-center text-white transition-colors hover:text-accent-2"
+              className="grid h-8 w-8 place-items-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white"
             >
               {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
             </button>
