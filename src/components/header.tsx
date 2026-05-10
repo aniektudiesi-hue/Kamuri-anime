@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Clock3, Heart, LogOut, Menu, UserRound, X } from "lucide-react";
+import { Clock3, Download, Heart, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { SearchBox } from "./search-box";
@@ -64,6 +64,13 @@ export function Header() {
               className="grid h-8 w-8 place-items-center rounded-lg text-white/40 transition-colors hover:bg-white/[0.05] hover:text-white"
             >
               <Heart size={17} />
+            </Link>
+            <Link
+              href="/downloads"
+              title="Downloads"
+              className="grid h-8 w-8 place-items-center rounded-lg text-white/40 transition-colors hover:bg-white/[0.05] hover:text-white"
+            >
+              <Download size={17} />
             </Link>
 
             {isLoggedIn ? (
@@ -135,6 +142,14 @@ export function Header() {
             >
               <Heart size={15} />
               Watchlist
+            </Link>
+            <Link
+              href="/downloads"
+              onClick={() => setOpen(false)}
+              className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white"
+            >
+              <Download size={15} />
+              Downloads
             </Link>
             {!isLoggedIn && (
               <Link

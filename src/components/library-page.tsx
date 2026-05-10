@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth";
 import type { Anime, LibraryItem } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, rememberedProgress, titleOf } from "@/lib/utils";
 
-type LibraryKind = "history" | "watchlist";
+type LibraryKind = "history" | "watchlist" | "downloads";
 
 // Fetch title + poster from AniList when the API item is missing them
 async function enrichFromAniList(malId: number): Promise<Partial<Anime>> {
@@ -50,10 +50,14 @@ async function enrichFromAniList(malId: number): Promise<Partial<Anime>> {
 export function LibraryPage({ kind }: { kind: LibraryKind }) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
-  const title = kind === "history" ? "Watch History" : "Watchlist";
+  const title = kind === "history" ? "Watch History" : kind === "watchlist" ? "Watchlist" : "Downloads";
   const query = useQuery({
     queryKey: [kind, token],
-    queryFn: () => (kind === "history" ? api.history(token!) : api.watchlist(token!)),
+    queryFn: () => {
+      if (kind === "history") return api.history(token!);
+      if (kind === "downloads") return api.downloads(token!);
+      return api.watchlist(token!);
+    },
     enabled: Boolean(token),
   });
 
@@ -62,6 +66,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
       if (!token) throw new Error("Login required");
       if (kind === "history") return api.clearHistory(token);
       if (kind === "watchlist" && item) return api.removeWatchlist(token, String(item.mal_id || item.anime_id));
+      if (kind === "downloads" && item) return api.removeDownload(token, String(item.mal_id || item.anime_id), item.episode || item.episode_num || 1);
       return Promise.resolve();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [kind] }),
@@ -73,7 +78,13 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-black">{title}</h1>
-            <p className="mt-2 text-muted">{kind === "history" ? "Resume from the exact timestamp you left." : "Saved anime ready for your next session."}</p>
+            <p className="mt-2 text-muted">
+              {kind === "history"
+                ? "Resume from the exact timestamp you left."
+                : kind === "downloads"
+                  ? "Episodes you downloaded in this browser and saved to your account."
+                  : "Saved anime ready for your next session."}
+            </p>
           </div>
           {kind === "history" && query.data?.length ? (
             <Button onClick={() => clear.mutate(undefined)} variant="panel">
@@ -113,7 +124,7 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
   const episode = item.episode || item.episode_num || 1;
   const baseItem = { ...savedAnime, ...item };
   const progress = progressOf(item) || progressOf(saved);
-  const href = kind === "history" ? `/watch/${id}/${episode}${progress > 1 ? `?t=${Math.floor(progress)}` : ""}` : `/anime/${id}`;
+  const href = kind === "watchlist" ? `/anime/${id}` : `/watch/${id}/${episode}${kind === "history" && progress > 1 ? `?t=${Math.floor(progress)}` : ""}`;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -157,7 +168,7 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
       <div className="min-w-0">
         <Link href={`/anime/${id}`} className="line-clamp-1 font-bold hover:text-accent-2">{displayTitle}</Link>
         <Link href={href} className="mt-1 inline-block text-sm text-muted hover:text-white">
-          Episode {episode}{progress > 1 ? ` at ${formatClock(progress)}` : ""}
+          Episode {episode}{kind === "history" && progress > 1 ? ` at ${formatClock(progress)}` : ""}
         </Link>
       </div>
       {canRemove ? (

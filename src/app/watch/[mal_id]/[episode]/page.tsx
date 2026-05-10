@@ -7,6 +7,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, RefreshCcw, Radio, Play } fro
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
+import { EpisodeDownloadButton } from "@/components/episode-download-button";
 import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -276,7 +277,7 @@ export default function WatchPage({
             </div>
 
             {/* Server + Audio bar */}
-            <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_auto_auto]">
               {/* Servers */}
               <div className="rounded-3xl border border-white/[0.055] bg-[#0d1020] p-4">
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">Stream Server</p>
@@ -340,6 +341,16 @@ export default function WatchPage({
                   ))}
                 </div>
               </div>
+
+              <EpisodeDownloadButton
+                stream={selectedStream}
+                token={token}
+                malId={malId}
+                episode={episodeNum}
+                title={displayTitle}
+                poster={animePoster}
+                server={activeServerId}
+              />
             </div>
 
             {/* Mobile episode list */}
