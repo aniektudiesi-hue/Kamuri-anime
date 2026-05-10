@@ -45,7 +45,7 @@ export function Header() {
           </nav>
 
           {/* Search */}
-          <div className="flex-1 max-w-lg mx-auto">
+          <div className="mx-auto hidden max-w-lg flex-1 sm:block">
             <SearchBox />
           </div>
 

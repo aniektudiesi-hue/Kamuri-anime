@@ -214,3 +214,106 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
     </section>
   );
 }
+
+export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loading?: boolean }) {
+  const [index, setIndex] = useState(0);
+  const len = Math.max(items.length, 1);
+  const current = items[index % len];
+
+  useEffect(() => {
+    if (!items.length) return;
+    const timer = window.setInterval(() => setIndex((value) => (value + 1) % items.length), 6500);
+    return () => window.clearInterval(timer);
+  }, [items.length]);
+
+  if (loading) {
+    return (
+      <section className="px-4 pb-5 pt-3 sm:hidden">
+        <div className="relative h-[360px] overflow-hidden rounded-3xl bg-[#101322]">
+          <div className="absolute inset-0 animate-pulse bg-[#141828]" />
+          <div className="absolute inset-x-5 bottom-5 space-y-3">
+            <div className="h-3 w-24 rounded-full bg-white/[0.08]" />
+            <div className="h-8 w-4/5 rounded-xl bg-white/[0.08]" />
+            <div className="h-10 w-32 rounded-2xl bg-white/[0.08]" />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!current) return null;
+
+  const id = animeId(current);
+  const title = titleOf(current);
+  const poster = posterOf(current);
+  const banner = bannerOf(current);
+  const count = episodeCount(current);
+
+  return (
+    <section className="px-4 pb-5 pt-3 sm:hidden">
+      <div className="relative h-[360px] overflow-hidden rounded-3xl bg-[#080a12] shadow-2xl shadow-black/40 ring-1 ring-white/[0.07]">
+        {banner || poster ? (
+          <Image
+            key={`${id}-${index}`}
+            src={banner || poster}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover opacity-75"
+          />
+        ) : null}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/45 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#06070d]/60 via-transparent to-transparent" />
+
+        <div className="absolute inset-x-0 bottom-0 p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="rounded-full bg-[#e8336a]/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#ff7aa6] ring-1 ring-[#e8336a]/25">
+              Featured
+            </span>
+            {count > 0 ? (
+              <span className="rounded-full bg-white/[0.09] px-2.5 py-1 text-[10px] font-bold text-white/60 ring-1 ring-white/10">
+                {count} Episodes
+              </span>
+            ) : null}
+          </div>
+
+          <h1 className="line-clamp-3 text-2xl font-black leading-tight text-white drop-shadow-xl">
+            {title}
+          </h1>
+
+          <div className="mt-4 flex gap-2">
+            <Link
+              href={`/watch/${id}/1`}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-sm font-black text-white shadow-lg shadow-[#e8336a]/25"
+            >
+              <Play size={16} fill="currentColor" />
+              Watch
+            </Link>
+            <Link
+              href={`/anime/${id}`}
+              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/[0.12] bg-white/[0.08] px-4 text-sm font-bold text-white/80"
+            >
+              Details
+            </Link>
+          </div>
+
+          {items.length > 1 ? (
+            <div className="mt-4 flex gap-1.5">
+              {items.slice(0, 5).map((_, i) => (
+                <button
+                  key={i}
+                  aria-label={`Featured ${i + 1}`}
+                  onClick={() => setIndex(i)}
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === index ? "w-7 bg-[#e8336a]" : "w-1.5 bg-white/25"
+                  }`}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -78,14 +78,23 @@ export function SearchBox() {
     suggestions.refetch();
   }
 
+  function openSuggestion(anime: (typeof items)[number]) {
+    const id = animeId(anime);
+    rememberAnime(anime);
+    setValue("");
+    setFocused(false);
+    inputRef.current?.blur();
+    if (id) {
+      router.push(`/anime/${id}`);
+    } else {
+      router.push(`/search?q=${encodeURIComponent(titleOf(anime))}`);
+    }
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       if (active >= 0 && items[active]) {
-        const anime = items[active];
-        rememberAnime(anime);
-        router.push(`/anime/${animeId(anime)}`);
-        setValue("");
-        setFocused(false);
+        openSuggestion(items[active]);
       } else {
         submit();
       }
@@ -202,12 +211,13 @@ export function SearchBox() {
                   const id = animeId(anime);
                   const poster = posterOf(anime);
                   return (
-                    <Link
+                    <button
+                      type="button"
                       key={`${id}-${index}`}
-                      href={`/anime/${id}`}
+                      onMouseDown={(event) => event.preventDefault()}
                       onMouseEnter={() => setActive(index)}
-                      onClick={() => { rememberAnime(anime); setValue(""); setFocused(false); }}
-                      className={`flex items-center gap-3 mx-1.5 px-2.5 py-2 rounded-lg transition-colors duration-100 ${
+                      onClick={() => openSuggestion(anime)}
+                      className={`mx-1.5 flex w-[calc(100%-12px)] items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors duration-100 ${
                         active === index ? "bg-white/[0.07]" : "hover:bg-white/[0.04]"
                       }`}
                     >
@@ -221,7 +231,7 @@ export function SearchBox() {
                           {anime.score ? ` · ★ ${Number(anime.score).toFixed(1)}` : ""}
                         </p>
                       </div>
-                    </Link>
+                    </button>
                   );
                 })}
               </div>

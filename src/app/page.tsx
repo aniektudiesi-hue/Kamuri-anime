@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Play, Star, ChevronRight, Flame, Radio, Trophy } from "lucide-react";
 import { useQueries } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
-import { HeroCarousel } from "@/components/hero-carousel";
+import { HeroCarousel, MobileHeroBanner } from "@/components/hero-carousel";
 import { SidebarLayout } from "@/components/sidebar";
 import { api } from "@/lib/api";
 import type { Anime } from "@/lib/types";
@@ -61,6 +61,7 @@ export default function Home() {
       <div className="hidden sm:block">
         <HeroCarousel items={banners.data} loading={banners.isLoading} />
       </div>
+      <MobileHeroBanner items={banners.data || thumbnails.data} loading={banners.isLoading && thumbnails.isLoading} />
 
       <SidebarLayout>
         {/* Popular Today — full grid, all items */}
