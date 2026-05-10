@@ -83,8 +83,6 @@ export function VideoPlayer({
   const introEnd = stream?.intro?.end ?? 90;
   const showSkipIntro = currentTime >= introStart && currentTime < introEnd && currentTime > 0;
   const progress = useMemo(() => (duration ? (currentTime / duration) * 100 : 0), [currentTime, duration]);
-  const isMoonLikeStream = Boolean(src && /moon|sprintcdn|r66nv9ed/i.test(src));
-
   const showControls = useCallback(
     (sticky = false) => {
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
@@ -202,9 +200,6 @@ export function VideoPlayer({
       setPlaying(true);
       setControlsOpen(true);
       hideControlsSoon();
-      if (hlsRef.current?.autoLevelEnabled) {
-        hlsRef.current.nextLevel = -1;
-      }
       rememberTime();
     };
     const markPause = () => {
@@ -230,27 +225,20 @@ export function VideoPlayer({
     video.addEventListener("waiting", markWaiting);
     video.addEventListener("stalled", markWaiting);
     video.addEventListener("progress", updateBuffered);
-    video.preload = "auto";
 
     if (isHlsStream) {
       if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
           lowLatencyMode: false,
-          autoStartLoad: true,
-          startFragPrefetch: true,
-          testBandwidth: false,
-          maxBufferLength: isMoonLikeStream ? 90 : 150,
-          maxMaxBufferLength: isMoonLikeStream ? 180 : 240,
-          maxBufferSize: 160 * 1000 * 1000,
-          backBufferLength: 45,
-          abrEwmaDefaultEstimate: isMoonLikeStream ? 3 * 1000 * 1000 : 5 * 1000 * 1000,
-          maxLoadingDelay: 0.5,
-          fragLoadingTimeOut: 18_000,
+          maxBufferLength: 7200,
+          maxMaxBufferLength: 7200,
+          maxBufferSize: 300 * 1000 * 1000,
+          backBufferLength: 30,
+          abrEwmaDefaultEstimate: 8 * 1000 * 1000,
+          maxLoadingDelay: 1,
           fragLoadingMaxRetry: 6,
           manifestLoadingMaxRetry: 4,
-          levelLoadingMaxRetry: 4,
-          capLevelOnFPSDrop: true,
         });
         hlsRef.current = hls;
         hls.loadSource(src);
@@ -268,11 +256,6 @@ export function VideoPlayer({
             })
             .map((l) => ({ hlsIndex: l.hlsIndex, height: l.height, label: `${l.height}p` }));
           setQualityLevels(levels);
-          if (data.levels.length > 1) {
-            hls!.startLevel = 0;
-            hls!.nextLevel = 0;
-          }
-          hls!.startLoad(Math.max(0, initialTime || -1));
           playWhenReady();
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
