@@ -318,14 +318,13 @@ function rewriteMoonMaster(text, originalUrl, workerOrigin, videoId) {
       out.push(line);
       if (line.startsWith("#EXT-X-STREAM-INF")) nextIsPlaylist = true;
       if (line.startsWith("#EXT-X-I-FRAME-STREAM-INF")) {
-        out[out.length - 1] = rewriteMoonAttributeUri(line, base, workerOrigin, videoId, "");
+        out[out.length - 1] = rewriteAttributeUri(line, base, workerOrigin, "/proxy/m3u8");
       }
       continue;
     }
     if (nextIsPlaylist) {
       const absolute = new URL(line, base).toString();
-      const variant = new URL(absolute).pathname.split("/").pop() || line;
-      out.push(`${workerOrigin}/proxy/moon/${encodeURIComponent(videoId)}/m3u8?variant=${encodeURIComponent(variant)}`);
+      out.push(proxyUrl(workerOrigin, "/proxy/m3u8", absolute));
       nextIsPlaylist = false;
       continue;
     }
@@ -340,7 +339,7 @@ function rewriteMoonVariant(text, originalUrl, workerOrigin, videoId, variant) {
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trimEnd();
     if (line.startsWith("#EXT-X-KEY") || line.startsWith("#EXT-X-MAP")) {
-      out.push(rewriteMoonAttributeUri(line, base, workerOrigin, videoId, variant));
+      out.push(rewriteAttributeUri(line, base, workerOrigin, "/proxy/chunk"));
       continue;
     }
     if (!line || line.startsWith("#")) {
@@ -348,8 +347,7 @@ function rewriteMoonVariant(text, originalUrl, workerOrigin, videoId, variant) {
       continue;
     }
     const absolute = new URL(line, base).toString();
-    const segment = new URL(absolute).pathname.split("/").pop() || line;
-    out.push(`${workerOrigin}/proxy/moon/${encodeURIComponent(videoId)}/chunk?variant=${encodeURIComponent(variant)}&segment=${encodeURIComponent(segment)}`);
+    out.push(proxyUrl(workerOrigin, "/proxy/chunk", absolute));
   }
   return `${out.join("\n")}\n`;
 }
