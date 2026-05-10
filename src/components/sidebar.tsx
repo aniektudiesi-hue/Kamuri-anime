@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Clock, TrendingUp, ChevronRight } from "lucide-react";
+import { Star, Clock, TrendingUp, ChevronRight, Moon, Sun, Wifi } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 import { animeId, episodeCount, posterOf, titleOf } from "@/lib/utils";
 
 const GENRES = [
@@ -16,6 +17,7 @@ const GENRES = [
 
 export function Sidebar() {
   const [tab, setTab] = useState<"popular" | "toprated">("popular");
+  const settings = useSettings();
 
   const thumbnails = useQuery({
     queryKey: ["thumbnails"],
@@ -42,6 +44,49 @@ export function Sidebar() {
 
   return (
     <aside className="w-[280px] shrink-0 space-y-4">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d1020]">
+        <div className="border-b border-white/[0.06] px-4 py-3">
+          <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/40">Playback Settings</h3>
+        </div>
+        <div className="space-y-2 p-3">
+          <SettingSwitch
+            label="Auto fetch chunks"
+            hint="Cache episode while watching"
+            checked={settings.autoFetchWhileWatching}
+            onChange={settings.setAutoFetchWhileWatching}
+            icon={<Wifi size={13} />}
+          />
+          <SettingSwitch
+            label="Auto resume"
+            hint="Start from your last timestamp"
+            checked={settings.autoResume}
+            onChange={settings.setAutoResume}
+            icon={<Clock size={13} />}
+          />
+          <div className="rounded-xl bg-white/[0.04] p-2.5">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-white/55">Theme</span>
+              {settings.theme === "dark" ? <Moon size={13} className="text-white/35" /> : <Sun size={13} className="text-[#f0b429]" />}
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {(["dark", "light"] as const).map((theme) => (
+                <button
+                  key={theme}
+                  onClick={() => settings.setTheme(theme)}
+                  className={`h-8 rounded-lg text-xs font-bold capitalize transition ${
+                    settings.theme === theme
+                      ? "bg-[#e8336a] text-white"
+                      : "bg-white/[0.05] text-white/35 hover:text-white"
+                  }`}
+                >
+                  {theme}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Genre Filter */}
       <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d1020]">
         <div className="border-b border-white/[0.06] px-4 py-3">
@@ -187,6 +232,39 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+  );
+}
+
+function SettingSwitch({
+  label,
+  hint,
+  checked,
+  onChange,
+  icon,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/[0.04] p-2.5 text-left transition hover:bg-white/[0.06]"
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[0.06] text-white/40">{icon}</span>
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold text-white/60">{label}</span>
+          <span className="block truncate text-[10px] text-white/25">{hint}</span>
+        </span>
+      </span>
+      <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${checked ? "bg-[#e8336a]" : "bg-white/[0.12]"}`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${checked ? "left-4" : "left-0.5"}`} />
+      </span>
+    </button>
   );
 }
 

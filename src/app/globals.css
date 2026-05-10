@@ -55,6 +55,58 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html[data-theme="light"] {
+  --background: #f5f7fb;
+  --background-2: #eef2f8;
+  --foreground: #101322;
+  --muted: #657087;
+  --subtle: #9aa4b8;
+  --panel: #ffffff;
+  --panel-strong: #eef2f8;
+  --surface-3: #e3e9f3;
+  --border: rgba(15,23,42,0.08);
+  --border-hover: rgba(15,23,42,0.16);
+}
+
+html[data-theme="light"] body {
+  background: #f5f7fb;
+  color: #101322;
+}
+
+html[data-theme="light"] [class*="bg-[#06070d]"],
+html[data-theme="light"] [class*="bg-[#0a0c16]"],
+html[data-theme="light"] [class*="bg-[#0d1020]"],
+html[data-theme="light"] [class*="bg-[#101322]"],
+html[data-theme="light"] [class*="bg-[#11131d]"],
+html[data-theme="light"] [class*="bg-[#141828]"],
+html[data-theme="light"] [class*="bg-[#1b2036]"],
+html[data-theme="light"] .bg-panel,
+html[data-theme="light"] .bg-panel-strong {
+  background-color: #ffffff !important;
+}
+
+html[data-theme="light"] [class*="border-white"] {
+  border-color: rgba(15,23,42,0.09) !important;
+}
+
+html[data-theme="light"] .text-white,
+html[data-theme="light"] [class*="text-white/"] {
+  color: #101322 !important;
+}
+
+html[data-theme="light"] .text-muted {
+  color: #657087 !important;
+}
+
+html[data-theme="light"] [class*="bg-white/"] {
+  background-color: rgba(15,23,42,0.055) !important;
+}
+
+html[data-theme="light"] header [class*="bg-[#06070d]"],
+html[data-theme="light"] footer {
+  background-color: rgba(255,255,255,0.94) !important;
+}
+
 button, a, input { outline-color: var(--accent); }
 
 /* ── Scrollbars ───────────────────────────────────────── */

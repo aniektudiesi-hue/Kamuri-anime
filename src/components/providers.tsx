@@ -7,6 +7,7 @@ import type { Persister } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { AuthProvider } from "@/lib/auth";
 import { makeQueryClient } from "@/lib/query";
+import { SettingsProvider } from "@/lib/settings";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => makeQueryClient());
@@ -26,7 +27,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   if (!persister) {
     return (
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>{children}</AuthProvider>
+        <SettingsProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </SettingsProvider>
       </QueryClientProvider>
     );
   }
@@ -45,7 +48,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      <AuthProvider>{children}</AuthProvider>
+      <SettingsProvider>
+        <AuthProvider>{children}</AuthProvider>
+      </SettingsProvider>
     </PersistQueryClientProvider>
   );
 }

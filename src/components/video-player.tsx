@@ -24,6 +24,7 @@ export function VideoPlayer({
   nextHref,
   onProgress,
   onFatalError,
+  autoPlay = true,
 }: {
   stream?: StreamResponse;
   title: string;
@@ -31,6 +32,7 @@ export function VideoPlayer({
   nextHref?: string;
   onProgress?: (progress: { currentTime: number; duration: number }) => void;
   onFatalError?: (message: string) => void;
+  autoPlay?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -182,6 +184,7 @@ export function VideoPlayer({
     const playWhenReady = async () => {
       restoreTime();
       setIsBuffering(false);
+      if (!autoPlay) return;
       try {
         await video.play();
       } catch {
@@ -303,7 +306,7 @@ export function VideoPlayer({
     };
   // onProgress and onFatalError are accessed via refs — omitting from deps is intentional
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hideControlsSoon, initialTime, isHlsStream, src, syncCaptionAt]);
+  }, [autoPlay, hideControlsSoon, initialTime, isHlsStream, src, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
@@ -535,7 +538,7 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         playsInline
-        autoPlay
+        autoPlay={autoPlay}
         onClick={togglePlay}
         className="h-full w-full bg-black"
         crossOrigin="anonymous"

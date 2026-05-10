@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Clock3, Download, Heart, LogOut, Menu, UserRound, X } from "lucide-react";
+import { Clock3, Download, Heart, LogOut, Menu, Moon, Sun, UserRound, Wifi, X } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useSettings } from "@/lib/settings";
 import { SearchBox } from "./search-box";
 
 const nav = [
@@ -15,6 +16,7 @@ const nav = [
 
 export function Header() {
   const { isLoggedIn, user, logout } = useAuth();
+  const settings = useSettings();
   const [open, setOpen] = useState(false);
 
   return (
@@ -151,6 +153,39 @@ export function Header() {
               <Download size={15} />
               Downloads
             </Link>
+            <div className="my-2 rounded-xl border border-white/[0.06] bg-white/[0.03] p-2">
+              <button
+                type="button"
+                onClick={() => settings.setAutoFetchWhileWatching(!settings.autoFetchWhileWatching)}
+                className="flex h-10 w-full items-center justify-between rounded-lg px-3 text-sm font-medium text-white/55"
+              >
+                <span className="flex items-center gap-3"><Wifi size={15} /> Auto fetch</span>
+                <span className={`h-5 w-9 rounded-full p-0.5 transition ${settings.autoFetchWhileWatching ? "bg-[#e8336a]" : "bg-white/[0.12]"}`}>
+                  <span className={`block h-4 w-4 rounded-full bg-white transition ${settings.autoFetchWhileWatching ? "translate-x-4" : ""}`} />
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => settings.setAutoResume(!settings.autoResume)}
+                className="flex h-10 w-full items-center justify-between rounded-lg px-3 text-sm font-medium text-white/55"
+              >
+                <span className="flex items-center gap-3"><Clock3 size={15} /> Auto resume</span>
+                <span className={`h-5 w-9 rounded-full p-0.5 transition ${settings.autoResume ? "bg-[#e8336a]" : "bg-white/[0.12]"}`}>
+                  <span className={`block h-4 w-4 rounded-full bg-white transition ${settings.autoResume ? "translate-x-4" : ""}`} />
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => settings.setTheme(settings.theme === "dark" ? "light" : "dark")}
+                className="flex h-10 w-full items-center justify-between rounded-lg px-3 text-sm font-medium text-white/55"
+              >
+                <span className="flex items-center gap-3">
+                  {settings.theme === "dark" ? <Moon size={15} /> : <Sun size={15} />}
+                  {settings.theme === "dark" ? "Dark mode" : "Light mode"}
+                </span>
+                <span className="text-xs font-bold text-[#e8336a]">Switch</span>
+              </button>
+            </div>
             {!isLoggedIn && (
               <Link
                 href="/login"

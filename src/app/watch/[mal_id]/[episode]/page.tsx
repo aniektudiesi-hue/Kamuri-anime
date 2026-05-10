@@ -12,6 +12,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { prefetchOfflineDownload } from "@/lib/offline-downloads";
+import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, rememberedProgress, rememberProgress, titleOf } from "@/lib/utils";
 
@@ -64,6 +65,7 @@ export default function WatchPage({
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [prefetchState, setPrefetchState] = useState({ progress: 0, message: "", ready: false });
   const { token } = useAuth();
+  const settings = useSettings();
   const queryClient = useQueryClient();
   const router = useRouter();
   const episodeNum = Number(episode);
@@ -113,7 +115,7 @@ export default function WatchPage({
 
   const animeTitle = titleOf(known);
   const animePoster = posterOf(known);
-  const initialTime = Number(t || localResumeTime || 0);
+  const initialTime = settings.autoResume ? Number(t || localResumeTime || 0) : 0;
 
   const saveHistory = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.addHistory(token!, body),
@@ -189,7 +191,10 @@ export default function WatchPage({
   }, [episode, malId, type]);
 
   useEffect(() => {
-    if (!selectedStream || !activeServerId) return;
+    if (!settings.autoFetchWhileWatching || !selectedStream || !activeServerId) {
+      setPrefetchState({ progress: 0, message: "", ready: false });
+      return;
+    }
 
     const controller = new AbortController();
     setPrefetchState({ progress: 0, message: "Caching while you watch", ready: false });
@@ -213,7 +218,7 @@ export default function WatchPage({
     });
 
     return () => controller.abort();
-  }, [activeServerId, animePoster, displayTitle, episodeNum, malId, selectedStream]);
+  }, [activeServerId, animePoster, displayTitle, episodeNum, malId, selectedStream, settings.autoFetchWhileWatching]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function markServerFailed(_msg: string) {
@@ -262,6 +267,7 @@ export default function WatchPage({
                 stream={selectedStream}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
+                autoPlay={settings.autoResume}
                 nextHref={nextHref}
                 onProgress={saveWatchProgress}
                 onFatalError={markServerFailed}
