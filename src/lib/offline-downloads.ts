@@ -1,8 +1,9 @@
 import type { StreamResponse, Subtitle } from "./types";
 
 const DB_NAME = "anime-tv-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = "episodes";
+const PREFETCH_STORE = "prefetch";
 
 export type OfflineDownload = {
   id: string;
@@ -21,6 +22,14 @@ export type OfflineDownload = {
 export type OfflinePlayable = {
   stream: StreamResponse;
   revoke: () => void;
+};
+
+export type OfflineMetadata = {
+  malId: string;
+  episode: number;
+  title: string;
+  poster?: string;
+  server?: string;
 };
 
 type SegmentResource = {
@@ -62,23 +71,75 @@ export async function deleteOfflineDownload(id: string) {
   });
 }
 
-export async function saveOfflineDownload(
+export async function getPrefetchedDownload(id: string) {
+  return getStoredDownload(PREFETCH_STORE, id);
+}
+
+export async function deletePrefetchedDownload(id: string) {
+  return deleteStoredDownload(PREFETCH_STORE, id);
+}
+
+export async function promotePrefetchToOffline(id: string) {
+  const item = await getPrefetchedDownload(id);
+  if (!item) return undefined;
+  const permanent = { ...item, downloadedAt: new Date().toISOString() };
+  await putOfflineDownload(permanent);
+  await deletePrefetchedDownload(id).catch(() => undefined);
+  return permanent;
+}
+
+export async function prefetchOfflineDownload(
   stream: StreamResponse,
-  metadata: {
-    malId: string;
-    episode: number;
-    title: string;
-    poster?: string;
-    server?: string;
-  },
+  metadata: OfflineMetadata,
   signal: AbortSignal,
   onProgress: (progress: number, message: string) => void,
+) {
+  return buildOfflineDownload(stream, metadata, signal, onProgress, PREFETCH_STORE);
+}
+
+export async function saveOfflineDownload(
+  stream: StreamResponse,
+  metadata: OfflineMetadata,
+  signal: AbortSignal,
+  onProgress: (progress: number, message: string) => void,
+) {
+  return buildOfflineDownload(stream, metadata, signal, onProgress, STORE);
+}
+
+async function buildOfflineDownload(
+  stream: StreamResponse,
+  metadata: OfflineMetadata,
+  signal: AbortSignal,
+  onProgress: (progress: number, message: string) => void,
+  targetStore: typeof STORE | typeof PREFETCH_STORE,
 ) {
   const src = stream.m3u8_url || stream.stream_url || stream.url;
   if (!src) throw new Error("No stream URL available");
   if (!isPlaylist(src)) throw new Error("Offline downloads need an HLS stream");
 
-  onProgress(1, "Preparing offline stream");
+  const existing = await getStoredDownload(STORE, offlineId(metadata.malId, metadata.episode));
+  if (existing) {
+    onProgress(100, "Already saved offline");
+    return existing;
+  }
+
+  const existingPrefetch = await getStoredDownload(PREFETCH_STORE, offlineId(metadata.malId, metadata.episode));
+  if (targetStore === PREFETCH_STORE && existingPrefetch) {
+    onProgress(100, "Ready to save offline");
+    return existingPrefetch;
+  }
+
+  const prefetched = targetStore === STORE
+    ? existingPrefetch
+    : undefined;
+  if (prefetched) {
+    await putStoredDownload(STORE, { ...prefetched, downloadedAt: new Date().toISOString() });
+    await deleteStoredDownload(PREFETCH_STORE, prefetched.id).catch(() => undefined);
+    onProgress(100, "Ready offline");
+    return prefetched;
+  }
+
+  onProgress(1, targetStore === PREFETCH_STORE ? "Caching while you watch" : "Preparing offline stream");
   const mediaPlaylistUrl = await resolveMediaPlaylist(src, signal);
   const playlistText = await fetchText(mediaPlaylistUrl, signal);
   const { playlistText: offlinePlaylist, resources } = rewritePlaylistForOffline(playlistText, mediaPlaylistUrl);
@@ -100,7 +161,7 @@ export async function saveOfflineDownload(
       segments[index] = blob;
       size += blob.size;
       completed += 1;
-      onProgress(5 + (completed / resources.length) * 88, `Saved ${completed}/${resources.length} chunks`);
+      onProgress(5 + (completed / resources.length) * 88, `Cached ${completed}/${resources.length} chunks`);
     }
   }
 
@@ -122,8 +183,8 @@ export async function saveOfflineDownload(
     downloadedAt: new Date().toISOString(),
   };
 
-  await putOfflineDownload(item);
-  onProgress(100, "Ready offline");
+  await putStoredDownload(targetStore, item);
+  onProgress(100, targetStore === PREFETCH_STORE ? "Ready to save offline" : "Ready offline");
   return item;
 }
 
@@ -178,9 +239,42 @@ function openDb() {
       if (!db.objectStoreNames.contains(STORE)) {
         db.createObjectStore(STORE, { keyPath: "id" });
       }
+      if (!db.objectStoreNames.contains(PREFETCH_STORE)) {
+        db.createObjectStore(PREFETCH_STORE, { keyPath: "id" });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
+  });
+}
+
+async function getStoredDownload(store: string, id: string) {
+  const db = await openDb();
+  return new Promise<OfflineDownload | undefined>((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).get(id);
+    req.onsuccess = () => resolve(req.result as OfflineDownload | undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function putStoredDownload(store: string, item: OfflineDownload) {
+  const db = await openDb();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(item);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function deleteStoredDownload(store: string, id: string) {
+  const db = await openDb();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 

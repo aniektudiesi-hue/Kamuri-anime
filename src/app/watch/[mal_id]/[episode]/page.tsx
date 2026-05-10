@@ -11,6 +11,7 @@ import { EpisodeDownloadButton } from "@/components/episode-download-button";
 import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { prefetchOfflineDownload } from "@/lib/offline-downloads";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, rememberedProgress, rememberProgress, titleOf } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ export default function WatchPage({
   const [localResumeTime, setLocalResumeTime] = useState(0);
   const [failedServers, setFailedServers] = useState<ServerId[]>([]);
   const [playedEps, setPlayedEps] = useState<number[]>([]);
+  const [prefetchState, setPrefetchState] = useState({ progress: 0, message: "", ready: false });
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -185,6 +187,33 @@ export default function WatchPage({
     const id = window.setTimeout(() => { setFailedServers([]); setServer("mega"); }, 0);
     return () => window.clearTimeout(id);
   }, [episode, malId, type]);
+
+  useEffect(() => {
+    if (!selectedStream || !activeServerId) return;
+
+    const controller = new AbortController();
+    setPrefetchState({ progress: 0, message: "Caching while you watch", ready: false });
+
+    prefetchOfflineDownload(
+      selectedStream,
+      {
+        malId,
+        episode: episodeNum,
+        title: displayTitle,
+        poster: animePoster,
+        server: activeServerId,
+      },
+      controller.signal,
+      (progress, message) => {
+        setPrefetchState({ progress, message, ready: progress >= 100 });
+      },
+    ).catch((error) => {
+      if ((error as Error).name === "AbortError") return;
+      setPrefetchState({ progress: 0, message: "Offline cache paused", ready: false });
+    });
+
+    return () => controller.abort();
+  }, [activeServerId, animePoster, displayTitle, episodeNum, malId, selectedStream]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function markServerFailed(_msg: string) {
@@ -350,6 +379,7 @@ export default function WatchPage({
                 title={displayTitle}
                 poster={animePoster}
                 server={activeServerId}
+                prefetch={prefetchState}
               />
             </div>
 
