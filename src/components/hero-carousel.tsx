@@ -254,7 +254,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const count = episodeCount(current);
 
   return (
-    <section className="relative -mt-1 min-h-[430px] overflow-hidden pb-6 sm:hidden">
+    <section className="relative -mt-1 min-h-[430px] overflow-hidden pb-4 sm:hidden">
       <div className="absolute inset-0 bg-[#080a12]">
         {banner || poster ? (
           <Image
@@ -272,8 +272,8 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
       </div>
 
       <div className="relative flex min-h-[430px] items-end px-4">
-        <div className="w-full rounded-[28px] border border-white/[0.12] bg-[#090b13]/35 p-4 shadow-2xl shadow-black/45 backdrop-blur-2xl">
-          <div className="mb-3 flex items-center gap-2">
+        <div className="w-[92%] max-w-[360px] rounded-3xl border border-white/[0.1] bg-[#090b13]/28 p-3.5 shadow-2xl shadow-black/35 backdrop-blur-xl">
+          <div className="mb-2 flex items-center gap-2">
             <span className="rounded-full bg-[#e8336a]/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#ff8db2] ring-1 ring-[#e8336a]/30">
               Featured
             </span>
@@ -284,28 +284,28 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             ) : null}
           </div>
 
-          <h1 className="line-clamp-3 text-2xl font-black leading-tight text-white drop-shadow-xl">
+          <h1 className="line-clamp-2 text-xl font-black leading-tight text-white drop-shadow-xl">
             {title}
           </h1>
 
-          <div className="mt-4 flex gap-2">
+          <div className="mt-3 flex gap-2">
             <Link
               href={`/watch/${id}/1`}
-              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-sm font-black text-white shadow-lg shadow-[#e8336a]/25"
+              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-sm font-black text-white shadow-lg shadow-[#e8336a]/25"
             >
               <Play size={16} fill="currentColor" />
               Watch
             </Link>
             <Link
               href={`/anime/${id}`}
-              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/[0.16] bg-white/[0.12] px-4 text-sm font-bold text-white/85 backdrop-blur-xl"
+              className="inline-flex h-10 items-center justify-center rounded-2xl border border-white/[0.14] bg-white/[0.1] px-3.5 text-sm font-bold text-white/85 backdrop-blur-xl"
             >
               Details
             </Link>
           </div>
 
           {items.length > 1 ? (
-            <div className="mt-4 flex gap-1.5">
+            <div className="mt-3 flex gap-1.5">
               {items.slice(0, 5).map((_, i) => (
                 <button
                   key={i}

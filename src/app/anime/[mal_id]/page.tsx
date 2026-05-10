@@ -152,9 +152,9 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
             <span className="line-clamp-1 max-w-[200px] text-white/50">{title}</span>
           </div>
 
-          <div className="grid gap-5 rounded-[30px] border border-white/[0.12] bg-[#090b13]/38 p-4 shadow-2xl shadow-black/45 backdrop-blur-2xl sm:gap-8 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-0 md:grid-cols-[200px_1fr]">
+          <div className="grid gap-4 sm:gap-8 md:grid-cols-[200px_1fr]">
             {/* Poster */}
-            <div className="mx-auto w-[142px] sm:w-[160px] md:mx-0 md:w-auto">
+            <div className="mx-auto w-[132px] sm:w-[160px] md:mx-0 md:w-auto">
               <div className="relative aspect-[2/3] overflow-hidden rounded-[22px] bg-[#141828] shadow-2xl shadow-black/70 ring-1 ring-white/[0.12] sm:rounded-2xl sm:ring-white/[0.08]">
                 {poster ? (
                   <Image src={poster} alt={title} fill priority sizes="200px" className="object-cover" />
@@ -165,7 +165,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
             </div>
 
             {/* Info panel */}
-            <div className="flex flex-col justify-end pb-1 text-center sm:pb-2 sm:text-left">
+            <div className="mx-auto flex w-full max-w-[360px] flex-col justify-end rounded-3xl border border-white/[0.1] bg-[#090b13]/30 p-3.5 text-center shadow-2xl shadow-black/35 backdrop-blur-xl sm:mx-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0 sm:pb-2 sm:text-left sm:shadow-none sm:backdrop-blur-0">
               <div className="mb-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 {statusCfg ? (
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ring-1 ${statusCfg.color}`}>
@@ -195,7 +195,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                 ) : null}
               </div>
 
-              <h1 className="mb-1 text-2xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
+              <h1 className="mb-1 text-xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
                 {title}
               </h1>
               {known?.title_jp && known.title_jp !== title ? (
