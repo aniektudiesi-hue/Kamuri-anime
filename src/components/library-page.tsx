@@ -9,6 +9,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button, ButtonLink } from "@/components/button";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { deleteOfflineDownload, listOfflineDownloads, offlineId } from "@/lib/offline-downloads";
 import type { Anime, LibraryItem } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, rememberedProgress, titleOf } from "@/lib/utils";
 
@@ -50,6 +51,7 @@ async function enrichFromAniList(malId: number): Promise<Partial<Anime>> {
 export function LibraryPage({ kind }: { kind: LibraryKind }) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const [localDownloads, setLocalDownloads] = useState<LibraryItem[]>([]);
   const title = kind === "history" ? "Watch History" : kind === "watchlist" ? "Watchlist" : "Downloads";
   const query = useQuery({
     queryKey: [kind, token],
@@ -58,19 +60,64 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
       if (kind === "downloads") return api.downloads(token!);
       return api.watchlist(token!);
     },
-    enabled: Boolean(token),
+    enabled: Boolean(token) && kind !== "downloads",
   });
+
+  useEffect(() => {
+    if (kind !== "downloads") return;
+    listOfflineDownloads().then((items) => {
+      setLocalDownloads(items.map((item) => ({
+        mal_id: item.malId,
+        anime_id: item.malId,
+        title: item.title,
+        poster: item.poster,
+        image_url: item.poster,
+        episode: item.episode,
+        episode_num: item.episode,
+        offline_id: item.id,
+        size: item.size,
+        downloaded_at: item.downloadedAt,
+      })));
+    }).catch(() => setLocalDownloads([]));
+  }, [kind]);
 
   const clear = useMutation({
     mutationFn: (item?: LibraryItem) => {
       if (!token) throw new Error("Login required");
       if (kind === "history") return api.clearHistory(token);
       if (kind === "watchlist" && item) return api.removeWatchlist(token, String(item.mal_id || item.anime_id));
-      if (kind === "downloads" && item) return api.removeDownload(token, String(item.mal_id || item.anime_id), item.episode || item.episode_num || 1);
       return Promise.resolve();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [kind] }),
   });
+
+  const removeDownload = useMutation({
+    mutationFn: async (item: LibraryItem) => {
+      const id = String(item.mal_id || item.anime_id || "");
+      const episode = item.episode || item.episode_num || 1;
+      await deleteOfflineDownload(item.offline_id || offlineId(id, episode));
+      if (token) {
+        await api.removeDownload(token, id, episode).catch(() => undefined);
+      }
+    },
+    onSuccess: async () => {
+      const items = await listOfflineDownloads();
+      setLocalDownloads(items.map((item) => ({
+        mal_id: item.malId,
+        anime_id: item.malId,
+        title: item.title,
+        poster: item.poster,
+        image_url: item.poster,
+        episode: item.episode,
+        episode_num: item.episode,
+        offline_id: item.id,
+        size: item.size,
+        downloaded_at: item.downloadedAt,
+      })));
+    },
+  });
+
+  const displayItems = kind === "downloads" ? localDownloads : (query.data ?? []);
 
   return (
     <AppShell>
@@ -94,19 +141,25 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
           ) : null}
         </div>
 
-        {!token ? (
+        {!token && kind !== "downloads" ? (
           <div className="rounded-md border border-white/10 bg-panel p-8 text-center">
             <p className="text-muted">Login to view this library.</p>
             <ButtonLink href="/login" className="mt-4">Login</ButtonLink>
           </div>
-        ) : query.isLoading ? (
+        ) : query.isLoading && kind !== "downloads" ? (
           <div className="grid gap-3">
             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-md bg-panel-strong" />)}
           </div>
-        ) : query.data?.length ? (
+        ) : displayItems.length ? (
           <div className="grid gap-3">
-            {query.data.map((item, index) => (
-              <LibraryRow key={`${item.anime_id}-${index}`} item={item} kind={kind} canRemove={kind !== "history"} onRemove={() => clear.mutate(item)} />
+            {displayItems.map((item, index) => (
+              <LibraryRow
+                key={`${item.anime_id}-${index}`}
+                item={item}
+                kind={kind}
+                canRemove={kind !== "history"}
+                onRemove={() => kind === "downloads" ? removeDownload.mutate(item) : clear.mutate(item)}
+              />
             ))}
           </div>
         ) : (
@@ -124,7 +177,12 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
   const episode = item.episode || item.episode_num || 1;
   const baseItem = { ...savedAnime, ...item };
   const progress = progressOf(item) || progressOf(saved);
-  const href = kind === "watchlist" ? `/anime/${id}` : `/watch/${id}/${episode}${kind === "history" && progress > 1 ? `?t=${Math.floor(progress)}` : ""}`;
+  const href =
+    kind === "watchlist"
+      ? `/anime/${id}`
+      : kind === "downloads"
+        ? `/offline/${encodeURIComponent(item.offline_id || offlineId(id, episode))}`
+        : `/watch/${id}/${episode}${progress > 1 ? `?t=${Math.floor(progress)}` : ""}`;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -169,6 +227,7 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
         <Link href={`/anime/${id}`} className="line-clamp-1 font-bold hover:text-accent-2">{displayTitle}</Link>
         <Link href={href} className="mt-1 inline-block text-sm text-muted hover:text-white">
           Episode {episode}{kind === "history" && progress > 1 ? ` at ${formatClock(progress)}` : ""}
+          {kind === "downloads" && item.size ? ` - ${formatBytes(item.size)}` : ""}
         </Link>
       </div>
       {canRemove ? (
@@ -184,4 +243,10 @@ function formatClock(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
+}
+
+function formatBytes(bytes: number) {
+  const mb = bytes / 1024 / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  return `${(mb / 1024).toFixed(2)} GB`;
 }
