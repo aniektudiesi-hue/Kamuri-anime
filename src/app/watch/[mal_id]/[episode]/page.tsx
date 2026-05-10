@@ -202,7 +202,7 @@ export default function WatchPage({
     }
 
     const controller = new AbortController();
-    setPrefetchState({ progress: 0, message: "Caching while you watch", ready: false });
+    setPrefetchState({ progress: 0, message: "Preparing cached playback", ready: false });
     setOfflinePlayable((current) => {
       current?.revoke();
       return undefined;
@@ -228,7 +228,7 @@ export default function WatchPage({
           current?.revoke();
           return createOfflinePlayable(download);
         });
-        setPrefetchState({ progress: 100, message: "Playing from local cache", ready: true });
+        setPrefetchState({ progress: 100, message: "Cached playback ready", ready: true });
       })
       .catch((error) => {
       if ((error as Error).name === "AbortError") return;
@@ -285,10 +285,24 @@ export default function WatchPage({
               </div>
             ) : streamsLoading && !selectedStream ? (
               <div className="aspect-video w-full animate-pulse bg-[#141828]" />
+            ) : settings.autoFetchWhileWatching && selectedStream && !offlinePlayable ? (
+              <div className="grid aspect-video w-full place-items-center bg-black px-6 text-center">
+                <div className="w-full max-w-xs">
+                  <div className="mx-auto mb-4 h-11 w-11 animate-spin rounded-full border-[3px] border-white/15 border-t-white/90" />
+                  <p className="text-sm font-bold text-white">Preparing cached playback</p>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-white transition-all"
+                      style={{ width: `${Math.max(4, prefetchState.progress)}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-white/40">{Math.round(prefetchState.progress)}%</p>
+                </div>
+              </div>
             ) : (
               <VideoPlayer
                 key={`${activeServerId}-${type}-${offlinePlayable?.stream.m3u8_url || selectedStream?.m3u8_url || selectedStream?.url || selectedStream?.stream_url}`}
-                stream={offlinePlayable?.stream || selectedStream}
+                stream={settings.autoFetchWhileWatching ? offlinePlayable?.stream : selectedStream}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
                 autoPlay={settings.autoResume}
