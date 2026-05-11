@@ -11,7 +11,6 @@ import { EpisodeDownloadButton } from "@/components/episode-download-button";
 import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { warmHlsStream } from "@/lib/hls-prefetch";
 import { startProgressiveOfflinePlayback, type OfflinePlayable } from "@/lib/offline-downloads";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
@@ -103,7 +102,6 @@ export default function WatchPage({
   const selectedStream = selectedServer
     ? streamQueries[SERVERS.findIndex((s) => s.id === selectedServer.id)]?.data
     : undefined;
-  const moonStream = streamQueries[SERVERS.findIndex((s) => s.id === "moon")]?.data;
   const activeServerId = selectedServer?.id;
   const streamsLoading = streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
@@ -174,37 +172,11 @@ export default function WatchPage({
 
   useEffect(() => {
     if (!malId || !Number.isFinite(episodeNum)) return;
-    const controller = new AbortController();
     queryClient.prefetchQuery({ queryKey: ["episodes", malId, 0], queryFn: () => api.episodes(malId), staleTime: 1000 * 60 * 20 });
     queryClient.prefetchQuery({ queryKey: ["stream", malId, episodeNum + 1, "mega", type], queryFn: () => api.stream(malId, episodeNum + 1, type), staleTime: 1000 * 60 * 2 });
-    queryClient
-      .prefetchQuery({ queryKey: ["stream", malId, episodeNum + 1, "moon", "any"], queryFn: () => api.moon(malId, episodeNum + 1), staleTime: 1000 * 60 * 5 })
-      .then(() => {
-        const nextMoon = queryClient.getQueryData<StreamResponse>(["stream", malId, episodeNum + 1, "moon", "any"]);
-        void warmHlsStream(nextMoon, { signal: controller.signal, maxDurationSeconds: 90, maxSegments: 10, concurrency: 3 });
-      })
-      .catch(() => undefined);
+    queryClient.prefetchQuery({ queryKey: ["stream", malId, episodeNum + 1, "moon", "any"], queryFn: () => api.moon(malId, episodeNum + 1), staleTime: 1000 * 60 * 5 });
     router.prefetch(`/watch/${malId}/${episodeNum + 1}`);
-    return () => controller.abort();
   }, [episodeNum, malId, queryClient, router, type]);
-
-  useEffect(() => {
-    if (!moonStream) return;
-    const controller = new AbortController();
-    const moonActive = activeServerId === "moon";
-    const id = window.setTimeout(() => {
-      void warmHlsStream(moonStream, {
-        signal: controller.signal,
-        maxDurationSeconds: moonActive ? 13 * 60 : 150,
-        maxSegments: moonActive ? 84 : 14,
-        concurrency: moonActive ? 8 : 4,
-      });
-    }, moonActive ? 2500 : 0);
-    return () => {
-      window.clearTimeout(id);
-      controller.abort();
-    };
-  }, [activeServerId, episode, malId, moonStream]);
 
   const maxEpisode = useMemo(
     () => episodes.data?.num_episodes || episodes.data?.episodes.at(-1)?.episode_number || 0,
@@ -340,7 +312,6 @@ export default function WatchPage({
                 autoPlay={settings.autoResume}
                 nextHref={nextHref}
                 onProgress={saveWatchProgress}
-                bufferAheadSeconds={activeServerId === "moon" ? 13 * 60 : 0}
               />
             )}
 
