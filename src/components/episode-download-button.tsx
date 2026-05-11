@@ -161,7 +161,7 @@ export function EpisodeDownloadButton({
           </p>
         </div>
       ) : (
-        <p className="mt-2 text-xs text-white/25">Caching starts automatically while you watch.</p>
+        <p className="mt-2 text-xs text-white/25">Tap Save offline when you want to keep this episode on this device.</p>
       )}
     </div>
   );

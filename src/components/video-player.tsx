@@ -25,6 +25,7 @@ export function VideoPlayer({
   onProgress,
   onFatalError,
   autoPlay = true,
+  deepBuffer = true,
 }: {
   stream?: StreamResponse;
   title: string;
@@ -33,6 +34,7 @@ export function VideoPlayer({
   onProgress?: (progress: { currentTime: number; duration: number }) => void;
   onFatalError?: (message: string) => void;
   autoPlay?: boolean;
+  deepBuffer?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -40,13 +42,13 @@ export function VideoPlayer({
   const hlsRef = useRef<Hls | null>(null);
   const lastTimeRef = useRef(0);
   const restoredRef = useRef(false);
+  const playIntentRef = useRef(autoPlay);
+  const deepBufferArmedRef = useRef(false);
   const captionCuesRef = useRef<CaptionCue[]>([]);
   const controlsTimerRef = useRef<number | undefined>(undefined);
   // Stable refs so callbacks never cause the HLS effect to re-run
   const onProgressRef = useRef(onProgress);
   const onFatalErrorRef = useRef(onFatalError);
-  onProgressRef.current = onProgress;
-  onFatalErrorRef.current = onFatalError;
 
   const [activeCaption, setActiveCaption] = useState("");
   const [isBuffering, setIsBuffering] = useState(true);
@@ -67,6 +69,8 @@ export function VideoPlayer({
   const [seekFlash, setSeekFlash] = useState<{ dir: "forward" | "backward"; n: number } | null>(null);
   const seekFlashTimer = useRef<number | undefined>(undefined);
   const [bufferedRanges, setBufferedRanges] = useState<Array<{ start: number; end: number }>>([]);
+  const [bufferAhead, setBufferAhead] = useState(0);
+  const [bufferedPercent, setBufferedPercent] = useState(0);
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
   const isMoonStream = stream?.server === "moon" || Boolean(src?.includes("/proxy/moon/"));
@@ -84,6 +88,7 @@ export function VideoPlayer({
   const introEnd = stream?.intro?.end ?? 90;
   const showSkipIntro = currentTime >= introStart && currentTime < introEnd && currentTime > 0;
   const progress = useMemo(() => (duration ? (currentTime / duration) * 100 : 0), [currentTime, duration]);
+  const bufferAheadLabel = useMemo(() => formatBufferAhead(bufferAhead), [bufferAhead]);
   const showControls = useCallback(
     (sticky = false) => {
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
@@ -94,6 +99,14 @@ export function VideoPlayer({
     },
     [playing],
   );
+
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
+
+  useEffect(() => {
+    onFatalErrorRef.current = onFatalError;
+  }, [onFatalError]);
 
   const hideControlsSoon = useCallback(() => {
     if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
@@ -162,17 +175,54 @@ export function VideoPlayer({
     setActiveCaption("");
     setPlaybackError("");
     setIsBuffering(true);
+    setBufferedRanges([]);
+    setBufferAhead(0);
+    setBufferedPercent(0);
     setQualityLevels([]);
     setSelectedQuality(-1);
     setShowQualityMenu(false);
     restoredRef.current = false;
+    playIntentRef.current = autoPlay;
+    deepBufferArmedRef.current = false;
     lastTimeRef.current = initialTime;
     let playRequested = false;
+    const targetForwardBuffer = deepBuffer
+      ? (isMoonStream ? 13 * 60 : 7 * 60)
+      : (isMoonStream ? 5 * 60 : 3 * 60);
+    const initialForwardBuffer = Math.min(targetForwardBuffer, isMoonStream ? 120 : 75);
+    const armDeepBuffer = () => {
+      if (!hls || deepBufferArmedRef.current) return;
+      deepBufferArmedRef.current = true;
+      const config = hls.config as Hls["config"] & {
+        maxBufferLength: number;
+        maxMaxBufferLength: number;
+        maxBufferSize: number;
+        backBufferLength: number;
+      };
+      config.maxBufferLength = targetForwardBuffer;
+      config.maxMaxBufferLength = Math.max(targetForwardBuffer, targetForwardBuffer + 120);
+      config.maxBufferSize = deepBuffer ? 512 * 1000 * 1000 : 240 * 1000 * 1000;
+      config.backBufferLength = isMoonStream ? 60 : 35;
+    };
+    const updateBuffered = () => {
+      const ranges: Array<{ start: number; end: number }> = [];
+      for (let i = 0; i < video.buffered.length; i++) {
+        ranges.push({ start: video.buffered.start(i), end: video.buffered.end(i) });
+      }
+      setBufferedRanges(ranges);
+      const ahead = bufferedAheadOf(video);
+      setBufferAhead(ahead);
+      const furthest = ranges.reduce((max, range) => Math.max(max, range.end), 0);
+      setBufferedPercent(video.duration ? Math.min(100, (furthest / video.duration) * 100) : 0);
+      return ahead;
+    };
+    const hasEnoughBuffer = () => updateBuffered() > 0.7 || video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
     const rememberTime = () => {
       if (Number.isFinite(video.currentTime) && video.currentTime > 0) {
         lastTimeRef.current = video.currentTime;
       }
       setCurrentTime(video.currentTime || 0);
+      updateBuffered();
       syncCaptionAt(video.currentTime || 0);
       onProgressRef.current?.({ currentTime: video.currentTime || 0, duration: video.duration || 0 });
     };
@@ -187,6 +237,7 @@ export function VideoPlayer({
       if (!autoPlay) return;
       if (playRequested) return;
       playRequested = true;
+      playIntentRef.current = true;
       try {
         await video.play();
       } catch {
@@ -196,17 +247,19 @@ export function VideoPlayer({
     };
     const markWaiting = () => {
       rememberTime();
-      if (video.paused || video.ended) {
+      if (video.paused || video.ended || !playIntentRef.current || hasEnoughBuffer()) {
         setIsBuffering(false);
         return;
       }
       setIsBuffering(true);
     };
     const markPlaying = () => {
+      playIntentRef.current = true;
       setIsBuffering(false);
       setPlaying(true);
       setControlsOpen(true);
       hideControlsSoon();
+      armDeepBuffer();
       rememberTime();
     };
     const markCanPlay = () => {
@@ -214,19 +267,13 @@ export function VideoPlayer({
       playWhenReady();
     };
     const markPause = () => {
+      playIntentRef.current = false;
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       setControlsOpen(true);
       setIsBuffering(false);
       setPlaying(false);
     };
     const markDuration = () => setDuration(Number.isFinite(video.duration) ? video.duration : 0);
-    const updateBuffered = () => {
-      const ranges: Array<{ start: number; end: number }> = [];
-      for (let i = 0; i < video.buffered.length; i++) {
-        ranges.push({ start: video.buffered.start(i), end: video.buffered.end(i) });
-      }
-      setBufferedRanges(ranges);
-    };
 
     video.addEventListener("loadedmetadata", restoreTime);
     video.addEventListener("loadedmetadata", markDuration);
@@ -244,18 +291,20 @@ export function VideoPlayer({
       if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
+          progressive: true,
           lowLatencyMode: true,
           startFragPrefetch: true,
-          ...(isMoonStream
-            ? {
-                maxBufferLength: 180,
-                maxMaxBufferLength: 300,
-                maxBufferSize: 180 * 1000 * 1000,
-                backBufferLength: 45,
-                fragLoadingMaxRetry: 8,
-                manifestLoadingMaxRetry: 4,
-              }
-            : {}),
+          startPosition: initialTime > 2 ? initialTime : -1,
+          testBandwidth: true,
+          capLevelToPlayerSize: true,
+          maxBufferLength: initialForwardBuffer,
+          maxMaxBufferLength: Math.max(initialForwardBuffer, 180),
+          maxBufferSize: 220 * 1000 * 1000,
+          maxBufferHole: 0.35,
+          backBufferLength: isMoonStream ? 45 : 25,
+          fragLoadingMaxRetry: isMoonStream ? 8 : 5,
+          manifestLoadingMaxRetry: isMoonStream ? 5 : 3,
+          levelLoadingMaxRetry: isMoonStream ? 5 : 3,
         });
         hlsRef.current = hls;
         hls.loadSource(src);
@@ -277,13 +326,15 @@ export function VideoPlayer({
         });
         hls.on(Hls.Events.FRAG_BUFFERED, () => {
           setIsBuffering(false);
+          updateBuffered();
+          armDeepBuffer();
           playWhenReady();
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (!data.fatal) return;
           rememberTime();
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            setIsBuffering(true);
+            if (!video.paused && playIntentRef.current) setIsBuffering(true);
             hls?.startLoad(Math.max(0, lastTimeRef.current || video.currentTime || 0));
             return;
           }
@@ -321,15 +372,20 @@ export function VideoPlayer({
       video.removeEventListener("stalled", markWaiting);
       video.removeEventListener("progress", updateBuffered);
     };
-  // onProgress and onFatalError are accessed via refs — omitting from deps is intentional
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlay, hideControlsSoon, initialTime, isHlsStream, isMoonStream, src, syncCaptionAt]);
+  }, [autoPlay, deepBuffer, hideControlsSoon, initialTime, isHlsStream, isMoonStream, src, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) video.play().catch(() => undefined);
-    else video.pause();
+    if (video.paused) {
+      playIntentRef.current = true;
+      setIsBuffering(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA && bufferedAheadOf(video) < 0.7);
+      video.play().catch(() => undefined);
+    } else {
+      playIntentRef.current = false;
+      setIsBuffering(false);
+      video.pause();
+    }
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -554,7 +610,7 @@ export function VideoPlayer({
       ref={containerRef}
       tabIndex={0}
       aria-label={`Video player: ${title}`}
-      className="group relative aspect-video w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black shadow-2xl shadow-black/50 outline-none"
+      className="group relative aspect-video w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] outline-none ring-1 ring-white/[0.025]"
       style={{ cursor: controlsOpen ? "default" : "none" }}
       onMouseMove={() => showControls()}
       onMouseLeave={() => {
@@ -568,9 +624,31 @@ export function VideoPlayer({
         autoPlay={autoPlay}
         preload="auto"
         onClick={togglePlay}
-        className="h-full w-full bg-black"
+        className="h-full w-full bg-black object-contain"
         crossOrigin="anonymous"
       />
+
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.55)_0%,transparent_24%,transparent_60%,rgba(0,0,0,0.86)_100%)]" />
+
+      {/* Top glass title rail */}
+      <div
+        className={`pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-3 pt-3 transition-opacity duration-300 sm:px-5 sm:pt-5 ${
+          controlsOpen ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-black/28 px-3 py-2 shadow-2xl backdrop-blur-2xl sm:px-4">
+          <p className="line-clamp-1 text-sm font-semibold text-white sm:text-base">{title}</p>
+          <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/42">
+            <span>{stream?.server || "HLS"}</span>
+            <span className="h-1 w-1 rounded-full bg-white/25" />
+            <span>{qualityLabel}</span>
+          </div>
+        </div>
+
+        <div className="hidden rounded-full border border-white/[0.08] bg-black/28 px-3 py-1.5 text-[11px] font-semibold text-white/55 shadow-2xl backdrop-blur-2xl sm:block">
+          {bufferAhead > 2 ? `${bufferAheadLabel} ready` : "Starting"}
+        </div>
+      </div>
 
       {/* Captions */}
       {captionsOn && activeCaption ? (
@@ -590,7 +668,10 @@ export function VideoPlayer({
       {/* Buffering spinner */}
       {isBuffering && !playbackError ? (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center">
-          <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/15 border-t-white/85 shadow-[0_0_28px_rgba(255,255,255,0.18)]" />
+          <div className="relative grid h-16 w-16 place-items-center rounded-full border border-white/[0.08] bg-black/18 shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+            <div className="absolute inset-2 animate-spin rounded-full border-2 border-white/10 border-t-white/90" />
+            <div className="h-1.5 w-1.5 rounded-full bg-white/90 shadow-[0_0_18px_rgba(255,255,255,0.75)]" />
+          </div>
         </div>
       ) : null}
 
@@ -651,13 +732,13 @@ export function VideoPlayer({
       ) : null}
 
       {/* Center play/pause overlay — only shown when paused */}
-      {!playing ? (
+      {!playing && !isBuffering ? (
         <button
           aria-label="Play"
           onClick={togglePlay}
           className="absolute inset-0 z-10 flex items-center justify-center"
         >
-          <span className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-black/45 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105 hover:bg-black/65">
+          <span className="grid h-16 w-16 place-items-center rounded-full border border-white/15 bg-black/38 text-white shadow-[0_20px_80px_rgba(0,0,0,0.7)] backdrop-blur-2xl transition hover:scale-105 hover:bg-black/58">
             <Play size={26} fill="currentColor" />
           </span>
         </button>
@@ -674,9 +755,9 @@ export function VideoPlayer({
         }}
       >
         {/* Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/54 to-transparent pointer-events-none" />
 
-        <div className="relative px-3 pb-3 pt-10 sm:px-4 sm:pb-4">
+        <div className="relative px-3 pb-3 pt-10 sm:px-5 sm:pb-5">
           {/* Custom seek bar */}
           <div
             ref={seekBarRef}
@@ -685,7 +766,7 @@ export function VideoPlayer({
             aria-valuenow={Math.round(progress)}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="group/seek relative mb-3 h-1 cursor-pointer rounded-full bg-white/[0.13] transition-[height] duration-150 hover:h-[5px] sm:mb-4"
+            className="group/seek relative mb-3 h-1 cursor-pointer rounded-full bg-white/[0.14] transition-[height] duration-150 hover:h-[6px] sm:mb-4"
             onPointerDown={handleSeekPointerDown}
             onPointerMove={handleSeekPointerMove}
           >
@@ -693,7 +774,7 @@ export function VideoPlayer({
             {duration > 0 && bufferedRanges.map((range, i) => (
               <div
                 key={i}
-                className="absolute inset-y-0 rounded-full bg-white/25 pointer-events-none"
+                className="absolute inset-y-0 rounded-full bg-white/28 pointer-events-none"
                 style={{
                   left: `${(range.start / duration) * 100}%`,
                   width: `${Math.min(100, ((range.end - range.start) / duration) * 100)}%`,
@@ -702,18 +783,18 @@ export function VideoPlayer({
             ))}
             {/* Played portion — sits on top of green */}
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-white pointer-events-none"
+              className="absolute inset-y-0 left-0 rounded-full bg-[#e8336a] pointer-events-none shadow-[0_0_18px_rgba(232,51,106,0.58)]"
               style={{ width: `${progress}%` }}
             />
             {/* Knob */}
             <div
-              className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow-md pointer-events-none opacity-0 group-hover/seek:opacity-100 transition-opacity"
+              className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full bg-white shadow-md pointer-events-none opacity-0 group-hover/seek:opacity-100 transition-opacity"
               style={{ left: `calc(${progress}% - 6px)` }}
             />
           </div>
 
           {/* Control row */}
-          <div className="flex items-center gap-1.5 rounded-2xl border border-white/[0.08] bg-black/35 px-2 py-1.5 shadow-xl shadow-black/30 backdrop-blur-xl sm:gap-2">
+          <div className="flex items-center gap-1.5 rounded-[18px] border border-white/[0.09] bg-black/42 px-2 py-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.48)] backdrop-blur-2xl sm:gap-2">
             {/* Play/Pause */}
             <button
               aria-label={playing ? "Pause" : "Play"}
@@ -742,6 +823,13 @@ export function VideoPlayer({
             {/* Time */}
             <span className="min-w-[76px] font-mono text-[11px] tabular-nums text-white/70 sm:min-w-[100px] sm:text-xs">
               {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+
+            <span
+              className="hidden min-w-[74px] rounded-full bg-white/[0.06] px-2 py-1 text-center text-[10px] font-semibold text-white/42 sm:inline-block"
+              title={`${Math.round(bufferedPercent)}% buffered`}
+            >
+              {bufferAhead > 2 ? bufferAheadLabel : "0s ready"}
             </span>
 
             <div className="flex-1" />
@@ -969,4 +1057,20 @@ function formatTime(seconds: number) {
   const s = Math.floor(seconds % 60);
   if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatBufferAhead(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "0s";
+  if (seconds >= 60) return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
+  return `${Math.floor(seconds)}s`;
+}
+
+function bufferedAheadOf(video: HTMLVideoElement) {
+  const time = video.currentTime || 0;
+  for (let i = 0; i < video.buffered.length; i += 1) {
+    const start = video.buffered.start(i);
+    const end = video.buffered.end(i);
+    if (time >= start && time <= end) return Math.max(0, end - time);
+  }
+  return 0;
 }

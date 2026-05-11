@@ -177,7 +177,7 @@ export function Header() {
                 onClick={() => settings.setAutoFetchWhileWatching(!settings.autoFetchWhileWatching)}
                 className="flex h-10 w-full items-center justify-between rounded-lg px-3 text-sm font-medium text-white/55"
               >
-                <span className="flex items-center gap-3"><Wifi size={15} /> Auto fetch</span>
+                <span className="flex items-center gap-3"><Wifi size={15} /> Deep buffer</span>
                 <span className={`h-5 w-9 rounded-full p-0.5 transition ${settings.autoFetchWhileWatching ? "bg-[#e8336a]" : "bg-white/[0.12]"}`}>
                   <span className={`block h-4 w-4 rounded-full bg-white transition ${settings.autoFetchWhileWatching ? "translate-x-4" : ""}`} />
                 </span>

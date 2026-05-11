@@ -50,8 +50,8 @@ export function Sidebar() {
         </div>
         <div className="space-y-2 p-3">
           <SettingSwitch
-            label="Auto fetch chunks"
-            hint="Cache episode while watching"
+            label="Deep buffer"
+            hint="Load far ahead while watching"
             checked={settings.autoFetchWhileWatching}
             onChange={settings.setAutoFetchWhileWatching}
             icon={<Wifi size={13} />}

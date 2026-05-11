@@ -12,7 +12,6 @@ import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { warmStreamManifest } from "@/lib/stream-cache";
-import { startProgressiveOfflinePlayback, type OfflinePlayable } from "@/lib/offline-downloads";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, rememberedProgress, rememberProgress, titleOf } from "@/lib/utils";
@@ -63,8 +62,6 @@ export default function WatchPage({
   const [known, setKnown] = useState<Anime | undefined>();
   const [localResumeTime, setLocalResumeTime] = useState(0);
   const [playedEps, setPlayedEps] = useState<number[]>([]);
-  const [prefetchState, setPrefetchState] = useState({ progress: 0, message: "", ready: false });
-  const [offlinePlayable, setOfflinePlayable] = useState<OfflinePlayable | undefined>();
   const [loadBackupServers, setLoadBackupServers] = useState(false);
   const { token } = useAuth();
   const settings = useSettings();
@@ -109,7 +106,6 @@ export default function WatchPage({
   const streamsLoading = streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
-  const shouldProgressiveCache = Boolean(selectedStream && activeServerId && settings.autoFetchWhileWatching);
   const streamWarmKey = streamQueries.map((query) => query.data?.m3u8_url || query.data?.stream_url || query.data?.url || "").join("|");
 
   const episodes = useQuery({
@@ -127,15 +123,27 @@ export default function WatchPage({
   });
   // Stable ref so saveWatchProgress never changes identity (avoids HLS restart)
   const saveHistoryRef = useRef(saveHistory.mutate);
-  saveHistoryRef.current = saveHistory.mutate;
 
   // Stable refs for title/poster/token so the callback deps stay minimal
   const animeTitleRef = useRef(animeTitle);
-  animeTitleRef.current = animeTitle;
   const animePosterRef = useRef(animePoster);
-  animePosterRef.current = animePoster;
   const tokenRef = useRef(token);
-  tokenRef.current = token;
+
+  useEffect(() => {
+    saveHistoryRef.current = saveHistory.mutate;
+  }, [saveHistory.mutate]);
+
+  useEffect(() => {
+    animeTitleRef.current = animeTitle;
+  }, [animeTitle]);
+
+  useEffect(() => {
+    animePosterRef.current = animePoster;
+  }, [animePoster]);
+
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
 
   const saveWatchProgress = useCallback(
     ({ currentTime, duration }: { currentTime: number; duration: number }) => {
@@ -170,8 +178,6 @@ export default function WatchPage({
       playback_pos: Math.floor(initialTime || 0), progress: Math.floor(initialTime || 0),
       timestamp: Math.floor(initialTime || 0), watched_at: new Date().toISOString(),
     });
-  // saveHistoryRef is a ref — intentionally excluded from deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animePoster, animeTitle, episodeNum, initialTime, malId, token, selectedStream]);
 
   useEffect(() => {
@@ -199,11 +205,18 @@ export default function WatchPage({
   }, [episode, malId, type]);
 
   useEffect(() => {
-    setLoadBackupServers(false);
-    if (!malId || !Number.isFinite(episodeNum)) return;
-    if (!megaQuery?.data && !megaQuery?.isError) return;
-    const id = window.setTimeout(() => setLoadBackupServers(true), 900);
-    return () => window.clearTimeout(id);
+    const resetId = window.setTimeout(() => setLoadBackupServers(false), 0);
+    if (!malId || !Number.isFinite(episodeNum)) {
+      return () => window.clearTimeout(resetId);
+    }
+    if (!megaQuery?.data && !megaQuery?.isError) {
+      return () => window.clearTimeout(resetId);
+    }
+    const loadId = window.setTimeout(() => setLoadBackupServers(true), 900);
+    return () => {
+      window.clearTimeout(resetId);
+      window.clearTimeout(loadId);
+    };
   }, [episodeNum, malId, megaQuery?.data, megaQuery?.isError]);
 
   useEffect(() => {
@@ -212,66 +225,6 @@ export default function WatchPage({
   // streamQueries is intentionally read here; streamWarmKey is the stable change signal.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamWarmKey]);
-
-  useEffect(() => {
-    if (!shouldProgressiveCache || !selectedStream || !activeServerId) {
-      setPrefetchState({ progress: 0, message: "", ready: false });
-      setOfflinePlayable((current) => {
-        current?.revoke();
-        return undefined;
-      });
-      return;
-    }
-
-    const controller = new AbortController();
-    setPrefetchState({ progress: 0, message: "Preparing cached playback", ready: false });
-    setOfflinePlayable((current) => {
-      current?.revoke();
-      return undefined;
-    });
-
-    startProgressiveOfflinePlayback(
-      selectedStream,
-      {
-        malId,
-        episode: episodeNum,
-        title: displayTitle,
-        poster: animePoster,
-        server: activeServerId,
-      },
-      controller.signal,
-      (progress, message) => {
-        setPrefetchState({ progress, message, ready: progress >= 100 });
-      },
-      (playable) => {
-        if (controller.signal.aborted) {
-          playable.revoke();
-          return;
-        }
-        setOfflinePlayable((current) => {
-          current?.revoke();
-          return playable;
-        });
-      },
-      { concurrency: 8 },
-    )
-      .then((download) => {
-        if (controller.signal.aborted) return;
-        setPrefetchState({ progress: 100, message: "Cached playback ready", ready: true });
-      })
-      .catch((error) => {
-      if ((error as Error).name === "AbortError") return;
-      setPrefetchState({ progress: 0, message: "Offline cache paused", ready: false });
-    });
-
-    return () => {
-      controller.abort();
-      setOfflinePlayable((current) => {
-        current?.revoke();
-        return undefined;
-      });
-    };
-  }, [activeServerId, animePoster, displayTitle, episodeNum, malId, selectedStream, shouldProgressiveCache]);
 
   return (
     <AppShell>
@@ -308,27 +261,14 @@ export default function WatchPage({
               </div>
             ) : streamsLoading && !selectedStream ? (
               <div className="aspect-video w-full animate-pulse bg-[#141828]" />
-            ) : shouldProgressiveCache && selectedStream && !offlinePlayable ? (
-              <div className="grid aspect-video w-full place-items-center bg-black px-6 text-center">
-                <div className="w-full max-w-xs">
-                  <div className="mx-auto mb-4 h-11 w-11 animate-spin rounded-full border-[3px] border-white/15 border-t-white/90" />
-                  <p className="text-sm font-bold text-white">Starting cached playback</p>
-                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-white transition-all"
-                      style={{ width: `${Math.max(4, prefetchState.progress)}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-white/40">{Math.round(prefetchState.progress)}%</p>
-                </div>
-              </div>
             ) : (
               <VideoPlayer
-                key={`${activeServerId}-${type}-${offlinePlayable?.stream.m3u8_url || selectedStream?.m3u8_url || selectedStream?.url || selectedStream?.stream_url}`}
-                stream={shouldProgressiveCache ? offlinePlayable?.stream : selectedStream}
+                key={`${activeServerId}-${type}-${selectedStream?.m3u8_url || selectedStream?.url || selectedStream?.stream_url}`}
+                stream={selectedStream}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
                 autoPlay={settings.autoResume}
+                deepBuffer={settings.autoFetchWhileWatching || activeServerId === "moon"}
                 nextHref={nextHref}
                 onProgress={saveWatchProgress}
               />
@@ -434,7 +374,6 @@ export default function WatchPage({
                 title={displayTitle}
                 poster={animePoster}
                 server={activeServerId}
-                prefetch={prefetchState}
               />
             </div>
 
