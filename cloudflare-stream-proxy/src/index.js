@@ -324,7 +324,8 @@ function rewriteMoonMaster(text, originalUrl, workerOrigin, videoId) {
     }
     if (nextIsPlaylist) {
       const absolute = new URL(line, base).toString();
-      out.push(proxyUrl(workerOrigin, "/proxy/m3u8", absolute));
+      const variant = new URL(absolute).pathname.split("/").pop() || line;
+      out.push(`${workerOrigin}/proxy/moon/${encodeURIComponent(videoId)}/m3u8?variant=${encodeURIComponent(variant)}`);
       nextIsPlaylist = false;
       continue;
     }
@@ -339,7 +340,7 @@ function rewriteMoonVariant(text, originalUrl, workerOrigin, videoId, variant) {
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trimEnd();
     if (line.startsWith("#EXT-X-KEY") || line.startsWith("#EXT-X-MAP")) {
-      out.push(rewriteAttributeUri(line, base, workerOrigin, "/proxy/chunk"));
+      out.push(rewriteMoonAttributeUri(line, base, workerOrigin, videoId, variant));
       continue;
     }
     if (!line || line.startsWith("#")) {
@@ -347,7 +348,8 @@ function rewriteMoonVariant(text, originalUrl, workerOrigin, videoId, variant) {
       continue;
     }
     const absolute = new URL(line, base).toString();
-    out.push(proxyUrl(workerOrigin, "/proxy/chunk", absolute));
+    const segment = new URL(absolute).pathname.split("/").pop() || line;
+    out.push(`${workerOrigin}/proxy/moon/${encodeURIComponent(videoId)}/chunk?variant=${encodeURIComponent(variant)}&segment=${encodeURIComponent(segment)}`);
   }
   return `${out.join("\n")}\n`;
 }
