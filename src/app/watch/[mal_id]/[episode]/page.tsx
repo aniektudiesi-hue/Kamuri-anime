@@ -320,7 +320,6 @@ export default function WatchPage({
                 autoPlay={settings.autoResume}
                 nextHref={nextHref}
                 onProgress={saveWatchProgress}
-                onFatalError={markServerFailed}
               />
             )}
 

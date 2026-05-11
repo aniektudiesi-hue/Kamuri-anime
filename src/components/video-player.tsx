@@ -278,10 +278,8 @@ export function VideoPlayer({
           if (!data.fatal) return;
           rememberTime();
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            const message = "This server blocked the playlist.";
-            setPlaybackError(message);
-            setIsBuffering(false);
-            onFatalErrorRef.current?.(message);
+            setIsBuffering(true);
+            hls?.startLoad(lastTimeRef.current || -1);
             return;
           }
           if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -618,8 +616,8 @@ export function VideoPlayer({
       {playbackError ? (
         <div className="absolute inset-0 z-40 grid place-items-center bg-black/85 px-6 text-center ">
           <div>
-            <p className="text-base font-bold text-white">Server unavailable</p>
-            <p className="mt-2 text-sm text-white/50">{playbackError} Try another server.</p>
+            <p className="text-base font-bold text-white">Playback issue</p>
+            <p className="mt-2 text-sm text-white/50">{playbackError}</p>
           </div>
         </div>
       ) : null}
