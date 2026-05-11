@@ -25,6 +25,7 @@ export function VideoPlayer({
   onProgress,
   onFatalError,
   autoPlay = true,
+  bufferAheadSeconds = 0,
 }: {
   stream?: StreamResponse;
   title: string;
@@ -33,6 +34,7 @@ export function VideoPlayer({
   onProgress?: (progress: { currentTime: number; duration: number }) => void;
   onFatalError?: (message: string) => void;
   autoPlay?: boolean;
+  bufferAheadSeconds?: number;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -195,6 +197,10 @@ export function VideoPlayer({
     };
     const markWaiting = () => {
       rememberTime();
+      if (video.paused || video.ended) {
+        setIsBuffering(false);
+        return;
+      }
       setIsBuffering(true);
     };
     const markPlaying = () => {
@@ -211,6 +217,7 @@ export function VideoPlayer({
     const markPause = () => {
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       setControlsOpen(true);
+      setIsBuffering(false);
       setPlaying(false);
     };
     const markDuration = () => setDuration(Number.isFinite(video.duration) ? video.duration : 0);
@@ -240,6 +247,14 @@ export function VideoPlayer({
           enableWorker: true,
           lowLatencyMode: true,
           startFragPrefetch: true,
+          ...(bufferAheadSeconds
+            ? {
+                maxBufferLength: bufferAheadSeconds,
+                maxMaxBufferLength: bufferAheadSeconds + 120,
+                maxBufferSize: 600 * 1000 * 1000,
+                backBufferLength: 60,
+              }
+            : {}),
         });
         hlsRef.current = hls;
         hls.loadSource(src);
@@ -307,7 +322,7 @@ export function VideoPlayer({
     };
   // onProgress and onFatalError are accessed via refs — omitting from deps is intentional
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlay, hideControlsSoon, initialTime, isHlsStream, src, syncCaptionAt]);
+  }, [autoPlay, bufferAheadSeconds, hideControlsSoon, initialTime, isHlsStream, src, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
