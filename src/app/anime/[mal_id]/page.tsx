@@ -10,9 +10,10 @@ import { SidebarLayout } from "@/components/sidebar";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Anime } from "@/lib/types";
+import { useResumeHistory } from "@/lib/use-resume-history";
 import {
-  animeId, bannerOf, displayStatus, episodeCount, posterOf, progressOf,
-  rememberAnime, rememberedAnime, rememberedProgress, titleOf,
+  animeId, bannerOf, displayStatus, episodeCount, posterOf,
+  rememberAnime, rememberedAnime, titleOf,
 } from "@/lib/utils";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
@@ -35,10 +36,10 @@ function getRanges(total: number): { label: string; start: number; end: number }
 
 export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: string }> }) {
   const { mal_id: malId } = use(params);
-  const { token, isLoggedIn } = useAuth();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   const [clickedAnime, setClickedAnime] = useState<Anime | undefined>();
-  const [localProgress, setLocalProgress] = useState(0);
+  const [watchlistSaved, setWatchlistSaved] = useState(false);
   const [activeRange, setActiveRange] = useState(0);
 
   useEffect(() => {
@@ -69,29 +70,22 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     staleTime: 1000 * 60 * 20,
   });
 
-  const history = useQuery({
-    queryKey: ["history", token],
-    queryFn: () => api.history(token!),
-    enabled: Boolean(token),
-  });
-  const last = history.data?.find((item) => String(item.mal_id || item.anime_id) === malId);
-  const lastEp = last?.episode || last?.episode_num || 1;
-
-  useEffect(() => {
-    if (!last) return;
-    const id = window.setTimeout(() => {
-      const saved = rememberedProgress(malId, lastEp);
-      setLocalProgress(progressOf(saved) || progressOf(last));
-    }, 0);
-    return () => window.clearTimeout(id);
-  }, [last, lastEp, malId]);
+  const resume = useResumeHistory(malId);
+  const last = resume.item;
+  const lastEp = resume.episode;
+  const localProgress = resume.progress;
 
   const watchlist = useQuery({
     queryKey: ["watchlist", token],
     queryFn: () => api.watchlist(token!),
     enabled: Boolean(token),
   });
-  const inWatchlist = Boolean(watchlist.data?.some((item) => String(item.mal_id || item.anime_id) === malId));
+  const watchlistHasAnime = Boolean(watchlist.data?.some((item) => String(item.mal_id || item.anime_id) === malId));
+  const inWatchlist = watchlistSaved || watchlistHasAnime;
+
+  useEffect(() => {
+    setWatchlistSaved(watchlistHasAnime);
+  }, [malId, watchlistHasAnime]);
 
   const addWatchlist = useMutation({
     mutationFn: () =>
@@ -99,7 +93,13 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
         mal_id: malId, anime_id: malId,
         title: titleOf(known), image_url: posterOf(known), episodes: hint,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["watchlist"] }),
+    onMutate: () => setWatchlistSaved(true),
+    onError: () => setWatchlistSaved(false),
+    onSuccess: () => {
+      setWatchlistSaved(true);
+      queryClient.invalidateQueries({ queryKey: ["watchlist"] });
+      queryClient.invalidateQueries({ queryKey: ["watchlist", token] });
+    },
   });
 
   function prefetchWatch(ep: number) {
@@ -116,7 +116,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const title = titleOf(known) || `Anime ${malId}`;
   const statusKey = (known?.status || "").toLowerCase();
   const statusCfg = STATUS_CONFIG[statusKey];
-  const resumeHref = `/watch/${malId}/${lastEp}${localProgress > 1 ? `?t=${Math.floor(localProgress)}` : ""}`;
+  const resumeHref = resume.href;
 
   const allEpisodes = episodes.data?.episodes ?? [];
   const ranges = getRanges(episodeTotal);
@@ -141,10 +141,10 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -bottom-12">
           {backdrop ? (
-            <Image src={backdrop} alt="" fill sizes="100vw" className="scale-105 object-cover object-center opacity-30 blur-[1px] sm:opacity-24" />
+            <Image src={backdrop} alt="" fill sizes="100vw" className="scale-105 object-cover object-center opacity-[0.46] blur-[1px] sm:opacity-[0.38]" />
           ) : null}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/35 via-[#06070d]/72 to-[#06070d]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#06070d] via-[#06070d]/82 to-[#06070d]/36" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/24 via-[#06070d]/62 to-[#06070d]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#06070d] via-[#06070d]/74 to-[#06070d]/22" />
           <div className="absolute inset-0 hidden bg-[radial-gradient(circle_at_78%_20%,rgba(200,34,61,0.16),transparent_32%),radial-gradient(circle_at_82%_76%,rgba(200,206,216,0.10),transparent_30%)] lg:block" />
         </div>
 
@@ -235,7 +235,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   {last ? "Continue Watching" : "Watch Episode 1"}
                 </Link>
                 <button
-                  disabled={!isLoggedIn || inWatchlist || addWatchlist.isPending}
+                  disabled={!token || inWatchlist || addWatchlist.isPending}
                   onClick={() => addWatchlist.mutate()}
                   className={`inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl border px-5 text-sm font-bold transition disabled:cursor-not-allowed sm:rounded-xl ${
                     inWatchlist
@@ -250,7 +250,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   ) : (
                     <Plus size={15} />
                   )}
-                  {!isLoggedIn
+                  {!token
                     ? "Sign in to save"
                     : inWatchlist
                       ? "Saved"

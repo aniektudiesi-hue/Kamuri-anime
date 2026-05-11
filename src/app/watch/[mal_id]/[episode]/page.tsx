@@ -120,7 +120,12 @@ export default function WatchPage({
 
   const animeTitle = titleOf(known);
   const animePoster = posterOf(known);
-  const initialTime = settings.autoResume ? Number(t || localResumeTime || 0) : 0;
+  const explicitResumeTime = Number(t || 0);
+  const initialTime = explicitResumeTime > 0
+    ? explicitResumeTime
+    : settings.autoResume
+      ? Number(localResumeTime || 0)
+      : 0;
 
   const saveHistory = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.addHistory(token!, body),

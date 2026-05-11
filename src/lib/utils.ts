@@ -110,7 +110,7 @@ export function historyKey(malId: string, episode: string | number) {
 
 const HISTORY_INDEX_KEY = "kairostream-history-index";
 const HISTORY_ENTRY_PREFIX = "kairostream-history-";
-const HISTORY_EVENT = "anime-tv-history-updated";
+export const HISTORY_UPDATED_EVENT = "anime-tv-history-updated";
 
 type HistoryPointer = {
   key: string;
@@ -160,7 +160,7 @@ function normalizeHistoryItem(item: LibraryItem, id: string, episode: string | n
 
 function notifyHistoryUpdated(item?: LibraryItem) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(HISTORY_EVENT, { detail: item }));
+  window.dispatchEvent(new CustomEvent(HISTORY_UPDATED_EVENT, { detail: item }));
 }
 
 function isHistoryStorageKey(key: string | null): key is string {

@@ -6,6 +6,7 @@ import { Play, Star } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Anime } from "@/lib/types";
+import { useResumeHistory } from "@/lib/use-resume-history";
 import { animeId, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
 
 const STATUS_DOT: Record<string, string> = {
@@ -21,6 +22,8 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
   const poster = posterOf(anime);
   const title = titleOf(anime);
   const statusKey = (anime.status || "").toLowerCase();
+  const resume = useResumeHistory(id);
+  const href = resume.hasResume ? resume.href : `/anime/${id}`;
 
   function prefetch() {
     if (!id) return;
@@ -29,6 +32,13 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
       queryFn: () => api.episodes(id, episodes),
       staleTime: 1000 * 60 * 20,
     });
+    if (resume.hasResume) {
+      queryClient.prefetchQuery({
+        queryKey: ["stream", id, resume.episode, "mega", "sub"],
+        queryFn: () => api.stream(id, resume.episode, "sub"),
+        staleTime: 1000 * 60 * 3,
+      });
+    }
   }
 
   return (
@@ -37,7 +47,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
       onFocus={prefetch}
       className={`card-lift group ${className ?? "w-[160px] shrink-0 sm:w-[180px]"}`}
     >
-      <Link href={`/anime/${id}`} onClick={() => rememberAnime(anime)} className="block">
+      <Link href={href} onClick={() => rememberAnime(anime)} className="block">
 
         {/* Poster container */}
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828]">
@@ -74,11 +84,13 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
 
           {/* Hover overlay */}
           <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/60 to-black/20 p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-            <p className="mb-2 text-[11px] font-semibold text-white/60">{episodeLabel(anime)}</p>
+            <p className="mb-2 text-[11px] font-semibold text-white/60">
+              {resume.hasResume ? `Episode ${resume.episode}` : episodeLabel(anime)}
+            </p>
             {/* Play button */}
             <div className="flex items-center justify-center rounded-xl bg-[#c8223d] py-2.5 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/24 transition hover:bg-[#d62a47]">
               <Play size={14} fill="currentColor" className="mr-1.5" />
-              Watch Now
+              {resume.hasResume ? "Continue" : "Watch Now"}
             </div>
           </div>
         </div>
@@ -89,7 +101,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
             {title}
           </h3>
           <p className="mt-1 text-[11px] text-white/30">
-            {episodeLabel(anime)}
+            {resume.hasResume ? `Continue Ep ${resume.episode}` : episodeLabel(anime)}
             {statusKey === "currently_airing" ? " · Airing" : statusKey === "finished_airing" ? " · Completed" : ""}
           </p>
         </div>
