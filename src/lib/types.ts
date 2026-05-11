@@ -52,6 +52,7 @@ export type StreamResponse = {
   stream_url?: string;
   iframe_url?: string;
   embed_url?: string;
+  server?: string;
   subtitles?: Subtitle[];
   intro?: { start: number; end: number };
   outro?: { start: number; end: number };

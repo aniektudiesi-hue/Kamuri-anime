@@ -65,6 +65,7 @@ export default function WatchPage({
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [prefetchState, setPrefetchState] = useState({ progress: 0, message: "", ready: false });
   const [offlinePlayable, setOfflinePlayable] = useState<OfflinePlayable | undefined>();
+  const [progressiveCacheFailed, setProgressiveCacheFailed] = useState(false);
   const { token } = useAuth();
   const settings = useSettings();
   const queryClient = useQueryClient();
@@ -107,6 +108,9 @@ export default function WatchPage({
   const streamsLoading = streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
+  const shouldProgressiveCache = Boolean(
+    selectedStream && activeServerId && !progressiveCacheFailed && (activeServerId === "moon" || settings.autoFetchWhileWatching),
+  );
 
   const episodes = useQuery({
     queryKey: ["episodes", malId, 0],
@@ -188,12 +192,16 @@ export default function WatchPage({
   const displayTitle = animeTitle === "Untitled" ? `Anime ${malId}` : animeTitle;
 
   useEffect(() => {
-    const id = window.setTimeout(() => { setFailedServers([]); setServer("mega"); }, 0);
+    const id = window.setTimeout(() => {
+      setFailedServers([]);
+      setProgressiveCacheFailed(false);
+      setServer("mega");
+    }, 0);
     return () => window.clearTimeout(id);
   }, [episode, malId, type]);
 
   useEffect(() => {
-    if (!settings.autoFetchWhileWatching || !selectedStream || !activeServerId) {
+    if (!shouldProgressiveCache || !selectedStream || !activeServerId) {
       setPrefetchState({ progress: 0, message: "", ready: false });
       setOfflinePlayable((current) => {
         current?.revoke();
@@ -203,7 +211,8 @@ export default function WatchPage({
     }
 
     const controller = new AbortController();
-    setPrefetchState({ progress: 0, message: "Preparing cached playback", ready: false });
+    setProgressiveCacheFailed(false);
+    setPrefetchState({ progress: 0, message: activeServerId === "moon" ? "Preloading Moon stream" : "Preparing cached playback", ready: false });
     setOfflinePlayable((current) => {
       current?.revoke();
       return undefined;
@@ -232,6 +241,7 @@ export default function WatchPage({
           return playable;
         });
       },
+      { concurrency: activeServerId === "moon" ? 18 : 8 },
     )
       .then((download) => {
         if (controller.signal.aborted) return;
@@ -239,6 +249,7 @@ export default function WatchPage({
       })
       .catch((error) => {
       if ((error as Error).name === "AbortError") return;
+      setProgressiveCacheFailed(true);
       setPrefetchState({ progress: 0, message: "Offline cache paused", ready: false });
     });
 
@@ -249,7 +260,7 @@ export default function WatchPage({
         return undefined;
       });
     };
-  }, [activeServerId, animePoster, displayTitle, episodeNum, malId, selectedStream, settings.autoFetchWhileWatching]);
+  }, [activeServerId, animePoster, displayTitle, episodeNum, malId, selectedStream, shouldProgressiveCache]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function markServerFailed(_msg: string) {
@@ -292,7 +303,7 @@ export default function WatchPage({
               </div>
             ) : streamsLoading && !selectedStream ? (
               <div className="aspect-video w-full animate-pulse bg-[#141828]" />
-            ) : settings.autoFetchWhileWatching && selectedStream && !offlinePlayable ? (
+            ) : shouldProgressiveCache && selectedStream && !offlinePlayable ? (
               <div className="grid aspect-video w-full place-items-center bg-black px-6 text-center">
                 <div className="w-full max-w-xs">
                   <div className="mx-auto mb-4 h-11 w-11 animate-spin rounded-full border-[3px] border-white/15 border-t-white/90" />
@@ -309,7 +320,7 @@ export default function WatchPage({
             ) : (
               <VideoPlayer
                 key={`${activeServerId}-${type}-${offlinePlayable?.stream.m3u8_url || selectedStream?.m3u8_url || selectedStream?.url || selectedStream?.stream_url}`}
-                stream={settings.autoFetchWhileWatching ? offlinePlayable?.stream : selectedStream}
+                stream={shouldProgressiveCache ? offlinePlayable?.stream : selectedStream}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
                 autoPlay={settings.autoResume}

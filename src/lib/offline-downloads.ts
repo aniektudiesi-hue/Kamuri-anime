@@ -32,6 +32,10 @@ export type OfflineMetadata = {
   server?: string;
 };
 
+type ProgressivePlaybackOptions = {
+  concurrency?: number;
+};
+
 type SegmentResource = {
   placeholder: string;
   url: string;
@@ -103,6 +107,7 @@ export async function startProgressiveOfflinePlayback(
   signal: AbortSignal,
   onProgress: (progress: number, message: string) => void,
   onReady: (playable: OfflinePlayable) => void,
+  options: ProgressivePlaybackOptions = {},
 ) {
   const src = stream.m3u8_url || stream.stream_url || stream.url;
   if (!src) throw new Error("No stream URL available");
@@ -145,6 +150,7 @@ export async function startProgressiveOfflinePlayback(
   onReady({
     stream: {
       m3u8_url: playlistUrl,
+      server: metadata.server,
       subtitles: stream.subtitles,
       intro: stream.intro,
     },
@@ -152,7 +158,7 @@ export async function startProgressiveOfflinePlayback(
   });
 
   let cursor = 0;
-  const concurrency = Math.min(6, resources.length);
+  const concurrency = Math.min(Math.max(options.concurrency ?? 6, 1), resources.length);
   async function worker() {
     while (cursor < resources.length) {
       const index = cursor++;
@@ -300,6 +306,7 @@ export function createOfflinePlayable(download: OfflineDownload): OfflinePlayabl
   return {
     stream: {
       m3u8_url: playlistUrl,
+      server: download.server,
       subtitles: subtitleUrls,
     },
     revoke: () => urls.forEach((url) => URL.revokeObjectURL(url)),

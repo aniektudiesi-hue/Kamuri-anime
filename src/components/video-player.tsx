@@ -75,6 +75,7 @@ export function VideoPlayer({
         /\/m3u8(?:$|[?#])/i.test(src) ||
         /\/proxy\/(?:m3u8|moon)\b/i.test(src)),
   );
+  const isMoonStream = stream?.server === "moon";
   const subtitles = useMemo(() => preferredSubtitles(stream?.subtitles), [stream?.subtitles]);
   const activeSubtitleUrl = subtitles[0]?.file ?? "";
   const subtitleCount = subtitles.length;
@@ -229,15 +230,20 @@ export function VideoPlayer({
       if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
+          progressive: true,
           lowLatencyMode: false,
-          maxBufferLength: 7200,
-          maxMaxBufferLength: 7200,
-          maxBufferSize: 300 * 1000 * 1000,
-          backBufferLength: 30,
-          abrEwmaDefaultEstimate: 8 * 1000 * 1000,
+          startFragPrefetch: true,
+          testBandwidth: !isMoonStream,
+          maxBufferLength: isMoonStream ? 14400 : 7200,
+          maxMaxBufferLength: isMoonStream ? 14400 : 7200,
+          maxBufferSize: isMoonStream ? 900 * 1000 * 1000 : 300 * 1000 * 1000,
+          backBufferLength: isMoonStream ? 300 : 30,
+          abrEwmaDefaultEstimate: isMoonStream ? 20 * 1000 * 1000 : 8 * 1000 * 1000,
           maxLoadingDelay: 1,
-          fragLoadingMaxRetry: 6,
-          manifestLoadingMaxRetry: 4,
+          fragLoadingTimeOut: isMoonStream ? 60_000 : 30_000,
+          manifestLoadingTimeOut: isMoonStream ? 45_000 : 20_000,
+          fragLoadingMaxRetry: isMoonStream ? 10 : 6,
+          manifestLoadingMaxRetry: isMoonStream ? 6 : 4,
         });
         hlsRef.current = hls;
         hls.loadSource(src);
