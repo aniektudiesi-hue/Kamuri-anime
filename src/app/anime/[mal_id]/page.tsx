@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { Anime } from "@/lib/types";
 import {
-  animeId, displayStatus, episodeCount, posterOf, progressOf,
+  animeId, bannerOf, displayStatus, episodeCount, posterOf, progressOf,
   rememberedAnime, rememberedProgress, titleOf,
 } from "@/lib/utils";
 
@@ -108,6 +108,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
 
   const episodeTotal = episodes.data?.num_episodes || hint;
   const poster = posterOf(known);
+  const backdrop = bannerOf(known) || poster;
   const title = titleOf(known) || `Anime ${malId}`;
   const statusKey = (known?.status || "").toLowerCase();
   const statusCfg = STATUS_CONFIG[statusKey];
@@ -135,14 +136,31 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       {/* ── Hero (full width, outside sidebar) ── */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -bottom-12">
-          {poster ? (
-            <Image src={poster} alt="" fill sizes="100vw" className="scale-110 object-cover object-top opacity-25 sm:opacity-15" />
+          {backdrop ? (
+            <Image src={backdrop} alt="" fill sizes="100vw" className="scale-105 object-cover object-center opacity-30 blur-[1px] sm:opacity-24" />
           ) : null}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/10 via-[#06070d]/70 to-[#06070d] sm:from-[#06070d]/30 sm:via-[#06070d]/85" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#06070d]/45 to-transparent sm:from-[#06070d]/90" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/35 via-[#06070d]/72 to-[#06070d]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#06070d] via-[#06070d]/82 to-[#06070d]/36" />
+          <div className="absolute inset-0 hidden bg-[radial-gradient(circle_at_78%_20%,rgba(200,34,61,0.16),transparent_32%),radial-gradient(circle_at_82%_76%,rgba(200,206,216,0.10),transparent_30%)] lg:block" />
         </div>
 
-        <div className="relative mx-auto max-w-screen-2xl px-4 py-6 sm:py-10 lg:px-6 lg:py-14">
+        {poster ? (
+          <div className="pointer-events-none absolute right-5 top-20 hidden w-[46%] grid-cols-3 gap-4 opacity-45 lg:grid xl:right-10">
+            {Array.from({ length: 9 }).map((_, index) => (
+              <div
+                key={index}
+                className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-white/[0.09] bg-white/[0.045] shadow-2xl shadow-black/25 backdrop-blur-md"
+                style={{ transform: `translateY(${(index % 3) * 16}px)` }}
+              >
+                <Image src={poster} alt="" fill sizes="15vw" className="object-cover opacity-70" />
+                <div className="absolute inset-0 bg-[#06070d]/28" />
+              </div>
+            ))}
+            <div className="absolute inset-[-10%] bg-gradient-to-l from-transparent via-[#06070d]/10 to-[#06070d]/95" />
+          </div>
+        ) : null}
+
+        <div className="relative mx-auto max-w-screen-2xl px-4 py-6 sm:py-10 lg:px-6 lg:py-16">
           {/* Breadcrumb */}
           <div className="mb-4 flex items-center gap-1.5 text-xs text-white/35 sm:mb-6">
             <Link href="/" className="transition-colors hover:text-white">Home</Link>
@@ -152,14 +170,14 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
             <span className="line-clamp-1 max-w-[200px] text-white/50">{title}</span>
           </div>
 
-          <div className="grid gap-4 sm:gap-8 md:grid-cols-[200px_1fr]">
+          <div className="grid gap-4 sm:gap-8 md:grid-cols-[200px_minmax(0,620px)] lg:min-h-[430px] lg:items-center">
             {/* Poster */}
             <div className="mx-auto w-[132px] sm:w-[160px] md:mx-0 md:w-auto">
               <div className="relative aspect-[2/3] overflow-hidden rounded-[22px] bg-[#141828] shadow-2xl shadow-black/70 ring-1 ring-white/[0.12] sm:rounded-2xl sm:ring-white/[0.08]">
                 {poster ? (
                   <Image src={poster} alt={title} fill priority sizes="200px" className="object-cover" />
                 ) : (
-                  <div className="h-full w-full bg-gradient-to-br from-[#141828] to-[#0d1020]" />
+                  <div className="h-full w-full bg-[#141828]" />
                 )}
               </div>
             </div>
@@ -188,8 +206,8 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   </span>
                 ) : null}
                 {known?.score ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0b429]/10 px-3 py-1 text-[11px] font-bold text-[#f0b429] ring-1 ring-[#f0b429]/20">
-                    <Star size={11} className="fill-[#f0b429]" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#d8b56a]/10 px-3 py-1 text-[11px] font-bold text-[#d8b56a] ring-1 ring-[#d8b56a]/20">
+                    <Star size={11} className="fill-[#d8b56a]" />
                     {Number(known.score).toFixed(2)} / 10
                   </span>
                 ) : null}
@@ -213,7 +231,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   </div>
                   <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.07]">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#e8336a] to-[#7c4dff]"
+                      className="h-full rounded-full bg-[#c8223d]"
                       style={{ width: `${Math.min(100, (localProgress / (last.duration || 1440)) * 100)}%` }}
                     />
                   </div>
@@ -223,7 +241,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
                 <Link
                   href={resumeHref}
-                  className="shine inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] px-6 text-sm font-bold text-white shadow-xl shadow-[#e8336a]/25 transition hover:opacity-90 sm:rounded-xl"
+                  className="shine inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl bg-[#c8223d] px-6 text-sm font-bold text-white shadow-xl shadow-[#c8223d]/25 transition hover:bg-[#d62a47] sm:rounded-xl"
                 >
                   <Play size={16} fill="currentColor" />
                   {last ? "Continue Watching" : "Watch Episode 1"}
@@ -233,8 +251,8 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   onClick={() => addWatchlist.mutate()}
                   className={`inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl border px-5 text-sm font-bold transition disabled:cursor-not-allowed sm:rounded-xl ${
                     inWatchlist
-                      ? "border-[#1ed9cc]/30 bg-[#1ed9cc]/10 text-[#1ed9cc]"
-                      : "border-white/[0.14] bg-white/[0.1] text-white/78 hover:border-white/20 hover:bg-white/10 hover:text-white disabled:opacity-40 sm:bg-white/[0.05]"
+                      ? "border-white/15 bg-white/[0.08] text-[#c8ced8]"
+                      : "border-[#c8223d]/35 bg-[#c8223d]/10 text-white/82 hover:border-[#c8223d]/60 hover:bg-[#c8223d]/18 hover:text-white disabled:opacity-40"
                   }`}
                 >
                   {addWatchlist.isPending ? (
@@ -263,7 +281,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
         <div className="py-6 pb-16">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="h-5 w-1 rounded-full bg-gradient-to-b from-[#e8336a] to-[#7c4dff]" />
+              <span className="h-5 w-1 rounded-full bg-[#c8223d]" />
               <h2 className="text-base font-black text-white">Episodes</h2>
               {episodeTotal > 0 && (
                 <span className="rounded-lg bg-white/[0.05] px-2.5 py-0.5 text-[11px] font-bold text-white/30">
@@ -282,7 +300,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   onClick={() => setActiveRange(i)}
                   className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                     activeRange === i
-                      ? "bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-white shadow-md shadow-[#e8336a]/20"
+                      ? "bg-[#c8223d] text-white shadow-md shadow-[#c8223d]/20"
                       : "border border-white/[0.07] bg-[#0d1020] text-white/40 hover:border-white/[0.13] hover:text-white"
                   }`}
                 >
@@ -312,13 +330,13 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     title={ep.title || `Episode ${ep.episode_number}`}
                     className={`group relative grid h-10 place-items-center rounded-xl text-xs font-bold transition ${
                       isCurrent
-                        ? "bg-gradient-to-br from-[#e8336a] to-[#7c4dff] text-white shadow-md shadow-[#e8336a]/25"
+                        ? "bg-[#c8223d] text-white shadow-md shadow-[#c8223d]/25"
                         : "bg-[#0d1020] text-white/40 hover:bg-[#141828] hover:text-white"
                     }`}
                   >
                     {ep.episode_number}
                     {isCurrent ? (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-[#1ed9cc]">
+                      <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-[#c8ced8]">
                         <span className="h-1 w-1 rounded-full bg-[#06070d]" />
                       </span>
                     ) : null}
