@@ -9,8 +9,8 @@ import type { Anime } from "@/lib/types";
 import { animeId, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
 
 const STATUS_DOT: Record<string, string> = {
-  currently_airing: "bg-emerald-400",
-  not_yet_aired: "bg-blue-400",
+  currently_airing: "bg-[#c8ced8]",
+  not_yet_aired: "bg-white/45",
   finished_airing: "bg-white/30",
 };
 
@@ -60,8 +60,8 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
           {/* Score badge — top left */}
           {anime.score ? (
             <div className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-xl bg-black/70 px-2 py-1 text-[11px] font-bold backdrop-blur-sm">
-              <Star size={10} className="fill-[#f0b429] text-[#f0b429]" />
-              <span className="text-[#f0b429]">{Number(anime.score).toFixed(1)}</span>
+              <Star size={10} className="fill-[#d8b56a] text-[#d8b56a]" />
+              <span className="text-[#d8b56a]">{Number(anime.score).toFixed(1)}</span>
             </div>
           ) : null}
 
@@ -76,7 +76,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
           <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/60 to-black/20 p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
             <p className="mb-2 text-[11px] font-semibold text-white/60">{episodeLabel(anime)}</p>
             {/* Play button */}
-            <div className="flex items-center justify-center rounded-xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] py-2.5 text-sm font-bold text-white shadow-lg shadow-[#e8336a]/30 transition hover:opacity-90">
+            <div className="flex items-center justify-center rounded-xl bg-[#c8223d] py-2.5 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/24 transition hover:bg-[#d62a47]">
               <Play size={14} fill="currentColor" className="mr-1.5" />
               Watch Now
             </div>

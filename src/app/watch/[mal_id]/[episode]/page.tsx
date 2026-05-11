@@ -291,7 +291,7 @@ export default function WatchPage({
 
               {/* Now playing badge */}
               <div className="hidden items-center gap-2 rounded-2xl border border-white/[0.06] bg-[#0d1020] px-4 py-2 sm:flex">
-                <Radio size={13} className="text-[#1ed9cc] animate-pulse" />
+                <Radio size={13} className="text-[#c8ced8] animate-pulse" />
                 <span className="text-xs font-semibold text-white/40">
                   {displayTitle} · Ep {episodeNum}
                 </span>
@@ -303,7 +303,7 @@ export default function WatchPage({
                 className={`inline-flex h-10 items-center gap-2 rounded-2xl px-4 text-sm font-bold transition ${
                   !hasNext
                     ? "pointer-events-none bg-white/[0.03] text-white/20"
-                    : "bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-white shadow-lg shadow-[#e8336a]/20 hover:opacity-90"
+                    : "bg-[#c8223d] text-white shadow-lg shadow-[#c8223d]/20 hover:bg-[#d62a47]"
                 }`}
               >
                 Next Episode
@@ -328,12 +328,12 @@ export default function WatchPage({
                         onClick={() => setServer(s.id)}
                         className={`group flex flex-col rounded-2xl px-4 py-2 text-left transition ${
                           isActive
-                            ? "bg-gradient-to-r from-[#e8336a]/20 to-[#7c4dff]/20 ring-1 ring-[#e8336a]/30"
+                            ? "bg-[#c8223d]/16 ring-1 ring-[#c8223d]/30"
                             : "border border-white/[0.07] bg-[#141828] hover:border-white/[0.13] hover:bg-[#1b2036]"
                         }`}
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-[#1ed9cc] animate-pulse" : "bg-emerald-400"}`} />
+                          <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-[#c8ced8] animate-pulse" : "bg-white/45"}`} />
                           <span className={`text-sm font-bold ${isActive ? "text-white" : "text-white/60"}`}>{s.label}</span>
                         </div>
                         <span className="mt-0.5 text-[10px] text-white/25">{s.desc}</span>
@@ -356,7 +356,7 @@ export default function WatchPage({
                       onClick={() => { setType(a); setServer("mega"); }}
                       className={`rounded-2xl px-4 py-2 text-sm font-bold uppercase transition ${
                         type === a
-                          ? "bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-white shadow-lg shadow-[#e8336a]/20"
+                          ? "bg-[#c8223d] text-white shadow-lg shadow-[#c8223d]/20"
                           : "border border-white/[0.07] bg-[#141828] text-white/40 hover:border-white/[0.14] hover:text-white"
                       }`}
                     >
@@ -469,7 +469,7 @@ function EpisodeSidebar({
             {ranges.map((r, i) => (
               <button key={r.label} onClick={() => setActiveRange(i)}
                 className={`shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold transition ${
-                  activeRange === i ? "bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-white" : "bg-white/[0.05] text-white/35 hover:text-white"
+                  activeRange === i ? "bg-[#c8223d] text-white" : "bg-white/[0.05] text-white/35 hover:text-white"
                 }`}
               >{r.label}</button>
             ))}
@@ -486,9 +486,9 @@ function EpisodeSidebar({
                     title={ep.title || `Episode ${ep.episode_number}`}
                     className={`grid h-10 place-items-center rounded-xl text-xs font-bold transition ${
                       isActive
-                        ? "bg-gradient-to-br from-[#e8336a] to-[#7c4dff] text-white shadow-md shadow-[#e8336a]/20"
+                        ? "bg-[#c8223d] text-white shadow-md shadow-[#c8223d]/20"
                         : isPlayed
-                          ? "bg-[#7c4dff]/20 text-[#a78bfa] ring-1 ring-[#7c4dff]/30 hover:bg-[#7c4dff]/30"
+                          ? "bg-white/[0.08] text-[#c8ced8] ring-1 ring-white/10 hover:bg-white/[0.12]"
                           : "bg-[#141828] text-white/35 hover:bg-[#1b2036] hover:text-white"
                     }`}
                   >
@@ -509,7 +509,7 @@ function EpisodeSidebar({
           <h2 className="text-sm font-black text-white">Episodes</h2>
           <p className="text-[11px] text-white/25">{maxEpisode ? `${maxEpisode} total` : "Loading…"}</p>
         </div>
-        <span className="rounded-lg bg-gradient-to-r from-[#e8336a]/20 to-[#7c4dff]/20 px-2.5 py-1 text-[10px] font-bold text-white/60 ring-1 ring-[#e8336a]/20">
+        <span className="rounded-lg bg-[#c8223d]/14 px-2.5 py-1 text-[10px] font-bold text-white/60 ring-1 ring-[#c8223d]/20">
           Ep {currentEp}
         </span>
       </div>
@@ -520,7 +520,7 @@ function EpisodeSidebar({
           {ranges.map((r, i) => (
             <button key={r.label} onClick={() => setActiveRange(i)}
               className={`shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold transition ${
-                activeRange === i ? "bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-white" : "bg-white/[0.05] text-white/35 hover:text-white"
+                activeRange === i ? "bg-[#c8223d] text-white" : "bg-white/[0.05] text-white/35 hover:text-white"
               }`}
             >{r.label}</button>
           ))}
@@ -549,9 +549,9 @@ function EpisodeSidebar({
                   ref={isActive ? currentRef : null}
                   className={`group flex gap-3 border-b border-white/[0.04] p-3 transition-colors ${
                     isActive
-                      ? "bg-gradient-to-r from-[#e8336a]/10 to-[#7c4dff]/10"
+                      ? "bg-[#c8223d]/10"
                       : isPlayed
-                        ? "bg-[#7c4dff]/5 hover:bg-[#7c4dff]/10"
+                        ? "bg-white/[0.035] hover:bg-white/[0.06]"
                         : "hover:bg-white/[0.03]"
                   }`}
                 >
@@ -568,15 +568,15 @@ function EpisodeSidebar({
                       <span className={`grid h-8 w-8 place-items-center rounded-full ${
                         isActive ? "bg-white/90" : "bg-black/60"
                       }`}>
-                        <Play size={12} fill="currentColor" className={isActive ? "text-[#e8336a]" : "text-white"} />
+                        <Play size={12} fill="currentColor" className={isActive ? "text-[#c8223d]" : "text-white"} />
                       </span>
                     </div>
                     {/* Episode number badge */}
                     <span className={`absolute bottom-1.5 left-1.5 rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
                       isActive
-                        ? "bg-[#e8336a] text-white"
+                        ? "bg-[#c8223d] text-white"
                         : isPlayed
-                          ? "bg-[#7c4dff]/80 text-white"
+                          ? "bg-white/25 text-white"
                           : "bg-black/70 text-white/80"
                     }`}>
                       {ep.episode_number}
@@ -586,7 +586,7 @@ function EpisodeSidebar({
                   {/* Info */}
                   <div className="min-w-0 flex-1 pt-0.5">
                     <p className={`text-[11px] font-bold uppercase tracking-wide ${
-                      isActive ? "text-[#e8336a]" : isPlayed ? "text-[#a78bfa]" : "text-white/30"
+                      isActive ? "text-[#c8223d]" : isPlayed ? "text-[#c8ced8]" : "text-white/30"
                     }`}>
                       {isActive ? "Now Playing" : isPlayed ? "Watched" : `Episode ${ep.episode_number}`}
                     </p>
@@ -596,13 +596,13 @@ function EpisodeSidebar({
                       {ep.title || `Episode ${ep.episode_number}`}
                     </p>
                     {isActive && (
-                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-[#1ed9cc]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#1ed9cc]">
-                        <span className="h-1 w-1 animate-pulse rounded-full bg-[#1ed9cc]" />
+                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white/[0.08] px-1.5 py-0.5 text-[9px] font-bold text-[#c8ced8]">
+                        <span className="h-1 w-1 animate-pulse rounded-full bg-[#c8ced8]" />
                         LIVE
                       </span>
                     )}
                     {isPlayed && !isActive && (
-                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-[#7c4dff]/15 px-1.5 py-0.5 text-[9px] font-bold text-[#a78bfa]">
+                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white/[0.08] px-1.5 py-0.5 text-[9px] font-bold text-[#c8ced8]">
                         ✓ Played
                       </span>
                     )}

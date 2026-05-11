@@ -4,9 +4,9 @@
   /* Core backgrounds — layered depth */
   --background: #06070d;
   --background-2: #0a0c16;
-  --foreground: #eaedf8;
-  --muted: #6b7494;
-  --subtle: #38405c;
+  --foreground: #edf0f5;
+  --muted: #7a8291;
+  --subtle: #3a4050;
 
   /* Surfaces — glass-like layering */
   --panel: #0d1020;
@@ -18,16 +18,16 @@
   --border-hover: rgba(255,255,255,0.11);
 
   /* Brand accents */
-  --accent: #e8336a;          /* vivid rose-pink */
-  --accent-dim: rgba(232,51,106,0.14);
-  --accent-glow: rgba(232,51,106,0.38);
-  --accent-2: #1ed9cc;        /* cyan-teal */
-  --accent-2-dim: rgba(30,217,204,0.12);
-  --accent-2-glow: rgba(30,217,204,0.32);
-  --purple: #7c4dff;
-  --purple-dim: rgba(124,77,255,0.15);
-  --gold: #f0b429;
-  --gold-dim: rgba(240,180,41,0.15);
+  --accent: #c8223d;          /* cinematic ruby */
+  --accent-dim: rgba(200,34,61,0.14);
+  --accent-glow: rgba(200,34,61,0.34);
+  --accent-2: #c8ced8;        /* soft silver */
+  --accent-2-dim: rgba(200,206,216,0.12);
+  --accent-2-glow: rgba(200,206,216,0.18);
+  --purple: #8f2638;
+  --purple-dim: rgba(143,38,56,0.14);
+  --gold: #d8b56a;
+  --gold-dim: rgba(216,181,106,0.15);
 }
 
 @theme inline {
@@ -138,7 +138,7 @@ button, a, input { outline-color: var(--accent); }
 
 /* ── Gradient text ───────────────────────────────────── */
 .gradient-text {
-  background: linear-gradient(135deg, #e8336a 0%, #7c4dff 55%, #1ed9cc 100%);
+  background: linear-gradient(135deg, #f1f3f6 0%, #c8223d 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -159,7 +159,7 @@ button, a, input { outline-color: var(--accent); }
   inset: 0;
   padding: 1px;
   border-radius: inherit;
-  background: linear-gradient(135deg, #e8336a, #7c4dff, #1ed9cc);
+  background: linear-gradient(135deg, #c8223d, #7b1426, #c8ced8);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -172,8 +172,13 @@ button, a, input { outline-color: var(--accent); }
               filter 0.25s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .card-lift:hover {
-  transform: translateY(-4px) scale(1.015);
+  transform: translateY(-3px) scale(1.01);
   filter: drop-shadow(0 16px 32px rgba(0,0,0,0.55));
+}
+
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 760px;
 }
 
 /* ── Shine overlay on hover ──────────────────────────── */

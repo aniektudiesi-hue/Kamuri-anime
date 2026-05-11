@@ -1,7 +1,7 @@
 "use client";
 
 import Hls from "hls.js";
-import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StreamResponse, Subtitle } from "@/lib/types";
 
@@ -66,6 +66,8 @@ export function VideoPlayer({
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [pipSupported, setPipSupported] = useState(false);
+  const [pipActive, setPipActive] = useState(false);
   const [seekFlash, setSeekFlash] = useState<{ dir: "forward" | "backward"; n: number } | null>(null);
   const seekFlashTimer = useRef<number | undefined>(undefined);
   const [bufferedRanges, setBufferedRanges] = useState<Array<{ start: number; end: number }>>([]);
@@ -167,6 +169,20 @@ export function VideoPlayer({
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    setPipSupported(Boolean(document.pictureInPictureEnabled && video && "requestPictureInPicture" in video));
+    if (!video) return;
+    const onEnter = () => setPipActive(true);
+    const onLeave = () => setPipActive(false);
+    video.addEventListener("enterpictureinpicture", onEnter);
+    video.addEventListener("leavepictureinpicture", onLeave);
+    return () => {
+      video.removeEventListener("enterpictureinpicture", onEnter);
+      video.removeEventListener("leavepictureinpicture", onLeave);
+    };
+  }, [src]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -406,6 +422,16 @@ export function VideoPlayer({
     }
   }, []);
 
+  const togglePictureInPicture = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !document.pictureInPictureEnabled || !("requestPictureInPicture" in video)) return;
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture().catch(() => undefined);
+    } else {
+      video.requestPictureInPicture().catch(() => undefined);
+    }
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -446,6 +472,11 @@ export function VideoPlayer({
         case "f":
           e.preventDefault();
           fullscreen();
+          break;
+        case "p":
+          e.preventDefault();
+          togglePictureInPicture();
+          showControls();
           break;
         case "ArrowUp": {
           e.preventDefault();
@@ -498,7 +529,7 @@ export function VideoPlayer({
 
     container.addEventListener("keydown", handleKeyDown);
     return () => container.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlay, toggleMute, fullscreen, showControls, flashSeek]);
+  }, [togglePlay, toggleMute, fullscreen, togglePictureInPicture, showControls, flashSeek]);
 
   function clientXToFraction(clientX: number) {
     const bar = seekBarRef.current;
@@ -783,7 +814,7 @@ export function VideoPlayer({
             ))}
             {/* Played portion — sits on top of green */}
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-[#e8336a] pointer-events-none shadow-[0_0_18px_rgba(232,51,106,0.58)]"
+              className="absolute inset-y-0 left-0 rounded-full bg-[#c8223d] pointer-events-none shadow-[0_0_18px_rgba(200,34,61,0.52)]"
               style={{ width: `${progress}%` }}
             />
             {/* Knob */}
@@ -965,6 +996,18 @@ export function VideoPlayer({
                   </>
                 ) : null}
               </div>
+            ) : null}
+
+            {pipSupported ? (
+              <button
+                aria-label={pipActive ? "Exit picture in picture" : "Picture in picture"}
+                onClick={togglePictureInPicture}
+                className={`hidden h-8 w-8 place-items-center rounded-xl transition-colors sm:grid ${
+                  pipActive ? "bg-white/10 text-white" : "text-white/75 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <PictureInPicture2 size={18} />
+              </button>
             ) : null}
 
             {/* Fullscreen */}

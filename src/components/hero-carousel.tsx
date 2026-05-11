@@ -85,8 +85,8 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
       </div>
 
       {/* Translucent overlays — lighter so the image shows through */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#06070d]/90 via-[#06070d]/50 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#06070d]/80 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#06070d]/94 via-[#06070d]/62 to-[#06070d]/10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#06070d]/86 via-transparent to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/30 to-transparent" style={{ height: "30%" }} />
 
       {/* Content grid */}
@@ -112,8 +112,8 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
               </span>
             ) : null}
             {current.score ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#f0b429]/15 px-3 py-1 text-[11px] font-bold text-[#f0b429] ring-1 ring-[#f0b429]/25">
-                <Star size={11} className="fill-[#f0b429]" />
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#d8b56a]/15 px-3 py-1 text-[11px] font-bold text-[#d8b56a] ring-1 ring-[#d8b56a]/25">
+                <Star size={11} className="fill-[#d8b56a]" />
                 {Number(current.score).toFixed(2)} rating
               </span>
             ) : null}
@@ -130,16 +130,11 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
             {title}
           </h1>
 
-          {/* UX copy / tagline */}
-          <p className="mb-8 max-w-md text-base leading-relaxed text-white/50">
-            Stream every episode in crystal-clear quality — sub &amp; dub — with adaptive servers, instant subtitle support, and seamless watch history.
-          </p>
-
           {/* CTA buttons */}
-          <div className="flex flex-wrap gap-3">
+          <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href={`/watch/${id}/1`}
-              className="shine group inline-flex h-12 items-center gap-2.5 rounded-2xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] px-6 text-sm font-bold text-white shadow-xl shadow-[#e8336a]/30 transition hover:opacity-90 hover:shadow-[#e8336a]/50 hover:shadow-2xl"
+              className="shine group inline-flex h-12 items-center gap-2.5 rounded-2xl bg-[#c8223d] px-6 text-sm font-bold text-white shadow-xl shadow-[#c8223d]/24 transition hover:bg-[#d62a47] hover:shadow-[#c8223d]/36 hover:shadow-2xl"
             >
               <Play size={18} fill="currentColor" />
               Watch Now
@@ -163,7 +158,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
                   onClick={() => goTo(i, i > index ? 1 : -1)}
                   className={`rounded-full transition duration-400 ${
                     i === index
-                      ? "w-7 h-[5px] bg-gradient-to-r from-[#e8336a] to-[#7c4dff]"
+                      ? "w-7 h-[5px] bg-[#c8223d]"
                       : "w-[5px] h-[5px] bg-white/20 hover:bg-white/40"
                   }`}
                 />
@@ -183,8 +178,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
               {/* Glow */}
               <div className="absolute inset-0 rounded-3xl ring-2 ring-inset ring-white/[0.08]" />
             </div>
-            {/* Decorative glow beneath poster */}
-            <div className="absolute -bottom-6 left-1/2 h-20 w-3/4 -translate-x-1/2 rounded-full bg-[#e8336a]/20 blur-3xl" />
+            <div className="absolute -bottom-6 left-1/2 h-px w-3/4 -translate-x-1/2 bg-white/20 blur-sm" />
           </div>
         ) : null}
       </div>
@@ -232,7 +226,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
         <div className="absolute inset-0 animate-pulse bg-[#141828]" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/35 to-transparent" />
         <div className="relative flex min-h-[420px] items-end px-4">
-          <div className="w-full rounded-[28px] border border-white/[0.1] bg-white/[0.07] p-4 shadow-2xl shadow-black/35 backdrop-blur-2xl">
+          <div className="w-full rounded-[28px] border border-white/[0.1] bg-black/30 p-4 shadow-2xl shadow-black/35 backdrop-blur-2xl">
             <div className="mb-3 h-3 w-24 rounded-full bg-white/[0.12]" />
             <div className="h-8 w-4/5 rounded-xl bg-white/[0.12]" />
             <div className="mt-4 flex gap-2">
@@ -274,7 +268,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
       <div className="relative flex min-h-[430px] items-end px-4">
         <div className="w-[92%] max-w-[360px] rounded-3xl border border-white/[0.1] bg-[#090b13]/28 p-3.5 shadow-2xl shadow-black/35 backdrop-blur-xl">
           <div className="mb-2 flex items-center gap-2">
-            <span className="rounded-full bg-[#e8336a]/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#ff8db2] ring-1 ring-[#e8336a]/30">
+            <span className="rounded-full bg-[#c8223d]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#c8223d]/30">
               Featured
             </span>
             {count > 0 ? (
@@ -291,7 +285,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
           <div className="mt-3 flex gap-2">
             <Link
               href={`/watch/${id}/1`}
-              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#e8336a] to-[#7c4dff] text-sm font-black text-white shadow-lg shadow-[#e8336a]/25"
+              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#c8223d] text-sm font-black text-white shadow-lg shadow-[#c8223d]/22"
             >
               <Play size={16} fill="currentColor" />
               Watch
@@ -312,7 +306,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
                   aria-label={`Featured ${i + 1}`}
                   onClick={() => setIndex(i)}
                   className={`h-1.5 rounded-full transition-all ${
-                    i === index ? "w-7 bg-[#e8336a]" : "w-1.5 bg-white/25"
+                    i === index ? "w-7 bg-[#c8223d]" : "w-1.5 bg-white/25"
                   }`}
                 />
               ))}

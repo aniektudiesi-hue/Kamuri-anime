@@ -29,7 +29,7 @@ export function Header() {
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
             <Image src="/logo.svg" alt="animeTv" width={32} height={32} priority />
             <span className="hidden text-[15px] font-black tracking-tight text-white sm:block">
-              anime<span className="text-[#e8336a]">Tv</span>
+                anime<span className="text-[#c8223d]">Tv</span>
             </span>
           </Link>
 
@@ -80,7 +80,7 @@ export function Header() {
                 onClick={logout}
                 className="ml-1 flex h-8 items-center gap-2 rounded-lg bg-white/[0.05] px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/[0.09] hover:text-white"
               >
-                <span className="grid h-5 w-5 place-items-center rounded-full bg-[#e8336a] text-[9px] font-black text-white">
+                    <span className="grid h-5 w-5 place-items-center rounded-full bg-[#c8223d] text-[9px] font-black text-white">
                   {(user?.username || user?.email || "U")[0].toUpperCase()}
                 </span>
                 <span className="hidden max-w-[80px] truncate lg:block">
@@ -91,7 +91,7 @@ export function Header() {
             ) : (
               <Link
                 href="/login"
-                className="ml-1 flex h-8 items-center gap-2 rounded-lg bg-[#e8336a] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                className="ml-1 flex h-8 items-center gap-2 rounded-lg bg-[#c8223d] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#d62a47]"
               >
                 <UserRound size={14} />
                 Sign In
@@ -157,7 +157,7 @@ export function Header() {
               {isLoggedIn ? (
                 <>
                   <div className="mb-1 flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/65">
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e8336a] text-[10px] font-black text-white">
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-[#c8223d] text-[10px] font-black text-white">
                       {(user?.username || user?.email || "U")[0].toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{user?.username || user?.email || "Account"}</span>
@@ -178,7 +178,7 @@ export function Header() {
                 className="flex h-10 w-full items-center justify-between rounded-lg px-3 text-sm font-medium text-white/55"
               >
                 <span className="flex items-center gap-3"><Wifi size={15} /> Deep buffer</span>
-                <span className={`h-5 w-9 rounded-full p-0.5 transition ${settings.autoFetchWhileWatching ? "bg-[#e8336a]" : "bg-white/[0.12]"}`}>
+                <span className={`h-5 w-9 rounded-full p-0.5 transition ${settings.autoFetchWhileWatching ? "bg-[#c8223d]" : "bg-white/[0.12]"}`}>
                   <span className={`block h-4 w-4 rounded-full bg-white transition ${settings.autoFetchWhileWatching ? "translate-x-4" : ""}`} />
                 </span>
               </button>
@@ -188,7 +188,7 @@ export function Header() {
                 className="flex h-10 w-full items-center justify-between rounded-lg px-3 text-sm font-medium text-white/55"
               >
                 <span className="flex items-center gap-3"><Clock3 size={15} /> Auto resume</span>
-                <span className={`h-5 w-9 rounded-full p-0.5 transition ${settings.autoResume ? "bg-[#e8336a]" : "bg-white/[0.12]"}`}>
+                <span className={`h-5 w-9 rounded-full p-0.5 transition ${settings.autoResume ? "bg-[#c8223d]" : "bg-white/[0.12]"}`}>
                   <span className={`block h-4 w-4 rounded-full bg-white transition ${settings.autoResume ? "translate-x-4" : ""}`} />
                 </span>
               </button>
@@ -201,14 +201,14 @@ export function Header() {
                   {settings.theme === "dark" ? <Moon size={15} /> : <Sun size={15} />}
                   {settings.theme === "dark" ? "Dark mode" : "Light mode"}
                 </span>
-                <span className="text-xs font-bold text-[#e8336a]">Switch</span>
+                      <span className="text-xs font-bold text-[#c8223d]">Switch</span>
               </button>
             </div>
             {!isLoggedIn && (
               <Link
                 href="/login"
                 onClick={() => setOpen(false)}
-                className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#e8336a] text-sm font-semibold text-white"
+                  className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#c8223d] text-sm font-semibold text-white"
               >
                 <UserRound size={14} />
                 Sign In

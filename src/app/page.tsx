@@ -11,47 +11,12 @@ import { api } from "@/lib/api";
 import type { Anime } from "@/lib/types";
 import { animeId, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
 
-async function fetchCurrentlyAiring(): Promise<Anime[]> {
-  const gql = `
-    query Airing {
-      Page(page: 1, perPage: 50) {
-        media(status: RELEASING, type: ANIME, sort: POPULARITY_DESC) {
-          idMal id
-          title { romaji english }
-          coverImage { large }
-          averageScore episodes status
-        }
-      }
-    }
-  `;
-  try {
-    const res = await fetch("https://graphql.anilist.co", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ query: gql }),
-    });
-    if (!res.ok) return [];
-    type M = { idMal: number | null; id: number; title: { romaji: string; english: string | null }; coverImage: { large: string }; averageScore: number | null; episodes: number | null };
-    const json = await res.json() as { data?: { Page?: { media: M[] } } };
-    return (json.data?.Page?.media ?? []).map((m) => ({
-      mal_id: m.idMal ? String(m.idMal) : String(m.id),
-      title: m.title.english || m.title.romaji,
-      image_url: m.coverImage.large,
-      score: m.averageScore ? m.averageScore / 10 : undefined,
-      episodes: m.episodes ?? undefined,
-      status: "currently_airing",
-    }));
-  } catch {
-    return [];
-  }
-}
-
 export default function Home() {
-  const [banners, thumbnails, airing, topRated] = useQueries({
+  const [banners, thumbnails, recent, topRated] = useQueries({
     queries: [
       { queryKey: ["banners"], queryFn: api.banners, staleTime: 1000 * 60 * 60 },
       { queryKey: ["thumbnails"], queryFn: api.thumbnails, staleTime: 1000 * 60 * 60 },
-      { queryKey: ["anilist-airing"], queryFn: fetchCurrentlyAiring, staleTime: 1000 * 60 * 20 },
+      { queryKey: ["recently-added"], queryFn: api.recentlyAdded, staleTime: 1000 * 60 * 45 },
       { queryKey: ["top-rated"], queryFn: api.topRated, staleTime: 1000 * 60 * 60 },
     ],
   });
@@ -67,7 +32,7 @@ export default function Home() {
         {/* Popular Today — full grid, all items */}
         <BigSection
           title="Popular Today"
-          icon={<Flame size={14} className="text-[#e8336a]" />}
+          icon={<Flame size={14} className="text-[#c8223d]" />}
           items={thumbnails.data}
           loading={thumbnails.isLoading}
           viewAllHref="/search?q=popular"
@@ -75,17 +40,17 @@ export default function Home() {
 
         {/* Currently Airing — sourced from AniList RELEASING status */}
         <BigSection
-          title="Currently Airing"
-          icon={<Radio size={14} className="text-emerald-400" />}
-          items={airing.data}
-          loading={airing.isLoading}
-          viewAllHref="/genre/Action"
+          title="New Episodes"
+          icon={<Radio size={14} className="text-[#c8ced8]" />}
+          items={recent.data}
+          loading={recent.isLoading}
+          viewAllHref="/search?q=recent"
         />
 
         {/* Top Rated — full grid, all items */}
         <BigSection
           title="Top Rated All Time"
-          icon={<Trophy size={14} className="text-[#f0b429]" />}
+          icon={<Trophy size={14} className="text-[#d8b56a]" />}
           items={topRated.data}
           loading={topRated.isLoading}
           viewAllHref="/search?q=top+rated"
@@ -111,7 +76,7 @@ function SectionHeader({
   return (
     <div className="mb-4 flex items-center justify-between">
       <div className="flex items-center gap-2.5">
-        <span className="h-5 w-1 rounded-full bg-gradient-to-b from-[#e8336a] to-[#7c4dff]" />
+        <span className="h-5 w-1 rounded-full bg-[#c8223d]" />
         {icon}
         <h2 className="text-base font-black text-white">{title}</h2>
         {count ? (
@@ -148,9 +113,10 @@ function BigSection({
   viewAllHref?: string;
 }) {
   const allItems = items ?? [];
+  const visibleItems = allItems.slice(0, 36);
 
   return (
-    <section className="border-t border-white/[0.05] py-6 first:border-t-0">
+    <section className="content-visibility-auto border-t border-white/[0.05] py-6 first:border-t-0">
       <SectionHeader
         title={title}
         icon={icon}
@@ -160,7 +126,7 @@ function BigSection({
 
       <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
         {loading
-          ? Array.from({ length: 24 }).map((_, i) => (
+          ? Array.from({ length: 18 }).map((_, i) => (
               <div key={i}>
                 <div
                   className="aspect-[2/3] animate-pulse rounded-xl bg-[#141828]"
@@ -170,8 +136,8 @@ function BigSection({
                 <div className="mt-1.5 h-2.5 w-2/5 animate-pulse rounded-full bg-[#0d1020]" style={{ animationDelay: `${i * 20 + 100}ms` }} />
               </div>
             ))
-          : allItems.map((anime, i) => (
-              <AnimeGridCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 12} />
+          : visibleItems.map((anime, i) => (
+              <AnimeGridCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 6} />
             ))}
       </div>
     </section>
@@ -222,15 +188,15 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
 
           {/* Score badge */}
           {anime.score ? (
-            <span className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-bold text-[#f0b429]">
-              <Star size={7} className="fill-[#f0b429]" />
+            <span className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-bold text-[#d8b56a]">
+              <Star size={7} className="fill-[#d8b56a]" />
               {Number(anime.score).toFixed(1)}
             </span>
           ) : null}
 
           {/* Hover overlay */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-[#e8336a] shadow-lg shadow-[#e8336a]/40">
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-[#c8223d] shadow-lg shadow-[#c8223d]/30">
               <Play size={14} fill="white" className="text-white" />
             </span>
           </div>
