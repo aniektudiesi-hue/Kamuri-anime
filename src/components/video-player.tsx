@@ -238,19 +238,8 @@ export function VideoPlayer({
       if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
-          lowLatencyMode: false,
+          lowLatencyMode: true,
           startFragPrefetch: true,
-          testBandwidth: true,
-          maxBufferLength: 7200,
-          maxMaxBufferLength: 7200,
-          maxBufferSize: 300 * 1000 * 1000,
-          backBufferLength: 30,
-          abrEwmaDefaultEstimate: 8 * 1000 * 1000,
-          maxLoadingDelay: 1,
-          fragLoadingTimeOut: 30_000,
-          manifestLoadingTimeOut: 20_000,
-          fragLoadingMaxRetry: 6,
-          manifestLoadingMaxRetry: 4,
         });
         hlsRef.current = hls;
         hls.loadSource(src);
@@ -279,7 +268,7 @@ export function VideoPlayer({
           rememberTime();
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             setIsBuffering(true);
-            hls?.startLoad(lastTimeRef.current || -1);
+            hls?.startLoad(Math.max(0, lastTimeRef.current || video.currentTime || 0));
             return;
           }
           if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -561,6 +550,7 @@ export function VideoPlayer({
         ref={videoRef}
         playsInline
         autoPlay={autoPlay}
+        preload="auto"
         onClick={togglePlay}
         className="h-full w-full bg-black"
         crossOrigin="anonymous"

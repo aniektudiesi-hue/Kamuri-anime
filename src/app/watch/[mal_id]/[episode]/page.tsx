@@ -61,7 +61,6 @@ export default function WatchPage({
   const [type, setType] = useState<"sub" | "dub">("sub");
   const [known, setKnown] = useState<Anime | undefined>();
   const [localResumeTime, setLocalResumeTime] = useState(0);
-  const [failedServers, setFailedServers] = useState<ServerId[]>([]);
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [prefetchState, setPrefetchState] = useState({ progress: 0, message: "", ready: false });
   const [offlinePlayable, setOfflinePlayable] = useState<OfflinePlayable | undefined>();
@@ -98,7 +97,7 @@ export default function WatchPage({
   const playableServers = SERVERS.filter(
     (s, i) => hasPlayableStream(streamQueries[i]?.data),
   );
-  const availableServers = playableServers.filter((s) => !failedServers.includes(s.id));
+  const availableServers = playableServers;
   const selectedServer = availableServers.find((s) => s.id === server) ?? availableServers[0];
   const selectedStream = selectedServer
     ? streamQueries[SERVERS.findIndex((s) => s.id === selectedServer.id)]?.data
@@ -190,7 +189,6 @@ export default function WatchPage({
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      setFailedServers([]);
       setServer("mega");
     }, 0);
     return () => window.clearTimeout(id);
@@ -255,12 +253,6 @@ export default function WatchPage({
       });
     };
   }, [activeServerId, animePoster, displayTitle, episodeNum, malId, selectedStream, shouldProgressiveCache]);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function markServerFailed(_msg: string) {
-    if (!activeServerId) return;
-    setFailedServers((c) => (c.includes(activeServerId) ? c : [...c, activeServerId]));
-  }
 
   return (
     <AppShell>
@@ -389,18 +381,7 @@ export default function WatchPage({
                       </button>
                     );
                   })}
-                  {failedServers.map((id) => (
-                    <div key={id} className="flex flex-col rounded-2xl border border-red-500/15 bg-red-950/10 px-4 py-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
-                        <span className="text-sm font-bold text-red-300/60">
-                          {SERVERS.find((s) => s.id === id)?.label}
-                        </span>
-                      </div>
-                      <span className="mt-0.5 text-[10px] text-red-400/40">Unavailable</span>
-                    </div>
-                  ))}
-                  {!streamsLoading && !availableServers.length && !failedServers.length ? (
+                  {!streamsLoading && !availableServers.length ? (
                     <span className="text-sm text-white/30">No servers responded</span>
                   ) : null}
                 </div>
