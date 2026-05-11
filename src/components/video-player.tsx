@@ -42,8 +42,6 @@ export function VideoPlayer({
   const restoredRef = useRef(false);
   const captionCuesRef = useRef<CaptionCue[]>([]);
   const controlsTimerRef = useRef<number | undefined>(undefined);
-  const startupTimerRef = useRef<number | undefined>(undefined);
-  const stallTimerRef = useRef<number | undefined>(undefined);
   // Stable refs so callbacks never cause the HLS effect to re-run
   const onProgressRef = useRef(onProgress);
   const onFatalErrorRef = useRef(onFatalError);
@@ -141,8 +139,6 @@ export function VideoPlayer({
     return () => {
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       if (seekFlashTimer.current) window.clearTimeout(seekFlashTimer.current);
-      if (startupTimerRef.current) window.clearTimeout(startupTimerRef.current);
-      if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
     };
   }, []);
 
@@ -170,19 +166,6 @@ export function VideoPlayer({
     setShowQualityMenu(false);
     restoredRef.current = false;
     lastTimeRef.current = initialTime;
-    if (startupTimerRef.current) window.clearTimeout(startupTimerRef.current);
-    if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
-
-    const failIfStillStarting = () => {
-      if (video.currentTime > 0.5 || video.readyState >= 3 || playbackError) return;
-      const message = "This server is taking too long to start.";
-      setPlaybackError(message);
-      setIsBuffering(false);
-      onFatalErrorRef.current?.(message);
-    };
-
-    startupTimerRef.current = window.setTimeout(failIfStillStarting, 18_000);
-
     const rememberTime = () => {
       if (Number.isFinite(video.currentTime) && video.currentTime > 0) {
         lastTimeRef.current = video.currentTime;
@@ -210,19 +193,8 @@ export function VideoPlayer({
     const markWaiting = () => {
       rememberTime();
       setIsBuffering(true);
-      if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
-      stallTimerRef.current = window.setTimeout(() => {
-        if (video.currentTime > 1 && video.readyState < 3) {
-          const message = "This server stalled while loading.";
-          setPlaybackError(message);
-          setIsBuffering(false);
-          onFatalErrorRef.current?.(message);
-        }
-      }, 18_000);
     };
     const markPlaying = () => {
-      if (startupTimerRef.current) window.clearTimeout(startupTimerRef.current);
-      if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
       setIsBuffering(false);
       setPlaying(true);
       setControlsOpen(true);
@@ -230,7 +202,6 @@ export function VideoPlayer({
       rememberTime();
     };
     const markPause = () => {
-      if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       setControlsOpen(true);
       setPlaying(false);
@@ -315,8 +286,6 @@ export function VideoPlayer({
     }
 
     return () => {
-      if (startupTimerRef.current) window.clearTimeout(startupTimerRef.current);
-      if (stallTimerRef.current) window.clearTimeout(stallTimerRef.current);
       hls?.destroy();
       hlsRef.current = null;
       video.removeEventListener("canplay", playWhenReady);
