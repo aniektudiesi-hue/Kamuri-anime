@@ -20,6 +20,7 @@ type QualityLevel = {
 export function VideoPlayer({
   stream,
   title,
+  poster,
   initialTime = 0,
   nextHref,
   onProgress,
@@ -29,6 +30,7 @@ export function VideoPlayer({
 }: {
   stream?: StreamResponse;
   title: string;
+  poster?: string;
   initialTime?: number;
   nextHref?: string;
   onProgress?: (progress: { currentTime: number; duration: number }) => void;
@@ -73,6 +75,7 @@ export function VideoPlayer({
   const [bufferedRanges, setBufferedRanges] = useState<Array<{ start: number; end: number }>>([]);
   const [bufferAhead, setBufferAhead] = useState(0);
   const [bufferedPercent, setBufferedPercent] = useState(0);
+  const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
   const isMoonStream = stream?.server === "moon" || Boolean(src?.includes("/proxy/moon/"));
@@ -194,6 +197,7 @@ export function VideoPlayer({
     setBufferedRanges([]);
     setBufferAhead(0);
     setBufferedPercent(0);
+    setHasVideoFrame(false);
     setQualityLevels([]);
     setSelectedQuality(-1);
     setShowQualityMenu(false);
@@ -270,6 +274,7 @@ export function VideoPlayer({
       setIsBuffering(true);
     };
     const markPlaying = () => {
+      setHasVideoFrame(true);
       playIntentRef.current = true;
       setIsBuffering(false);
       setPlaying(true);
@@ -279,6 +284,7 @@ export function VideoPlayer({
       rememberTime();
     };
     const markCanPlay = () => {
+      setHasVideoFrame(true);
       setIsBuffering(false);
       playWhenReady();
     };
@@ -654,10 +660,19 @@ export function VideoPlayer({
         playsInline
         autoPlay={autoPlay}
         preload="auto"
+        poster={poster}
         onClick={togglePlay}
         className="h-full w-full bg-black object-contain"
         crossOrigin="anonymous"
       />
+
+      {poster && !hasVideoFrame && !playbackError ? (
+        <div className="pointer-events-none absolute inset-0 z-10 bg-black">
+          <img src={poster} alt="" className="h-full w-full object-cover opacity-78 blur-[1px] scale-105" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/28 to-black/32" />
+          <div className="absolute inset-0 bg-black/12 backdrop-blur-[1px]" />
+        </div>
+      ) : null}
 
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.55)_0%,transparent_24%,transparent_60%,rgba(0,0,0,0.86)_100%)]" />
 

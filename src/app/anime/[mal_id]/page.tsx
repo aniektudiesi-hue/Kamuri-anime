@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth";
 import type { Anime } from "@/lib/types";
 import {
   animeId, bannerOf, displayStatus, episodeCount, posterOf, progressOf,
-  rememberedAnime, rememberedProgress, titleOf,
+  rememberAnime, rememberedAnime, rememberedProgress, titleOf,
 } from "@/lib/utils";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
@@ -58,6 +58,10 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       (item) => animeId(item) === malId,
     )) as Anime | undefined;
   const hint = episodeCount(known);
+
+  useEffect(() => {
+    if (known) rememberAnime(known);
+  }, [known]);
 
   const episodes = useQuery({
     queryKey: ["episodes", malId, hint],
@@ -143,22 +147,6 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           <div className="absolute inset-0 bg-gradient-to-r from-[#06070d] via-[#06070d]/82 to-[#06070d]/36" />
           <div className="absolute inset-0 hidden bg-[radial-gradient(circle_at_78%_20%,rgba(200,34,61,0.16),transparent_32%),radial-gradient(circle_at_82%_76%,rgba(200,206,216,0.10),transparent_30%)] lg:block" />
         </div>
-
-        {poster ? (
-          <div className="pointer-events-none absolute right-5 top-20 hidden w-[46%] grid-cols-3 gap-4 opacity-45 lg:grid xl:right-10">
-            {Array.from({ length: 9 }).map((_, index) => (
-              <div
-                key={index}
-                className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-white/[0.09] bg-white/[0.045] shadow-2xl shadow-black/25 backdrop-blur-md"
-                style={{ transform: `translateY(${(index % 3) * 16}px)` }}
-              >
-                <Image src={poster} alt="" fill sizes="15vw" className="object-cover opacity-70" />
-                <div className="absolute inset-0 bg-[#06070d]/28" />
-              </div>
-            ))}
-            <div className="absolute inset-[-10%] bg-gradient-to-l from-transparent via-[#06070d]/10 to-[#06070d]/95" />
-          </div>
-        ) : null}
 
         <div className="relative mx-auto max-w-screen-2xl px-4 py-6 sm:py-10 lg:px-6 lg:py-16">
           {/* Breadcrumb */}

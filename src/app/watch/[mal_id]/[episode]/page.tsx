@@ -329,11 +329,27 @@ export default function WatchPage({
                 </div>
               </div>
             ) : streamsLoading && !selectedStream ? (
-              <div className="aspect-video w-full animate-pulse bg-[#141828]" />
+              <div className="relative aspect-video w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)]">
+                {animePoster ? (
+                  <>
+                    <Image src={animePoster} alt="" fill priority sizes="100vw" className="scale-105 object-cover opacity-80 blur-[1px]" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/28 to-black/32" />
+                  </>
+                ) : (
+                  <div className="absolute inset-0 animate-pulse bg-[#141828]" />
+                )}
+                <div className="absolute inset-0 grid place-items-center">
+                  <div className="relative grid h-14 w-14 place-items-center rounded-full border border-white/[0.08] bg-black/18 shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+                    <div className="absolute inset-2 animate-spin rounded-full border-2 border-white/10 border-t-white/90" />
+                    <div className="h-1.5 w-1.5 rounded-full bg-white/90 shadow-[0_0_18px_rgba(255,255,255,0.75)]" />
+                  </div>
+                </div>
+              </div>
             ) : (
               <VideoPlayer
                 key={`${activeServerId}-${type}-${selectedStream?.m3u8_url || selectedStream?.url || selectedStream?.stream_url}`}
                 stream={selectedStream}
+                poster={animePoster}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
                 autoPlay={settings.autoResume}
