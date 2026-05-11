@@ -109,6 +109,7 @@ export function historyKey(malId: string, episode: string | number) {
 }
 
 const HISTORY_INDEX_KEY = "kairostream-history-index";
+const HISTORY_ENTRY_PREFIX = "kairostream-history-";
 const HISTORY_EVENT = "anime-tv-history-updated";
 
 type HistoryPointer = {
@@ -162,6 +163,10 @@ function notifyHistoryUpdated(item?: LibraryItem) {
   window.dispatchEvent(new CustomEvent(HISTORY_EVENT, { detail: item }));
 }
 
+function isHistoryStorageKey(key: string | null): key is string {
+  return typeof key === "string" && key.startsWith(HISTORY_ENTRY_PREFIX) && key !== HISTORY_INDEX_KEY;
+}
+
 export function rememberProgress(item: LibraryItem) {
   const id = String(item.mal_id || item.anime_id || "");
   const episode = item.episode || item.episode_num || 1;
@@ -173,7 +178,7 @@ export function rememberProgress(item: LibraryItem) {
   const pointer: HistoryPointer = { key, mal_id: id, episode, watched_at: saved.watched_at };
   const nextIndex = [
     pointer,
-    ...readHistoryIndex().filter((entry) => entry.key !== key),
+    ...readHistoryIndex().filter((entry) => String(entry.mal_id) !== id),
   ].slice(0, 250);
   window.localStorage.setItem(HISTORY_INDEX_KEY, JSON.stringify(nextIndex));
   notifyHistoryUpdated(saved);
@@ -190,17 +195,20 @@ export function rememberedProgress(malId: string, episode: string | number) {
 
 export function rememberedHistory(limit = 200) {
   if (typeof window === "undefined") return [];
-  const seen = new Set<string>();
-  const items: LibraryItem[] = [];
+  const byAnime = new Map<string, LibraryItem>();
 
   const addByKey = (key: string, fallback?: HistoryPointer) => {
-    if (!key || seen.has(key)) return;
-    seen.add(key);
+    if (!isHistoryStorageKey(key)) return;
     try {
       const stored = JSON.parse(window.localStorage.getItem(key) || "") as LibraryItem;
       const id = String(stored.mal_id || stored.anime_id || fallback?.mal_id || "");
       const episode = stored.episode || stored.episode_num || fallback?.episode || 1;
-      if (id) items.push(normalizeHistoryItem(stored, id, episode));
+      if (!id) return;
+      const next = normalizeHistoryItem(stored, id, episode);
+      const current = byAnime.get(id);
+      if (!current || watchedAtMillis(next.watched_at) >= watchedAtMillis(current.watched_at)) {
+        byAnime.set(id, { ...current, ...next });
+      }
     } catch {
       // Ignore corrupt local history entries instead of losing the rest.
     }
@@ -209,10 +217,10 @@ export function rememberedHistory(limit = 200) {
   readHistoryIndex().forEach((entry) => addByKey(entry.key, entry));
   for (let index = 0; index < window.localStorage.length; index += 1) {
     const key = window.localStorage.key(index);
-    if (key?.startsWith("kairostream-history-")) addByKey(key);
+    if (isHistoryStorageKey(key)) addByKey(key);
   }
 
-  return items
+  return Array.from(byAnime.values())
     .sort((a, b) => watchedAtMillis(b.watched_at) - watchedAtMillis(a.watched_at))
     .slice(0, limit);
 }
@@ -222,7 +230,7 @@ export function clearRememberedHistory() {
   const keys = new Set(readHistoryIndex().map((entry) => entry.key));
   for (let index = 0; index < window.localStorage.length; index += 1) {
     const key = window.localStorage.key(index);
-    if (key?.startsWith("kairostream-history-")) keys.add(key);
+    if (isHistoryStorageKey(key)) keys.add(key);
   }
   keys.forEach((key) => window.localStorage.removeItem(key));
   window.localStorage.removeItem(HISTORY_INDEX_KEY);

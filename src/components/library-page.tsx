@@ -61,18 +61,16 @@ function historyTime(item: LibraryItem) {
 
 function mergeHistoryItems(remote: LibraryItem[], local: LibraryItem[]) {
   const merged = new Map<string, LibraryItem>();
-  remote.forEach((item) => {
+  const put = (item: LibraryItem) => {
     const id = String(item.mal_id || item.anime_id || "");
-    const episode = item.episode || item.episode_num || 1;
-    if (id) merged.set(`${id}:${episode}`, item);
-  });
-  local.forEach((item) => {
-    const id = String(item.mal_id || item.anime_id || "");
-    const episode = item.episode || item.episode_num || 1;
     if (!id) return;
-    const key = `${id}:${episode}`;
-    merged.set(key, { ...(merged.get(key) ?? {}), ...item });
-  });
+    const current = merged.get(id);
+    if (!current || historyTime(item) >= historyTime(current)) {
+      merged.set(id, { ...current, ...item });
+    }
+  };
+  remote.forEach(put);
+  local.forEach(put);
   return Array.from(merged.values()).sort((a, b) => historyTime(b) - historyTime(a));
 }
 
