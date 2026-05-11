@@ -64,6 +64,7 @@ export default function WatchPage({
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [prefetchState, setPrefetchState] = useState({ progress: 0, message: "", ready: false });
   const [offlinePlayable, setOfflinePlayable] = useState<OfflinePlayable | undefined>();
+  const [loadBackupServers, setLoadBackupServers] = useState(false);
   const { token } = useAuth();
   const settings = useSettings();
   const queryClient = useQueryClient();
@@ -87,7 +88,7 @@ export default function WatchPage({
     queries: SERVERS.map((s) => ({
       queryKey: ["stream", malId, episode, s.id, s.id === "mega" ? type : "any"],
       queryFn: () => fetchServer(s.id, malId, episode, type),
-      enabled: Boolean(malId) && Number.isFinite(episodeNum) && (s.id === "mega" || server === s.id),
+      enabled: Boolean(malId) && Number.isFinite(episodeNum) && (s.id === "mega" || server === s.id || loadBackupServers),
       retry: s.id === "moon" ? 1 : false,
       staleTime: 1000 * 60 * 5,
       gcTime: 1000 * 60 * 20,
@@ -103,6 +104,7 @@ export default function WatchPage({
     ? streamQueries[SERVERS.findIndex((s) => s.id === selectedServer.id)]?.data
     : undefined;
   const activeServerId = selectedServer?.id;
+  const megaQuery = streamQueries[SERVERS.findIndex((s) => s.id === "mega")];
   const streamsLoading = streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
@@ -189,9 +191,18 @@ export default function WatchPage({
   useEffect(() => {
     const id = window.setTimeout(() => {
       setServer("mega");
+      setLoadBackupServers(false);
     }, 0);
     return () => window.clearTimeout(id);
   }, [episode, malId, type]);
+
+  useEffect(() => {
+    setLoadBackupServers(false);
+    if (!malId || !Number.isFinite(episodeNum)) return;
+    if (!megaQuery?.data && !megaQuery?.isError) return;
+    const id = window.setTimeout(() => setLoadBackupServers(true), 900);
+    return () => window.clearTimeout(id);
+  }, [episodeNum, malId, megaQuery?.data, megaQuery?.isError]);
 
   useEffect(() => {
     if (!shouldProgressiveCache || !selectedStream || !activeServerId) {
