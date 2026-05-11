@@ -1,5 +1,6 @@
 import type { Anime, EpisodeResponse, LibraryItem, StreamResponse, User } from "./types";
 import { listFromPayload } from "./utils";
+import { readCachedStream, writeCachedStream } from "./stream-cache";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
 
@@ -73,6 +74,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return (await res.json()) as T;
 }
 
+async function cachedStreamRequest(key: string, path: string) {
+  const cached = readCachedStream(key);
+  if (cached) return cached;
+  const stream = await request<StreamResponse>(path);
+  writeCachedStream(key, stream);
+  return stream;
+}
+
 export const api = {
   banners: async () => listFromPayload<Anime>(await request("/api/v1/banners")),
   thumbnails: async () => listFromPayload<Anime>(await request("/home/thumbnails")),
@@ -82,9 +91,11 @@ export const api = {
   suggest: async (query: string) => listFromPayload<Anime>(await request(`/suggest/${encodeURIComponent(query)}`)),
   episodes: (malId: string, hint = 0) => request<EpisodeResponse>(`/anime/episode/${malId}?hint=${hint}`),
   stream: (malId: string, episode: string | number, type: "sub" | "dub") =>
-    request<StreamResponse>(`/api/stream/${malId}/${episode}?type=${type}&embed=false`),
-  moon: (malId: string, episode: string | number) => request<StreamResponse>(`/api/moon/${malId}/${episode}`),
-  hd1: (malId: string, episode: string | number) => request<StreamResponse>(`/api/hd1/${malId}/${episode}`),
+    cachedStreamRequest(`mega:${malId}:${episode}:${type}`, `/api/stream/${malId}/${episode}?type=${type}&embed=false`),
+  moon: (malId: string, episode: string | number) =>
+    cachedStreamRequest(`moon:${malId}:${episode}`, `/api/moon/${malId}/${episode}`),
+  hd1: (malId: string, episode: string | number) =>
+    cachedStreamRequest(`hd1:${malId}:${episode}`, `/api/hd1/${malId}/${episode}`),
   login: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   register: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   me: (token: string) => request<User>("/auth/me", { token }),

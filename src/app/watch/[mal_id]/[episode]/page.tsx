@@ -11,6 +11,7 @@ import { EpisodeDownloadButton } from "@/components/episode-download-button";
 import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { warmStreamManifest } from "@/lib/stream-cache";
 import { startProgressiveOfflinePlayback, type OfflinePlayable } from "@/lib/offline-downloads";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
@@ -90,8 +91,8 @@ export default function WatchPage({
       queryFn: () => fetchServer(s.id, malId, episode, type),
       enabled: Boolean(malId) && Number.isFinite(episodeNum) && (s.id === "mega" || server === s.id || loadBackupServers),
       retry: s.id === "moon" ? 1 : false,
-      staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 20,
+      staleTime: 1000 * 60 * 25,
+      gcTime: 1000 * 60 * 120,
     })),
   });
 
@@ -109,6 +110,7 @@ export default function WatchPage({
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
   const shouldProgressiveCache = Boolean(selectedStream && activeServerId && settings.autoFetchWhileWatching);
+  const streamWarmKey = streamQueries.map((query) => query.data?.m3u8_url || query.data?.stream_url || query.data?.url || "").join("|");
 
   const episodes = useQuery({
     queryKey: ["episodes", malId, 0],
@@ -203,6 +205,13 @@ export default function WatchPage({
     const id = window.setTimeout(() => setLoadBackupServers(true), 900);
     return () => window.clearTimeout(id);
   }, [episodeNum, malId, megaQuery?.data, megaQuery?.isError]);
+
+  useEffect(() => {
+    const streams = streamQueries.map((query) => query.data).filter(Boolean);
+    streams.forEach((stream) => warmStreamManifest(stream));
+  // streamQueries is intentionally read here; streamWarmKey is the stable change signal.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamWarmKey]);
 
   useEffect(() => {
     if (!shouldProgressiveCache || !selectedStream || !activeServerId) {
