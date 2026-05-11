@@ -75,7 +75,6 @@ export function VideoPlayer({
         /\/m3u8(?:$|[?#])/i.test(src) ||
         /\/proxy\/(?:m3u8|moon)\b/i.test(src)),
   );
-  const isMoonStream = stream?.server === "moon";
   const subtitles = useMemo(() => preferredSubtitles(stream?.subtitles), [stream?.subtitles]);
   const activeSubtitleUrl = subtitles[0]?.file ?? "";
   const subtitleCount = subtitles.length;
@@ -167,6 +166,7 @@ export function VideoPlayer({
     setShowQualityMenu(false);
     restoredRef.current = false;
     lastTimeRef.current = initialTime;
+    let playRequested = false;
     const rememberTime = () => {
       if (Number.isFinite(video.currentTime) && video.currentTime > 0) {
         lastTimeRef.current = video.currentTime;
@@ -184,6 +184,8 @@ export function VideoPlayer({
       restoreTime();
       setIsBuffering(false);
       if (!autoPlay) return;
+      if (playRequested) return;
+      playRequested = true;
       try {
         await video.play();
       } catch {
@@ -202,6 +204,10 @@ export function VideoPlayer({
       hideControlsSoon();
       rememberTime();
     };
+    const markCanPlay = () => {
+      setIsBuffering(false);
+      playWhenReady();
+    };
     const markPause = () => {
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       setControlsOpen(true);
@@ -218,6 +224,8 @@ export function VideoPlayer({
 
     video.addEventListener("loadedmetadata", restoreTime);
     video.addEventListener("loadedmetadata", markDuration);
+    video.addEventListener("loadeddata", markCanPlay);
+    video.addEventListener("canplay", markCanPlay);
     video.addEventListener("playing", markPlaying);
     video.addEventListener("pause", markPause);
     video.addEventListener("durationchange", markDuration);
@@ -230,20 +238,19 @@ export function VideoPlayer({
       if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
-          progressive: true,
           lowLatencyMode: false,
           startFragPrefetch: true,
-          testBandwidth: !isMoonStream,
-          maxBufferLength: isMoonStream ? 14400 : 7200,
-          maxMaxBufferLength: isMoonStream ? 14400 : 7200,
-          maxBufferSize: isMoonStream ? 900 * 1000 * 1000 : 300 * 1000 * 1000,
-          backBufferLength: isMoonStream ? 300 : 30,
-          abrEwmaDefaultEstimate: isMoonStream ? 20 * 1000 * 1000 : 8 * 1000 * 1000,
+          testBandwidth: true,
+          maxBufferLength: 7200,
+          maxMaxBufferLength: 7200,
+          maxBufferSize: 300 * 1000 * 1000,
+          backBufferLength: 30,
+          abrEwmaDefaultEstimate: 8 * 1000 * 1000,
           maxLoadingDelay: 1,
-          fragLoadingTimeOut: isMoonStream ? 60_000 : 30_000,
-          manifestLoadingTimeOut: isMoonStream ? 45_000 : 20_000,
-          fragLoadingMaxRetry: isMoonStream ? 10 : 6,
-          manifestLoadingMaxRetry: isMoonStream ? 6 : 4,
+          fragLoadingTimeOut: 30_000,
+          manifestLoadingTimeOut: 20_000,
+          fragLoadingMaxRetry: 6,
+          manifestLoadingMaxRetry: 4,
         });
         hlsRef.current = hls;
         hls.loadSource(src);
@@ -261,6 +268,10 @@ export function VideoPlayer({
             })
             .map((l) => ({ hlsIndex: l.hlsIndex, height: l.height, label: `${l.height}p` }));
           setQualityLevels(levels);
+          playWhenReady();
+        });
+        hls.on(Hls.Events.FRAG_BUFFERED, () => {
+          setIsBuffering(false);
           playWhenReady();
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
@@ -297,6 +308,8 @@ export function VideoPlayer({
       video.removeEventListener("canplay", playWhenReady);
       video.removeEventListener("loadedmetadata", restoreTime);
       video.removeEventListener("loadedmetadata", markDuration);
+      video.removeEventListener("loadeddata", markCanPlay);
+      video.removeEventListener("canplay", markCanPlay);
       video.removeEventListener("playing", markPlaying);
       video.removeEventListener("pause", markPause);
       video.removeEventListener("durationchange", markDuration);
