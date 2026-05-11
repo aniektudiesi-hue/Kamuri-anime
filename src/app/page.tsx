@@ -167,7 +167,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
               className="object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="h-full w-full bg-gradient-to-br from-[#141828] to-[#0d1020]" />
+            <div className="h-full w-full bg-[#141828]" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 

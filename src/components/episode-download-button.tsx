@@ -124,7 +124,7 @@ export function EpisodeDownloadButton({
           type="button"
         disabled={!src || busy}
           onClick={startDownload}
-          className="inline-flex h-10 items-center gap-2 rounded-2xl bg-gradient-to-r from-[#1ed9cc] to-[#7c4dff] px-4 text-sm font-bold text-white shadow-lg shadow-[#1ed9cc]/10 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex h-10 items-center gap-2 rounded-2xl bg-[#c8223d] px-4 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/15 transition hover:bg-[#d62a47] disabled:cursor-not-allowed disabled:opacity-45"
         >
           {state === "done" ? <CheckCircle2 size={16} /> : <Download size={16} />}
           {busy ? "Saving offline" : state === "done" ? "Saved offline" : prefetch?.ready ? "Save offline" : "Save offline"}
@@ -146,7 +146,7 @@ export function EpisodeDownloadButton({
         <div className="mt-3">
           <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
             <div
-              className={`h-full rounded-full transition-all ${state === "error" ? "bg-red-400" : "bg-[#1ed9cc]"}`}
+              className={`h-full rounded-full transition-all ${state === "error" ? "bg-red-400" : "bg-[#c8ced8]"}`}
               style={{ width: `${Math.max(4, state === "idle" ? prefetch?.progress ?? 0 : progress)}%` }}
             />
           </div>

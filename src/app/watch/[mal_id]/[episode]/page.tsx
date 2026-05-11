@@ -11,6 +11,7 @@ import { EpisodeDownloadButton } from "@/components/episode-download-button";
 import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { historySocketUrl } from "@/lib/history-realtime";
 import { warmStreamManifest } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
@@ -70,6 +71,9 @@ export default function WatchPage({
   const episodeNum = Number(episode);
   const savedHistoryKey = useRef("");
   const lastProgressSave = useRef(0);
+  const lastHttpProgressSave = useRef(0);
+  const historySocketRef = useRef<WebSocket | null>(null);
+  const historySocketReadyRef = useRef(false);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -145,11 +149,63 @@ export default function WatchPage({
     tokenRef.current = token;
   }, [token]);
 
+  useEffect(() => {
+    if (!token) {
+      historySocketReadyRef.current = false;
+      historySocketRef.current?.close();
+      historySocketRef.current = null;
+      return;
+    }
+
+    let closed = false;
+    let reconnectTimer: number | undefined;
+
+    const connect = () => {
+      if (closed) return;
+      const socket = new WebSocket(historySocketUrl(token));
+      historySocketRef.current = socket;
+      historySocketReadyRef.current = false;
+
+      socket.onopen = () => {
+        historySocketReadyRef.current = true;
+      };
+      socket.onclose = () => {
+        historySocketReadyRef.current = false;
+        if (!closed) reconnectTimer = window.setTimeout(connect, 5000);
+      };
+      socket.onerror = () => {
+        historySocketReadyRef.current = false;
+        socket.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      closed = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      historySocketReadyRef.current = false;
+      historySocketRef.current?.close();
+      historySocketRef.current = null;
+    };
+  }, [token]);
+
+  const sendRealtimeHistory = useCallback((body: Record<string, unknown>) => {
+    const socket = historySocketRef.current;
+    if (!historySocketReadyRef.current || !socket || socket.readyState !== WebSocket.OPEN) return false;
+    try {
+      socket.send(JSON.stringify(body));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const saveWatchProgress = useCallback(
     ({ currentTime, duration }: { currentTime: number; duration: number }) => {
       if (!Number.isFinite(currentTime) || currentTime < 1) return;
       const now = Date.now();
-      if (now - lastProgressSave.current < 12000 && currentTime + 2 < duration) return;
+      if (now - lastProgressSave.current < 5000 && currentTime + 2 < duration) return;
       lastProgressSave.current = now;
       const body = {
         mal_id: malId, anime_id: malId, title: animeTitleRef.current,
@@ -160,25 +216,38 @@ export default function WatchPage({
         watched_at: new Date().toISOString(),
       };
       rememberProgress(body);
-      if (tokenRef.current) saveHistoryRef.current(body);
+      if (!tokenRef.current) return;
+
+      const sentRealtime = sendRealtimeHistory(body);
+      const shouldHttpFallback =
+        !sentRealtime ||
+        now - lastHttpProgressSave.current > 30000 ||
+        currentTime + 2 >= duration;
+
+      if (shouldHttpFallback) {
+        lastHttpProgressSave.current = now;
+        saveHistoryRef.current(body);
+      }
     },
     // Only re-create when episode/anime changes, not on every mutation state change
-    [episodeNum, malId],
+    [episodeNum, malId, sendRealtimeHistory],
   );
 
   useEffect(() => {
-    if (!token || !selectedStream) return;
+    if (!selectedStream) return;
     const key = `${malId}:${episodeNum}`;
     if (savedHistoryKey.current === key) return;
     savedHistoryKey.current = key;
-    saveHistoryRef.current({
+    const body = {
       mal_id: malId, anime_id: malId, title: animeTitle,
       image_url: animePoster, poster: animePoster,
       episode: episodeNum, episode_num: episodeNum,
       playback_pos: Math.floor(initialTime || 0), progress: Math.floor(initialTime || 0),
       timestamp: Math.floor(initialTime || 0), watched_at: new Date().toISOString(),
-    });
-  }, [animePoster, animeTitle, episodeNum, initialTime, malId, token, selectedStream]);
+    };
+    rememberProgress(body);
+    if (token && !sendRealtimeHistory(body)) saveHistoryRef.current(body);
+  }, [animePoster, animeTitle, episodeNum, initialTime, malId, token, selectedStream, sendRealtimeHistory]);
 
   useEffect(() => {
     if (!malId || !Number.isFinite(episodeNum)) return;

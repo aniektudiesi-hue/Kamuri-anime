@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, X, Loader2, AlertCircle, RefreshCw, WifiOff } from "lucide-react";
 import { KeyboardEvent, useEffect, useRef, useState, useMemo } from "react";
@@ -110,11 +109,11 @@ export function SearchBox() {
       <div
         className={`flex h-9 items-center gap-2 rounded-lg border px-3 transition-[border-color,background-color] duration-150 ${
           focused
-            ? "border-[#7c4dff]/50 bg-[#141828]"
+            ? "border-[#c8223d]/50 bg-[#141828]"
             : "border-white/[0.07] bg-[#0d1020] hover:border-white/[0.12]"
         }`}
       >
-        <Search size={14} className={`shrink-0 transition-colors duration-150 ${focused ? "text-[#7c4dff]" : "text-white/25"}`} />
+        <Search size={14} className={`shrink-0 transition-colors duration-150 ${focused ? "text-[#c8223d]" : "text-white/25"}`} />
         <input
           ref={inputRef}
           value={value}
@@ -157,7 +156,7 @@ export function SearchBox() {
             <div className="px-4 py-4">
               <div className="flex items-start gap-3">
                 {isTimeout ? (
-                  <WifiOff size={16} className="mt-0.5 shrink-0 text-amber-400" />
+                  <WifiOff size={16} className="mt-0.5 shrink-0 text-[#d8b56a]" />
                 ) : (
                   <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-400" />
                 )}
@@ -185,7 +184,7 @@ export function SearchBox() {
           ) : isSlow && suggestions.isFetching ? (
             <div className="px-4 py-4">
               <div className="flex items-center gap-3">
-                <Loader2 size={15} className="shrink-0 animate-spin text-amber-400" />
+                <Loader2 size={15} className="shrink-0 animate-spin text-[#d8b56a]" />
                 <div>
                   <p className="text-sm font-medium text-white/70">Waking up the server…</p>
                   <p className="mt-0.5 text-xs text-white/30">This takes ~10s on first search. Results coming.</p>
@@ -238,7 +237,7 @@ export function SearchBox() {
               <div className="border-t border-white/[0.055] px-3 py-2">
                 <button
                   onClick={submit}
-                  className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-[#7c4dff] transition-colors duration-100 hover:bg-white/[0.04] hover:text-white"
+                  className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-[#c8223d] transition-colors duration-100 hover:bg-white/[0.04] hover:text-white"
                 >
                   <span>All results for &ldquo;{trimmed}&rdquo;</span>
                   <Search size={13} />

@@ -42,7 +42,7 @@ function Footer() {
             <Link href="/" className="inline-flex items-center gap-2.5">
               <Image src="/logo.svg" alt="animeTv" width={28} height={28} />
               <span className="text-sm font-black tracking-tight text-white">
-                anime<span className="text-[#e8336a]">Tv</span>
+                anime<span className="text-[#c8223d]">Tv</span>
               </span>
             </Link>
             <p className="mt-3 max-w-[200px] text-[12px] leading-relaxed text-white/30">

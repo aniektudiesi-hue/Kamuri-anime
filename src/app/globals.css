@@ -24,8 +24,8 @@
   --accent-2: #c8ced8;        /* soft silver */
   --accent-2-dim: rgba(200,206,216,0.12);
   --accent-2-glow: rgba(200,206,216,0.18);
-  --purple: #8f2638;
-  --purple-dim: rgba(143,38,56,0.14);
+  --ruby-deep: #8f2638;
+  --ruby-deep-dim: rgba(143,38,56,0.14);
   --gold: #d8b56a;
   --gold-dim: rgba(216,181,106,0.15);
 }
@@ -39,7 +39,7 @@
   --color-panel-strong: var(--panel-strong);
   --color-accent: var(--accent);
   --color-accent-2: var(--accent-2);
-  --color-purple: var(--purple);
+  --color-ruby-deep: var(--ruby-deep);
   --color-gold: var(--gold);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
@@ -147,7 +147,7 @@ button, a, input { outline-color: var(--accent); }
 /* ── Glow utilities ─────────────────────────────────── */
 .glow-accent  { box-shadow: 0 0 32px var(--accent-glow); }
 .glow-accent-2 { box-shadow: 0 0 32px var(--accent-2-glow); }
-.glow-purple  { box-shadow: 0 0 32px rgba(124,77,255,0.4); }
+.glow-ruby  { box-shadow: 0 0 32px rgba(200,34,61,0.28); }
 
 /* ── Animated gradient border ────────────────────────── */
 .gradient-border {

@@ -154,7 +154,7 @@ export function Sidebar() {
                           : i === 1
                             ? "text-white/50"
                             : i === 2
-                              ? "text-amber-700"
+                            ? "text-[#b58653]"
                               : "text-white/20"
                       }`}
                     >

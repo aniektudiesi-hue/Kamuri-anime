@@ -744,10 +744,12 @@ export function VideoPlayer({
       {showSkipIntro ? (
         <button
           onClick={(e) => { e.stopPropagation(); skipIntro(); }}
-          className="absolute bottom-[72px] right-4 z-50 inline-flex h-9 items-center gap-2 rounded-md border border-white/30 bg-black/85 px-4 text-sm font-bold text-white shadow-lg backdrop-blur-sm transition hover:border-white/60 hover:bg-black/95 active:scale-95"
+          className="absolute bottom-[76px] right-4 z-50 inline-flex h-10 items-center gap-2 rounded-full border border-white/15 bg-black/70 px-4 text-sm font-bold text-white shadow-[0_18px_45px_rgba(0,0,0,0.45)] backdrop-blur-xl transition hover:border-[#c8223d]/55 hover:bg-[#c8223d]/88 active:scale-95"
         >
-          <SkipForward size={14} />
-          Skip Intro
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-white/10">
+            <SkipForward size={13} />
+          </span>
+          Skip intro
         </button>
       ) : null}
 
@@ -755,7 +757,7 @@ export function VideoPlayer({
       {showNextPrompt && nextHref && !showSkipIntro ? (
         <a
           href={nextHref}
-          className="absolute bottom-[72px] right-4 z-50 inline-flex h-9 items-center gap-1.5 rounded-md bg-accent px-4 text-sm font-bold text-white shadow-lg hover:bg-[#f15f9a] transition-colors"
+          className="absolute bottom-[76px] right-4 z-50 inline-flex h-10 items-center gap-1.5 rounded-full bg-[#c8223d] px-4 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/20 transition-colors hover:bg-[#d62a47]"
         >
           Next Episode
           <ChevronRight size={15} />

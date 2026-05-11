@@ -79,6 +79,6 @@ export type LibraryItem = Anime & {
   timestamp?: number;
   duration?: number;
   added_at?: string;
-  watched_at?: string;
+  watched_at?: string | number;
   created_at?: string;
 };

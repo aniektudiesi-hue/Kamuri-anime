@@ -51,7 +51,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
               className="object-cover transition-transform duration-700 group-hover:scale-105"
             />
           ) : (
-            <div className="h-full w-full bg-gradient-to-br from-[#141828] to-[#0d1020]" />
+            <div className="h-full w-full bg-[#141828]" />
           )}
 
           {/* Always-present bottom gradient */}

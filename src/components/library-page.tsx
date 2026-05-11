@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { deleteOfflineDownload, listOfflineDownloads, offlineId } from "@/lib/offline-downloads";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { posterOf, progressOf, rememberedAnime, rememberedProgress, titleOf } from "@/lib/utils";
+import { clearRememberedHistory, posterOf, progressOf, rememberedAnime, rememberedHistory, rememberedProgress, titleOf } from "@/lib/utils";
 
 type LibraryKind = "history" | "watchlist" | "downloads";
 
@@ -48,10 +48,39 @@ async function enrichFromAniList(malId: number): Promise<Partial<Anime>> {
   }
 }
 
+function historyTime(item: LibraryItem) {
+  if (typeof item.watched_at === "number") return item.watched_at < 10_000_000_000 ? item.watched_at * 1000 : item.watched_at;
+  if (typeof item.watched_at === "string") {
+    const numeric = Number(item.watched_at);
+    if (Number.isFinite(numeric)) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+    const parsed = Date.parse(item.watched_at);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function mergeHistoryItems(remote: LibraryItem[], local: LibraryItem[]) {
+  const merged = new Map<string, LibraryItem>();
+  remote.forEach((item) => {
+    const id = String(item.mal_id || item.anime_id || "");
+    const episode = item.episode || item.episode_num || 1;
+    if (id) merged.set(`${id}:${episode}`, item);
+  });
+  local.forEach((item) => {
+    const id = String(item.mal_id || item.anime_id || "");
+    const episode = item.episode || item.episode_num || 1;
+    if (!id) return;
+    const key = `${id}:${episode}`;
+    merged.set(key, { ...(merged.get(key) ?? {}), ...item });
+  });
+  return Array.from(merged.values()).sort((a, b) => historyTime(b) - historyTime(a));
+}
+
 export function LibraryPage({ kind }: { kind: LibraryKind }) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [localDownloads, setLocalDownloads] = useState<LibraryItem[]>([]);
+  const [localHistory, setLocalHistory] = useState<LibraryItem[]>([]);
   const title = kind === "history" ? "Watch History" : kind === "watchlist" ? "Watchlist" : "Downloads";
   const query = useQuery({
     queryKey: [kind, token],
@@ -81,14 +110,35 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
     }).catch(() => setLocalDownloads([]));
   }, [kind]);
 
+  useEffect(() => {
+    if (kind !== "history") return;
+    const syncHistory = () => setLocalHistory(rememberedHistory());
+    syncHistory();
+    window.addEventListener("anime-tv-history-updated", syncHistory);
+    window.addEventListener("storage", syncHistory);
+    return () => {
+      window.removeEventListener("anime-tv-history-updated", syncHistory);
+      window.removeEventListener("storage", syncHistory);
+    };
+  }, [kind]);
+
   const clear = useMutation({
     mutationFn: (item?: LibraryItem) => {
+      if (kind === "history") {
+        if (token) return api.clearHistory(token);
+        return Promise.resolve({ ok: true });
+      }
       if (!token) throw new Error("Login required");
-      if (kind === "history") return api.clearHistory(token);
       if (kind === "watchlist" && item) return api.removeWatchlist(token, String(item.mal_id || item.anime_id));
       return Promise.resolve();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [kind] }),
+    onSuccess: () => {
+      if (kind === "history") {
+        clearRememberedHistory();
+        setLocalHistory([]);
+      }
+      queryClient.invalidateQueries({ queryKey: [kind] });
+    },
   });
 
   const removeDownload = useMutation({
@@ -117,7 +167,12 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
     },
   });
 
-  const displayItems = kind === "downloads" ? localDownloads : (query.data ?? []);
+  const displayItems =
+    kind === "downloads"
+      ? localDownloads
+      : kind === "history"
+        ? mergeHistoryItems(query.data ?? [], localHistory)
+        : (query.data ?? []);
 
   return (
     <AppShell>
@@ -133,7 +188,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
                   : "Saved anime ready for your next session."}
             </p>
           </div>
-          {kind === "history" && query.data?.length ? (
+          {kind === "history" && displayItems.length ? (
             <Button onClick={() => clear.mutate(undefined)} variant="panel">
               <Trash2 size={16} />
               Clear
@@ -141,7 +196,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
           ) : null}
         </div>
 
-        {!token && kind !== "downloads" ? (
+        {!token && kind === "watchlist" ? (
           <div className="rounded-md border border-white/10 bg-panel p-8 text-center">
             <p className="text-muted">Login to view this library.</p>
             <ButtonLink href="/login" className="mt-4">Login</ButtonLink>
@@ -220,7 +275,7 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
       <Link href={href} className="relative h-24 overflow-hidden rounded bg-panel-strong">
         {displayPoster
           ? <Image src={displayPoster} alt="" width={72} height={108} className="h-full w-full object-cover" />
-          : <div className="h-full w-full bg-gradient-to-br from-[#141828] to-[#0d1020]" />
+          : <div className="h-full w-full bg-[#141828]" />
         }
       </Link>
       <div className="min-w-0">
