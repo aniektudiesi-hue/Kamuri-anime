@@ -298,34 +298,68 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
             </div>
           )}
 
-          {/* Episode grid */}
+          {/* Episode playback list */}
           {episodes.isLoading ? (
-            <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
-              {Array.from({ length: 40 }).map((_, i) => (
-                <div key={i} className="h-10 animate-pulse rounded-xl bg-[#141828]" />
+            <div className="grid gap-2 rounded-2xl border border-white/[0.055] bg-[#0d1020]/70 p-2">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="h-24 animate-pulse rounded-xl bg-[#141828]" />
               ))}
             </div>
           ) : visibleEpisodes.length ? (
-            <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
+            <div className="no-scrollbar max-h-[620px] overflow-y-auto rounded-2xl border border-white/[0.055] bg-[#0d1020]/72 p-2 shadow-2xl shadow-black/20">
               {visibleEpisodes.map((ep) => {
                 const isCurrent = ep.episode_number === lastEp && Boolean(last);
+                const href = isCurrent ? resumeHref : `/watch/${malId}/${ep.episode_number}`;
                 return (
                   <Link
                     key={ep.episode_number}
-                    href={`/watch/${malId}/${ep.episode_number}`}
+                    href={href}
                     onMouseEnter={() => prefetchWatch(ep.episode_number)}
                     onFocus={() => prefetchWatch(ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
-                    className={`group relative grid h-10 place-items-center rounded-xl text-xs font-bold transition ${
+                    className={`group mb-2 grid grid-cols-[118px_1fr_auto] items-center gap-3 rounded-xl border p-2.5 text-left transition last:mb-0 sm:grid-cols-[148px_1fr_auto] ${
                       isCurrent
-                        ? "bg-[#c8223d] text-white shadow-md shadow-[#c8223d]/25"
-                        : "bg-[#0d1020] text-white/40 hover:bg-[#141828] hover:text-white"
+                        ? "border-[#c8223d]/40 bg-[#c8223d]/12 shadow-md shadow-[#c8223d]/12"
+                        : "border-white/[0.055] bg-[#111527] hover:border-white/[0.12] hover:bg-[#171c31]"
                     }`}
                   >
-                    {ep.episode_number}
+                    <div className="relative aspect-video overflow-hidden rounded-lg bg-[#141828]">
+                      {poster ? (
+                        <Image src={poster} alt="" fill sizes="148px" className="object-cover transition-transform duration-300 group-hover:scale-105" />
+                      ) : null}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                      <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/72 px-2 py-0.5 text-[10px] font-black text-white">
+                        EP {ep.episode_number}
+                      </span>
+                      {isCurrent ? (
+                        <span className="absolute right-1.5 top-1.5 rounded-full bg-[#c8223d] px-2 py-0.5 text-[9px] font-black uppercase text-white">
+                          Resume
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className={`text-[11px] font-black uppercase tracking-wide ${isCurrent ? "text-[#c8223d]" : "text-white/35"}`}>
+                        {isCurrent ? "Continue watching" : `Episode ${ep.episode_number}`}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-white/82 group-hover:text-white">
+                        {ep.title || `Episode ${ep.episode_number}`}
+                      </p>
+                      {isCurrent && localProgress > 1 ? (
+                        <p className="mt-1 text-xs font-semibold text-white/38">
+                          Resume at {formatClock(localProgress)}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <span className={`hidden h-10 w-10 place-items-center rounded-full sm:grid ${
+                      isCurrent ? "bg-[#c8223d] text-white" : "bg-white/[0.06] text-white/45 group-hover:text-white"
+                    }`}>
+                      <Play size={15} fill="currentColor" />
+                    </span>
                     {isCurrent ? (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-[#c8ced8]">
-                        <span className="h-1 w-1 rounded-full bg-[#06070d]" />
+                      <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-[#c8ced8]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#06070d]" />
                       </span>
                     ) : null}
                   </Link>

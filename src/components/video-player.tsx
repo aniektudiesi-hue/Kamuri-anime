@@ -772,7 +772,7 @@ export function VideoPlayer({
       {showNextPrompt && nextHref && !showSkipIntro ? (
         <a
           href={nextHref}
-          className="absolute bottom-[76px] right-4 z-50 inline-flex h-10 items-center gap-1.5 rounded-full bg-[#c8223d] px-4 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/20 transition-colors hover:bg-[#d62a47]"
+          className="absolute bottom-[116px] right-4 z-50 inline-flex h-10 items-center gap-1.5 rounded-full bg-[#c8223d] px-4 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/20 transition-colors hover:bg-[#d62a47] sm:bottom-[112px]"
         >
           Next Episode
           <ChevronRight size={15} />
