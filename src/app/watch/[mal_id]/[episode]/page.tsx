@@ -65,7 +65,6 @@ export default function WatchPage({
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [prefetchState, setPrefetchState] = useState({ progress: 0, message: "", ready: false });
   const [offlinePlayable, setOfflinePlayable] = useState<OfflinePlayable | undefined>();
-  const [progressiveCacheFailed, setProgressiveCacheFailed] = useState(false);
   const { token } = useAuth();
   const settings = useSettings();
   const queryClient = useQueryClient();
@@ -108,9 +107,7 @@ export default function WatchPage({
   const streamsLoading = streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
-  const shouldProgressiveCache = Boolean(
-    selectedStream && activeServerId && !progressiveCacheFailed && (activeServerId === "moon" || settings.autoFetchWhileWatching),
-  );
+  const shouldProgressiveCache = Boolean(selectedStream && activeServerId && settings.autoFetchWhileWatching);
 
   const episodes = useQuery({
     queryKey: ["episodes", malId, 0],
@@ -194,7 +191,6 @@ export default function WatchPage({
   useEffect(() => {
     const id = window.setTimeout(() => {
       setFailedServers([]);
-      setProgressiveCacheFailed(false);
       setServer("mega");
     }, 0);
     return () => window.clearTimeout(id);
@@ -211,8 +207,7 @@ export default function WatchPage({
     }
 
     const controller = new AbortController();
-    setProgressiveCacheFailed(false);
-    setPrefetchState({ progress: 0, message: activeServerId === "moon" ? "Preloading Moon stream" : "Preparing cached playback", ready: false });
+    setPrefetchState({ progress: 0, message: "Preparing cached playback", ready: false });
     setOfflinePlayable((current) => {
       current?.revoke();
       return undefined;
@@ -241,7 +236,7 @@ export default function WatchPage({
           return playable;
         });
       },
-      { concurrency: activeServerId === "moon" ? 18 : 8 },
+      { concurrency: 8 },
     )
       .then((download) => {
         if (controller.signal.aborted) return;
@@ -249,7 +244,6 @@ export default function WatchPage({
       })
       .catch((error) => {
       if ((error as Error).name === "AbortError") return;
-      setProgressiveCacheFailed(true);
       setPrefetchState({ progress: 0, message: "Offline cache paused", ready: false });
     });
 
