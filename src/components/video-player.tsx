@@ -69,6 +69,7 @@ export function VideoPlayer({
   const [bufferedRanges, setBufferedRanges] = useState<Array<{ start: number; end: number }>>([]);
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
+  const isMoonStream = stream?.server === "moon" || Boolean(src?.includes("/proxy/moon/"));
   const isHlsStream = Boolean(
     src &&
       (/\.m3u8(?:$|[?#])/i.test(src) ||
@@ -245,6 +246,16 @@ export function VideoPlayer({
           enableWorker: true,
           lowLatencyMode: true,
           startFragPrefetch: true,
+          ...(isMoonStream
+            ? {
+                maxBufferLength: 180,
+                maxMaxBufferLength: 300,
+                maxBufferSize: 180 * 1000 * 1000,
+                backBufferLength: 45,
+                fragLoadingMaxRetry: 8,
+                manifestLoadingMaxRetry: 4,
+              }
+            : {}),
         });
         hlsRef.current = hls;
         hls.loadSource(src);
@@ -312,7 +323,7 @@ export function VideoPlayer({
     };
   // onProgress and onFatalError are accessed via refs — omitting from deps is intentional
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlay, hideControlsSoon, initialTime, isHlsStream, src, syncCaptionAt]);
+  }, [autoPlay, hideControlsSoon, initialTime, isHlsStream, isMoonStream, src, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
