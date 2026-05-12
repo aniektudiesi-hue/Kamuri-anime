@@ -48,7 +48,6 @@ export function VideoPlayer({
   const deepBufferArmedRef = useRef(false);
   const captionCuesRef = useRef<CaptionCue[]>([]);
   const controlsTimerRef = useRef<number | undefined>(undefined);
-  const fullscreenTransitionUntilRef = useRef(0);
   // Stable refs so callbacks never cause the HLS effect to re-run
   const onProgressRef = useRef(onProgress);
   const onFatalErrorRef = useRef(onFatalError);
@@ -169,24 +168,7 @@ export function VideoPlayer({
   }, []);
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const fullscreenActive = Boolean(document.fullscreenElement);
-      setIsFullscreen(fullscreenActive);
-      fullscreenTransitionUntilRef.current = Date.now() + 1000;
-
-      window.setTimeout(() => {
-        const video = videoRef.current;
-        const hls = hlsRef.current;
-        if (!video) return;
-        if (hls) {
-          hls.nextLevel = -1;
-          hls.startLoad(Math.max(0, video.currentTime || lastTimeRef.current || 0));
-        }
-        if (playIntentRef.current && video.paused && !video.ended) {
-          video.play().catch(() => undefined);
-        }
-      }, 140);
-    };
+    const handleFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
@@ -307,16 +289,7 @@ export function VideoPlayer({
       playWhenReady();
     };
     const markPause = () => {
-      const fullscreenTransitioning = Date.now() < fullscreenTransitionUntilRef.current;
-      if (!fullscreenTransitioning) {
-        playIntentRef.current = false;
-      } else {
-        window.setTimeout(() => {
-          if (playIntentRef.current && video.paused && !video.ended) {
-            video.play().catch(() => undefined);
-          }
-        }, 160);
-      }
+      playIntentRef.current = false;
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       setControlsOpen(true);
       setIsBuffering(false);
@@ -345,17 +318,11 @@ export function VideoPlayer({
           startFragPrefetch: true,
           startPosition: initialTime > 2 ? initialTime : -1,
           testBandwidth: true,
-          capLevelToPlayerSize: false,
-          abrEwmaDefaultEstimate: isMoonStream ? 8_000_000 : 6_000_000,
-          maxStarvationDelay: 3,
-          maxLoadingDelay: 3,
+          capLevelToPlayerSize: true,
           maxBufferLength: initialForwardBuffer,
           maxMaxBufferLength: Math.max(initialForwardBuffer, 180),
           maxBufferSize: 220 * 1000 * 1000,
-          maxBufferHole: 0.5,
-          nudgeOffset: 0.12,
-          nudgeMaxRetry: 5,
-          highBufferWatchdogPeriod: 2,
+          maxBufferHole: 0.35,
           backBufferLength: isMoonStream ? 45 : 25,
           fragLoadingMaxRetry: isMoonStream ? 8 : 5,
           manifestLoadingMaxRetry: isMoonStream ? 5 : 3,
@@ -394,11 +361,7 @@ export function VideoPlayer({
             return;
           }
           if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            hls?.swapAudioCodec();
             hls?.recoverMediaError();
-            if (playIntentRef.current) {
-              window.setTimeout(() => video.play().catch(() => undefined), 120);
-            }
             return;
           }
           const message = "This stream cannot be played.";
@@ -458,7 +421,6 @@ export function VideoPlayer({
   const fullscreen = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-    fullscreenTransitionUntilRef.current = Date.now() + 1200;
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => undefined);
     } else {
@@ -685,9 +647,7 @@ export function VideoPlayer({
       ref={containerRef}
       tabIndex={0}
       aria-label={`Video player: ${title}`}
-      className={`video-player-shell group relative aspect-video w-full overflow-hidden bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] outline-none ring-1 ring-white/[0.025] ${
-        isFullscreen ? "rounded-none border-0" : "rounded-[22px] border border-white/[0.08]"
-      }`}
+      className="group relative aspect-video w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] outline-none ring-1 ring-white/[0.025]"
       style={{ cursor: controlsOpen ? "default" : "none" }}
       onMouseMove={() => showControls()}
       onMouseLeave={() => {
