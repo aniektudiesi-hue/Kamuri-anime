@@ -302,7 +302,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           {episodes.isLoading ? (
             <div className="grid gap-2 rounded-2xl border border-white/[0.055] bg-[#0d1020]/70 p-2">
               {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="h-24 animate-pulse rounded-xl bg-[#141828]" />
+                <div key={i} className="h-20 animate-pulse rounded-xl bg-[#141828]" />
               ))}
             </div>
           ) : visibleEpisodes.length ? (
@@ -317,17 +317,23 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     onMouseEnter={() => prefetchWatch(ep.episode_number)}
                     onFocus={() => prefetchWatch(ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
-                    className={`group mb-2 grid grid-cols-[118px_1fr_auto] items-center gap-3 rounded-xl border p-2.5 text-left transition last:mb-0 sm:grid-cols-[148px_1fr_auto] ${
+                    className={`group mb-2 grid grid-cols-[96px_1fr_auto] items-center gap-2.5 rounded-xl border p-2 text-left transition last:mb-0 sm:grid-cols-[118px_1fr_auto] ${
                       isCurrent
                         ? "border-[#c8223d]/40 bg-[#c8223d]/12 shadow-md shadow-[#c8223d]/12"
                         : "border-white/[0.055] bg-[#111527] hover:border-white/[0.12] hover:bg-[#171c31]"
                     }`}
                   >
-                    <div className="relative aspect-video overflow-hidden rounded-lg bg-[#141828]">
+                    <div className="relative h-[58px] overflow-hidden rounded-lg bg-[#080a12] sm:h-[68px]">
                       {poster ? (
-                        <Image src={poster} alt="" fill sizes="148px" className="object-cover object-top transition-transform duration-300 group-hover:scale-105" />
+                        <Image
+                          src={poster}
+                          alt=""
+                          fill
+                          sizes="118px"
+                          className="object-contain p-0.5 transition-transform duration-300 group-hover:scale-[1.03]"
+                        />
                       ) : null}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/62 via-transparent to-transparent" />
                       <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/72 px-2 py-0.5 text-[10px] font-black text-white">
                         EP {ep.episode_number}
                       </span>
