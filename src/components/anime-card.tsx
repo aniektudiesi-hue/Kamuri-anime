@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Play, Star } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
@@ -20,6 +21,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
   const id = animeId(anime);
   const episodes = episodeCount(anime);
   const poster = posterOf(anime);
+  const [imageFailed, setImageFailed] = useState(false);
   const title = titleOf(anime);
   const statusKey = (anime.status || "").toLowerCase();
   const resume = useResumeHistory(id);
@@ -51,17 +53,18 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
 
         {/* Poster container */}
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828]">
-          {poster ? (
+          {poster && !imageFailed ? (
             <Image
               src={poster}
               alt={title}
               fill
               sizes="190px"
               priority={priority}
+              onError={() => setImageFailed(true)}
               className="object-cover transition-transform duration-700 group-hover:scale-105"
             />
           ) : (
-            <div className="h-full w-full bg-[#141828]" />
+            <PosterFallback title={title} />
           )}
 
           {/* Always-present bottom gradient */}
@@ -107,5 +110,22 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
         </div>
       </Link>
     </article>
+  );
+}
+
+function PosterFallback({ title }: { title: string }) {
+  const initials = title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+
+  return (
+    <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_28%_18%,rgba(200,34,61,0.25),transparent_34%),linear-gradient(145deg,#171b2d,#080a12)]">
+      <div className="grid h-16 w-16 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.06] text-xl font-black text-white/70 shadow-2xl shadow-black/35">
+        {initials || "AT"}
+      </div>
+    </div>
   );
 }

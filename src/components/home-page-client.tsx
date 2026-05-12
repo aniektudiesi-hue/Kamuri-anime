@@ -143,6 +143,7 @@ function BigSection({
 function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }) {
   const id = animeId(anime);
   const poster = posterOf(anime);
+  const [imageFailed, setImageFailed] = useState(false);
   const title = titleOf(anime);
   const count = episodeCount(anime);
   const statusKey = (anime.status || "").toLowerCase();
@@ -151,17 +152,18 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
     <article className="card-lift group">
       <Link href={`/anime/${id}`} onClick={() => rememberAnime(anime)} className="block">
         <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
-          {poster ? (
+          {poster && !imageFailed ? (
             <Image
               src={poster}
               alt={title}
               fill
               sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 20vw"
               priority={priority}
+              onError={() => setImageFailed(true)}
               className="object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="h-full w-full bg-[#141828]" />
+            <PosterFallback title={title} />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
@@ -246,7 +248,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
             >
               <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
                 {posterOf(item.anime) ? (
-                  <Image src={posterOf(item.anime)} alt="" fill sizes="72px" className="object-cover" />
+                  <Image src={posterOf(item.anime)} alt="" fill sizes="72px" className="object-cover" unoptimized />
                 ) : null}
               </div>
               <div className="min-w-0 py-1">
@@ -263,6 +265,23 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function PosterFallback({ title }: { title: string }) {
+  const initials = title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+
+  return (
+    <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_28%_18%,rgba(200,34,61,0.25),transparent_34%),linear-gradient(145deg,#171b2d,#080a12)]">
+      <div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.06] text-lg font-black text-white/70 shadow-2xl shadow-black/35">
+        {initials || "AT"}
+      </div>
+    </div>
   );
 }
 
