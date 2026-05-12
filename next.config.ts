@@ -8,6 +8,16 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "anime-search-api-burw.onrender.com" },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.animetvplus.xyz" }],
+        destination: "https://animetvplus.xyz/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
