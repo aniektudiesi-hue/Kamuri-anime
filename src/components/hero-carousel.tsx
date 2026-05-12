@@ -14,6 +14,8 @@ const STATUS_LABEL: Record<string, string> = {
   not_yet_aired: "Upcoming",
 };
 
+const HERO_AUTO_ADVANCE_MS = 3000;
+
 export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading?: boolean }) {
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState<1 | -1>(1);
@@ -32,7 +34,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
 
   useEffect(() => {
     if (!items.length) return;
-    timerRef.current = window.setInterval(() => goTo(index + 1, 1), 8000);
+    timerRef.current = window.setInterval(() => goTo(index + 1, 1), HERO_AUTO_ADVANCE_MS);
     return () => window.clearInterval(timerRef.current);
   }, [items.length, index]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -224,7 +226,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
 
   useEffect(() => {
     if (!items.length) return;
-    const timer = window.setInterval(() => setIndex((value) => (value + 1) % items.length), 6500);
+    const timer = window.setInterval(() => setIndex((value) => (value + 1) % items.length), HERO_AUTO_ADVANCE_MS);
     return () => window.clearInterval(timer);
   }, [items.length]);
 
