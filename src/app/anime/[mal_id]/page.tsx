@@ -325,15 +325,25 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   >
                     <div className="relative h-[58px] overflow-hidden rounded-lg bg-[#080a12] sm:h-[68px]">
                       {poster ? (
-                        <Image
-                          src={poster}
-                          alt=""
-                          fill
-                          sizes="118px"
-                          className="object-contain p-0.5 transition-transform duration-300 group-hover:scale-[1.03]"
-                        />
+                        <>
+                          <Image
+                            src={poster}
+                            alt=""
+                            fill
+                            sizes="118px"
+                            className="scale-110 object-cover opacity-40 blur-[3px] transition-transform duration-300 group-hover:scale-[1.16]"
+                          />
+                          <div className="absolute inset-0 bg-black/18" />
+                          <Image
+                            src={poster}
+                            alt=""
+                            fill
+                            sizes="118px"
+                            className="object-contain p-0.5 drop-shadow-[0_8px_18px_rgba(0,0,0,0.65)] transition-transform duration-300 group-hover:scale-[1.03]"
+                          />
+                        </>
                       ) : null}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/62 via-transparent to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
                       <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/72 px-2 py-0.5 text-[10px] font-black text-white">
                         EP {ep.episode_number}
                       </span>

@@ -229,21 +229,23 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
   const [saved, setSaved] = useState<LibraryItem | undefined>();
   const episode = item.episode || item.episode_num || 1;
   const baseItem = { ...savedAnime, ...item };
-  const progress = progressOf(item) || progressOf(saved);
+  const downloadHref = `/offline/${encodeURIComponent(item.offline_id || offlineId(id, episode))}`;
+  const progress = kind === "downloads" ? 0 : progressOf(item) || progressOf(saved);
   const href =
     kind === "watchlist"
       ? `/anime/${id}`
       : kind === "downloads"
-        ? `/offline/${encodeURIComponent(item.offline_id || offlineId(id, episode))}`
+        ? downloadHref
         : `/watch/${id}/${episode}${progress > 1 ? `?t=${Math.floor(progress)}` : ""}`;
+  const titleHref = kind === "downloads" ? href : `/anime/${id}`;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setSavedAnime(rememberedAnime(id));
-      setSaved(rememberedProgress(id, episode));
+      setSaved(kind === "downloads" ? undefined : rememberedProgress(id, episode));
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [episode, id]);
+  }, [episode, id, kind]);
 
   // Enrich from AniList when title or poster is missing
   const hasMissingData = !posterOf(baseItem) || titleOf(baseItem) === "Untitled";
@@ -277,7 +279,7 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
         }
       </Link>
       <div className="min-w-0">
-        <Link href={`/anime/${id}`} className="line-clamp-1 font-bold hover:text-accent-2">{displayTitle}</Link>
+        <Link href={titleHref} className="line-clamp-1 font-bold hover:text-accent-2">{displayTitle}</Link>
         <Link href={href} className="mt-1 inline-block text-sm text-muted hover:text-white">
           Episode {episode}{kind === "history" && progress > 1 ? ` at ${formatClock(progress)}` : ""}
           {kind === "downloads" && item.size ? ` - ${formatBytes(item.size)}` : ""}
