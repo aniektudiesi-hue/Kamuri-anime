@@ -25,6 +25,8 @@ export type Anime = {
   episodes?: number;
   score?: number;
   status?: string;
+  start_date?: string;
+  year?: number;
 };
 
 export type Episode = {

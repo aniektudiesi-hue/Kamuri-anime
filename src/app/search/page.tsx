@@ -129,8 +129,9 @@ function SearchContent() {
     };
   }, [results.isLoading, anilistQ.isLoading]);
 
-  const backendResults = intent.useBackend ? rankAnimeForSearch(results.data ?? [], q) : [];
-  const merged = mergeAnimeSources(backendResults, allAnilist, allJikan);
+  const backendResults = intent.useBackend ? (results.data ?? []) : [];
+  const mergedRaw = mergeAnimeSources(backendResults, allAnilist, allJikan);
+  const merged = intent.useBackend ? rankAnimeForSearch(mergedRaw, q) : mergedRaw;
   const hasMore = Boolean(anilistQ.data?.hasNextPage || jikanQ.data?.hasNextPage);
   const isTimeout = results.error instanceof Error && results.error.message === "timeout";
   const isLoading = (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1;

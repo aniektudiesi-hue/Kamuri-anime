@@ -10,6 +10,7 @@ type AniListMedia = {
   averageScore: number | null;
   episodes: number | null;
   status: string;
+  startDate?: { year?: number | null; month?: number | null; day?: number | null };
 };
 
 type JikanAnime = {
@@ -24,6 +25,7 @@ type JikanAnime = {
   score?: number | null;
   episodes?: number | null;
   status?: string | null;
+  aired?: { from?: string | null };
 };
 
 type MediaSort = "POPULARITY_DESC" | "TRENDING_DESC" | "SCORE_DESC" | "START_DATE_DESC";
@@ -199,9 +201,9 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     sourceLabel: "Search results from your API, AniList, and MyAnimeList",
     useBackend: true,
     search: query,
-    sort: "POPULARITY_DESC",
+    sort: "START_DATE_DESC",
     jikanQuery: query,
-    jikanOrderBy: "popularity",
+    jikanOrderBy: "start_date",
   };
 }
 
@@ -238,6 +240,7 @@ export async function fetchAniListDiscovery(
           coverImage { large extraLarge }
           bannerImage
           averageScore episodes status
+          startDate { year month day }
         }
       }
     }
@@ -332,6 +335,8 @@ function mapAniList(item: AniListMedia): Anime {
     score: item.averageScore ? item.averageScore / 10 : undefined,
     episodes: item.episodes ?? undefined,
     status: ANILIST_STATUS[item.status] || item.status.toLowerCase(),
+    start_date: formatAniListStartDate(item.startDate),
+    year: item.startDate?.year ?? undefined,
   };
 }
 
@@ -345,7 +350,17 @@ function mapJikan(item: JikanAnime): Anime {
     score: item.score ?? undefined,
     episodes: item.episodes ?? undefined,
     status: normalizeJikanStatus(item.status),
+    start_date: item.aired?.from || undefined,
+    year: item.aired?.from ? new Date(item.aired.from).getFullYear() : undefined,
   };
+}
+
+function formatAniListStartDate(startDate?: AniListMedia["startDate"]) {
+  const year = startDate?.year;
+  if (!year) return undefined;
+  const month = startDate.month ? String(startDate.month).padStart(2, "0") : "01";
+  const day = startDate.day ? String(startDate.day).padStart(2, "0") : "01";
+  return `${year}-${month}-${day}`;
 }
 
 function normalizeJikanStatus(status?: string | null) {

@@ -78,15 +78,42 @@ function scoreSearchItem(anime: Anime, query: string) {
   const title = titleOf(anime).toLowerCase();
   const english = (anime.title_en || anime.english || "").toLowerCase();
   const status = (anime.status || "").toLowerCase();
+  const currentYear = new Date().getFullYear();
+  const releaseYear = releaseYearOf(anime);
   let score = 0;
-  if (english) score += 30;
-  if (english === query || title === query) score += 120;
-  if (english.startsWith(query) || title.startsWith(query)) score += 70;
-  if (english.includes(query) || title.includes(query)) score += 30;
-  if (status.includes("currently") || status.includes("airing")) score += 24;
-  if (status.includes("not_yet")) score += 12;
+
+  if (english) score += 20;
+
+  if (query) {
+    if (english === query || title === query) score += 420;
+    if (english.startsWith(query) || title.startsWith(query)) score += 250;
+    if (english.includes(query) || title.includes(query)) score += 130;
+  }
+
+  if (status.includes("currently") || status.includes("airing") || status.includes("releasing")) score += 150;
+  if (status.includes("not_yet") || status.includes("upcoming")) score += 95;
+  if (status.includes("finished") || status.includes("complete")) score -= 24;
+
+  if (releaseYear) {
+    const age = currentYear - releaseYear;
+    if (age <= 0) score += 85;
+    else if (age === 1) score += 68;
+    else if (age === 2) score += 45;
+    else if (age <= 4) score += 24;
+    else if (age >= 10) score -= 20;
+  }
+
   score += Math.min(Number(anime.score || 0), 10);
   return score;
+}
+
+function releaseYearOf(anime: Anime) {
+  if (typeof anime.year === "number" && Number.isFinite(anime.year)) return anime.year;
+  if (typeof anime.start_date === "string" && anime.start_date) {
+    const parsed = new Date(anime.start_date).getFullYear();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }
 
 export function rememberAnime(anime: Anime | undefined) {
