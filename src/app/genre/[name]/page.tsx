@@ -6,6 +6,7 @@ import { AlertCircle, RefreshCw, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AnimeCard } from "@/components/anime-card";
 import { SidebarLayout } from "@/components/sidebar";
+import { fetchJikanDiscovery, mergeAnimeSources, resolveDiscoveryIntent } from "@/lib/anime-discovery";
 import type { Anime } from "@/lib/types";
 import { animeId } from "@/lib/utils";
 
@@ -98,6 +99,7 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
   const { name: rawName } = use(params);
   const genre = decodeURIComponent(rawName);
   const [page, setPage] = useState(1);
+  const intent = resolveDiscoveryIntent(genre);
 
   const query = useQuery({
     queryKey: ["anilist-browse", genre, page],
@@ -108,9 +110,17 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
     retryDelay: 2000,
   });
 
-  const animeList: Anime[] = (query.data?.media ?? [])
+  const jikanQuery = useQuery({
+    queryKey: ["jikan-browse", intent.key, page],
+    queryFn: () => fetchJikanDiscovery({ ...intent, useBackend: false, jikanQuery: intent.jikanQuery || genre }, page),
+    staleTime: 1000 * 60 * 45,
+    gcTime: 1000 * 60 * 120,
+  });
+
+  const anilistList: Anime[] = (query.data?.media ?? [])
     .filter((m) => m.idMal || m.id)
     .map(mapToAnime);
+  const animeList = mergeAnimeSources(anilistList, jikanQuery.data?.media ?? []);
 
   const resolvedLabel =
     query.data?.resolvedAs === "tag" ? "Tag"
@@ -153,7 +163,7 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
               </button>
             </div>
 
-          ) : query.isLoading ? (
+          ) : query.isLoading && page === 1 ? (
             <>
               <div className="mb-5 flex items-center gap-3 rounded-xl border border-white/[0.07] bg-[#0d1020] px-4 py-3">
                 <Loader2 size={15} className="shrink-0 animate-spin text-white/40" />
@@ -189,7 +199,7 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
                 </button>
                 <span className="text-sm text-white/30">Page {page}</span>
                 <button
-                  disabled={!query.data?.hasNextPage}
+                  disabled={!query.data?.hasNextPage && !jikanQuery.data?.hasNextPage}
                   onClick={() => setPage((p) => p + 1)}
                   className="rounded-xl border border-white/[0.08] bg-[#0d1020] px-5 py-2.5 text-sm font-semibold text-white/60 transition-colors hover:border-white/[0.14] hover:text-white disabled:pointer-events-none disabled:opacity-30"
                 >

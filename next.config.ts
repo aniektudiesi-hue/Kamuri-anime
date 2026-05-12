@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1", "localhost", "10.88.55.120"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "myanimelist.net" },

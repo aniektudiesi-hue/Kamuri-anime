@@ -1,0 +1,13 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ruby" x1="28" y1="24" x2="152" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff4a6c"/>
+      <stop offset="0.52" stop-color="#c8223d"/>
+      <stop offset="1" stop-color="#7c1326"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="42" fill="#0b0d16"/>
+  <path d="M57 51.8C57 46.8 62.52 43.78 66.74 46.52L128.02 86.18C131.84 88.65 131.84 94.35 128.02 96.82L66.74 136.48C62.52 139.22 57 136.2 57 131.2V51.8Z" fill="url(#ruby)"/>
+  <path d="M52 52V128" stroke="white" stroke-opacity="0.42" stroke-width="10" stroke-linecap="round"/>
+  <path d="M77 71.5V108.5L106.5 90L77 71.5Z" fill="white" fill-opacity="0.94"/>
+</svg>

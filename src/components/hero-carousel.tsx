@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Play, Star, TvIcon, Info } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { Anime } from "@/lib/types";
 import { animeId, bannerOf, episodeCount, posterOf, titleOf } from "@/lib/utils";
@@ -15,8 +16,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading?: boolean }) {
   const [index, setIndex] = useState(0);
-  const [, setPrev] = useState(-1);
-  const [, setDir] = useState<1 | -1>(1);
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [flipKey, setFlipKey] = useState(0);
   const timerRef = useRef<number | undefined>(undefined);
   const len = Math.max(items.length, 1);
   const current = items[index % len];
@@ -24,8 +25,8 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
   function goTo(next: number, direction: 1 | -1 = 1) {
     if (!items.length) return;
     const clamped = ((next % items.length) + items.length) % items.length;
-    setPrev(index);
     setDir(direction);
+    setFlipKey((value) => value + 1);
     setIndex(clamped);
   }
 
@@ -71,13 +72,14 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
     <section className="relative h-[72vh] max-h-[640px] min-h-[420px] overflow-hidden bg-[#06070d]">
 
       {/* Background image */}
-      <div key={`bg-${index}`} className="absolute inset-0 animate-[fadeIn_0.7s_ease]">
+      <div key={`bg-${index}`} className="absolute inset-0 animate-[heroBackdropTurn_0.82s_cubic-bezier(0.2,0.8,0.18,1)]">
         {banner ? (
           <Image
             src={banner}
             alt=""
             fill
             priority
+            quality={95}
             sizes="100vw"
             className="object-cover object-center opacity-60"
           />
@@ -170,13 +172,19 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
         {/* Right: floating poster */}
         {poster ? (
           <div
-            key={`poster-${index}`}
-            className="hidden lg:block relative w-[240px] xl:w-[280px] shrink-0 animate-[slideUp_0.7s_cubic-bezier(0.22,1,0.36,1)_0.1s_both]"
+            key={`poster-${index}-${flipKey}`}
+            className="hero-book-stage hidden lg:block relative w-[240px] xl:w-[280px] shrink-0"
           >
-            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-3xl shadow-2xl shadow-black/70 ring-1 ring-white/10">
-              <Image src={poster} alt={title} fill sizes="280px" priority className="object-cover" />
+            <div className="hero-book-page hero-book-page-a" />
+            <div className="hero-book-page hero-book-page-b" />
+            <div
+              className="hero-book-card relative aspect-[2/3] w-full overflow-hidden rounded-3xl shadow-2xl shadow-black/70 ring-1 ring-white/10"
+              style={{ "--book-start": dir === 1 ? "-34deg" : "34deg", "--book-shift": dir === 1 ? "-28px" : "28px" } as CSSProperties}
+            >
+              <Image src={poster} alt={title} fill sizes="280px" priority quality={94} className="object-cover" />
               {/* Glow */}
               <div className="absolute inset-0 rounded-3xl ring-2 ring-inset ring-white/[0.08]" />
+              <div className="hero-book-sheen" />
             </div>
             <div className="absolute -bottom-6 left-1/2 h-px w-3/4 -translate-x-1/2 bg-white/20 blur-sm" />
           </div>
@@ -257,6 +265,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             alt=""
             fill
             priority
+            quality={92}
             sizes="100vw"
             className="object-cover opacity-85"
           />

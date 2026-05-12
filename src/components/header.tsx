@@ -9,8 +9,8 @@ import { useSettings } from "@/lib/settings";
 import { SearchBox } from "./search-box";
 
 const nav = [
-  { href: "/search?q=trending", label: "Browse" },
-  { href: "/search?q=spring+2026", label: "New Releases" },
+  { href: "/search?q=popular", label: "Browse" },
+  { href: "/search?q=airing", label: "New Releases" },
   { href: "/search?q=top+rated", label: "Top Rated" },
 ];
 
@@ -27,8 +27,8 @@ export function Header() {
 
           {/* Logo */}
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <Image src="/logo.svg" alt="animeTv" width={32} height={32} priority />
-            <span className="hidden text-[15px] font-black tracking-tight text-white sm:block">
+            <Image src="/logo.svg" alt="animeTv" width={36} height={36} priority className="drop-shadow-[0_12px_28px_rgba(200,34,61,0.22)]" />
+            <span className="hidden text-[16px] font-black tracking-tight text-white sm:block">
                 anime<span className="text-[#c8223d]">Tv</span>
             </span>
           </Link>

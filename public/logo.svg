@@ -1,5 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
-  <rect width="40" height="40" rx="10" fill="#0f1117"/>
-  <path d="M14 11L29 20L14 29V11Z" fill="#e8336a"/>
-  <rect x="11" y="11" width="3" height="18" rx="1.5" fill="#e8336a" opacity="0.4"/>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ruby" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff4a6c"/>
+      <stop offset="0.52" stop-color="#c8223d"/>
+      <stop offset="1" stop-color="#7c1326"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#c8223d" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <rect x="5" y="5" width="54" height="54" rx="17" fill="#0b0d16"/>
+  <rect x="5.75" y="5.75" width="52.5" height="52.5" rx="16.25" stroke="white" stroke-opacity="0.08" stroke-width="1.5"/>
+  <path d="M21 18.6C21 16.8 22.98 15.72 24.48 16.7L45.25 30.1C46.62 30.98 46.62 33.02 45.25 33.9L24.48 47.3C22.98 48.28 21 47.2 21 45.4V18.6Z" fill="url(#ruby)" filter="url(#glow)"/>
+  <path d="M19 18.5V45.5" stroke="white" stroke-opacity="0.4" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M27.5 25.4V38.6L38 32L27.5 25.4Z" fill="white" fill-opacity="0.92"/>
+  <path d="M43.5 19.5H50.5M47 19.5V29.5M42.4 35L47 44L51.6 35" stroke="#eef2f8" stroke-opacity="0.78" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

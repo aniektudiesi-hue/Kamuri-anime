@@ -325,7 +325,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   >
                     <div className="relative aspect-video overflow-hidden rounded-lg bg-[#141828]">
                       {poster ? (
-                        <Image src={poster} alt="" fill sizes="148px" className="object-cover transition-transform duration-300 group-hover:scale-105" />
+                        <Image src={poster} alt="" fill sizes="148px" className="object-cover object-top transition-transform duration-300 group-hover:scale-105" />
                       ) : null}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                       <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/72 px-2 py-0.5 text-[10px] font-black text-white">

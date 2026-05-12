@@ -82,3 +82,19 @@ export type LibraryItem = Anime & {
   watched_at?: string | number;
   created_at?: string;
 };
+
+export type AiringScheduleItem = {
+  id: string;
+  episode: number;
+  airingAt: number;
+  anime: Anime;
+};
+
+export type HomeInitialData = {
+  banners: Anime[];
+  thumbnails: Anime[];
+  recent: Anime[];
+  topRated: Anime[];
+  schedule: AiringScheduleItem[];
+  generatedAt: string;
+};
