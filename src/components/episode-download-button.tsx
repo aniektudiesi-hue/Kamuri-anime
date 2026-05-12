@@ -2,7 +2,6 @@
 
 import { CheckCircle2, Download, XCircle } from "lucide-react";
 import { useRef, useState } from "react";
-import { api } from "@/lib/api";
 import { offlineId, promotePrefetchToOffline, saveOfflineDownload, type OfflineDownload } from "@/lib/offline-downloads";
 import type { StreamResponse } from "@/lib/types";
 
@@ -10,7 +9,6 @@ type DownloadState = "idle" | "preparing" | "downloading" | "saving" | "done" | 
 
 export function EpisodeDownloadButton({
   stream,
-  token,
   malId,
   episode,
   title,
@@ -19,7 +17,6 @@ export function EpisodeDownloadButton({
   prefetch,
 }: {
   stream?: StreamResponse;
-  token?: string | null;
   malId: string;
   episode: number;
   title: string;
@@ -75,29 +72,6 @@ export function EpisodeDownloadButton({
       setState("done");
       setProgress(100);
       setMessage("Saved offline");
-
-      if (token) {
-        setState("saving");
-        setMessage("Saved offline, syncing account");
-        await api.addDownload(token, {
-            mal_id: malId,
-            anime_id: malId,
-            title,
-            image_url: poster,
-            poster,
-            episode,
-            episode_num: episode,
-            server,
-            offline_id: item.id,
-            size: item.size,
-            downloaded_at: new Date().toISOString(),
-          })
-          .then(() => setMessage("Saved offline and synced"))
-          .catch(() => setMessage("Saved offline"));
-      }
-
-      setState("done");
-      setProgress(100);
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         setState("idle");

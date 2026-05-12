@@ -15,7 +15,7 @@ import { historySocketUrl } from "@/lib/history-realtime";
 import { warmStreamManifest } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
-import { posterOf, progressOf, rememberedAnime, rememberedProgress, rememberProgress, titleOf } from "@/lib/utils";
+import { posterOf, progressOf, rememberedAnime, titleOf } from "@/lib/utils";
 
 const SERVERS = [
   { id: "mega", label: "MegaPlay", desc: "Primary · Adaptive HLS" },
@@ -61,7 +61,6 @@ export default function WatchPage({
   const [server, setServer] = useState<ServerId>("mega");
   const [type, setType] = useState<"sub" | "dub">("sub");
   const [known, setKnown] = useState<Anime | undefined>();
-  const [localResumeTime, setLocalResumeTime] = useState(0);
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [loadBackupServers, setLoadBackupServers] = useState(false);
   const { token } = useAuth();
@@ -78,8 +77,6 @@ export default function WatchPage({
   useEffect(() => {
     const id = window.setTimeout(() => {
       setKnown(rememberedAnime(malId));
-      const saved = rememberedProgress(malId, episodeNum);
-      setLocalResumeTime(progressOf(saved));
       markPlayed(malId, episodeNum);
       setPlayedEps(getPlayed(malId));
     }, 0);
@@ -118,13 +115,29 @@ export default function WatchPage({
     staleTime: 1000 * 60 * 20,
   });
 
+  const history = useQuery({
+    queryKey: ["history", token],
+    queryFn: () => api.history(token!),
+    enabled: Boolean(token && malId && settings.autoResume),
+    staleTime: 1000 * 20,
+  });
+
   const animeTitle = titleOf(known);
   const animePoster = posterOf(known);
   const explicitResumeTime = Number(t || 0);
+  const serverResumeItem = useMemo(
+    () => history.data?.find(
+      (item) =>
+        String(item.mal_id || item.anime_id) === malId &&
+        Number(item.episode || item.episode_num || 1) === episodeNum,
+    ),
+    [episodeNum, history.data, malId],
+  );
+  const serverResumeTime = progressOf(serverResumeItem);
   const initialTime = explicitResumeTime > 0
     ? explicitResumeTime
     : settings.autoResume
-      ? Number(localResumeTime || 0)
+      ? Number(serverResumeTime || 0)
       : 0;
 
   const saveHistory = useMutation({
@@ -220,7 +233,6 @@ export default function WatchPage({
         timestamp: Math.floor(currentTime), duration: Math.floor(duration || 0),
         watched_at: new Date().toISOString(),
       };
-      rememberProgress(body);
       if (!tokenRef.current) return;
 
       const sentRealtime = sendRealtimeHistory(body);
@@ -250,7 +262,6 @@ export default function WatchPage({
       playback_pos: Math.floor(initialTime || 0), progress: Math.floor(initialTime || 0),
       timestamp: Math.floor(initialTime || 0), watched_at: new Date().toISOString(),
     };
-    rememberProgress(body);
     if (token && !sendRealtimeHistory(body)) saveHistoryRef.current(body);
   }, [animePoster, animeTitle, episodeNum, initialTime, malId, token, selectedStream, sendRealtimeHistory]);
 
@@ -458,7 +469,6 @@ export default function WatchPage({
 
               <EpisodeDownloadButton
                 stream={selectedStream}
-                token={token}
                 malId={malId}
                 episode={episodeNum}
                 title={displayTitle}

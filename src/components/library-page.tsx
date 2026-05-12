@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { deleteOfflineDownload, listOfflineDownloads, offlineId } from "@/lib/offline-downloads";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { clearRememberedHistory, posterOf, progressOf, rememberedAnime, rememberedHistory, rememberedProgress, titleOf } from "@/lib/utils";
+import { posterOf, progressOf, rememberedAnime, titleOf } from "@/lib/utils";
 
 type LibraryKind = "history" | "watchlist" | "downloads";
 
@@ -48,43 +48,16 @@ async function enrichFromAniList(malId: number): Promise<Partial<Anime>> {
   }
 }
 
-function historyTime(item: LibraryItem) {
-  if (typeof item.watched_at === "number") return item.watched_at < 10_000_000_000 ? item.watched_at * 1000 : item.watched_at;
-  if (typeof item.watched_at === "string") {
-    const numeric = Number(item.watched_at);
-    if (Number.isFinite(numeric)) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
-    const parsed = Date.parse(item.watched_at);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-}
-
-function mergeHistoryItems(remote: LibraryItem[], local: LibraryItem[]) {
-  const merged = new Map<string, LibraryItem>();
-  const put = (item: LibraryItem) => {
-    const id = String(item.mal_id || item.anime_id || "");
-    if (!id) return;
-    const current = merged.get(id);
-    if (!current || historyTime(item) >= historyTime(current)) {
-      merged.set(id, { ...current, ...item });
-    }
-  };
-  remote.forEach(put);
-  local.forEach(put);
-  return Array.from(merged.values()).sort((a, b) => historyTime(b) - historyTime(a));
-}
-
 export function LibraryPage({ kind }: { kind: LibraryKind }) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [localDownloads, setLocalDownloads] = useState<LibraryItem[]>([]);
-  const [localHistory, setLocalHistory] = useState<LibraryItem[]>([]);
   const title = kind === "history" ? "Watch History" : kind === "watchlist" ? "Watchlist" : "Downloads";
   const query = useQuery({
     queryKey: [kind, token],
     queryFn: () => {
       if (kind === "history") return api.history(token!);
-      if (kind === "downloads") return api.downloads(token!);
+      if (kind === "downloads") return Promise.resolve([]);
       return api.watchlist(token!);
     },
     enabled: Boolean(token) && kind !== "downloads",
@@ -108,33 +81,17 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
     }).catch(() => setLocalDownloads([]));
   }, [kind]);
 
-  useEffect(() => {
-    if (kind !== "history") return;
-    const syncHistory = () => setLocalHistory(rememberedHistory());
-    syncHistory();
-    window.addEventListener("anime-tv-history-updated", syncHistory);
-    window.addEventListener("storage", syncHistory);
-    return () => {
-      window.removeEventListener("anime-tv-history-updated", syncHistory);
-      window.removeEventListener("storage", syncHistory);
-    };
-  }, [kind]);
-
   const clear = useMutation({
     mutationFn: (item?: LibraryItem) => {
       if (kind === "history") {
-        if (token) return api.clearHistory(token);
-        return Promise.resolve({ ok: true });
+        if (!token) throw new Error("Login required");
+        return api.clearHistory(token);
       }
       if (!token) throw new Error("Login required");
       if (kind === "watchlist" && item) return api.removeWatchlist(token, String(item.mal_id || item.anime_id));
       return Promise.resolve();
     },
     onSuccess: () => {
-      if (kind === "history") {
-        clearRememberedHistory();
-        setLocalHistory([]);
-      }
       queryClient.invalidateQueries({ queryKey: [kind] });
     },
   });
@@ -144,9 +101,6 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
       const id = String(item.mal_id || item.anime_id || "");
       const episode = item.episode || item.episode_num || 1;
       await deleteOfflineDownload(item.offline_id || offlineId(id, episode));
-      if (token) {
-        await api.removeDownload(token, id, episode).catch(() => undefined);
-      }
     },
     onSuccess: async () => {
       const items = await listOfflineDownloads();
@@ -168,9 +122,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
   const displayItems =
     kind === "downloads"
       ? localDownloads
-      : kind === "history"
-        ? mergeHistoryItems(query.data ?? [], localHistory)
-        : (query.data ?? []);
+      : (query.data ?? []);
 
   return (
     <AppShell>
@@ -182,7 +134,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
               {kind === "history"
                 ? "Resume from the exact timestamp you left."
                 : kind === "downloads"
-                  ? "Episodes you downloaded in this browser and saved to your account."
+                  ? "Episodes saved on this browser for offline playback."
                   : "Saved anime ready for your next session."}
             </p>
           </div>
@@ -194,7 +146,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
           ) : null}
         </div>
 
-        {!token && kind === "watchlist" ? (
+        {!token && kind !== "downloads" ? (
           <div className="rounded-md border border-white/10 bg-panel p-8 text-center">
             <p className="text-muted">Login to view this library.</p>
             <ButtonLink href="/login" className="mt-4">Login</ButtonLink>
@@ -226,11 +178,10 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
 function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; kind: LibraryKind; canRemove: boolean; onRemove: () => void }) {
   const id = String(item.mal_id || item.anime_id || "");
   const [savedAnime, setSavedAnime] = useState<Anime | undefined>();
-  const [saved, setSaved] = useState<LibraryItem | undefined>();
   const episode = item.episode || item.episode_num || 1;
   const baseItem = { ...savedAnime, ...item };
   const downloadHref = `/offline/${encodeURIComponent(item.offline_id || offlineId(id, episode))}`;
-  const progress = kind === "downloads" ? 0 : progressOf(item) || progressOf(saved);
+  const progress = kind === "downloads" ? 0 : progressOf(item);
   const href =
     kind === "watchlist"
       ? `/anime/${id}`
@@ -242,10 +193,9 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setSavedAnime(rememberedAnime(id));
-      setSaved(kind === "downloads" ? undefined : rememberedProgress(id, episode));
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [episode, id, kind]);
+  }, [id]);
 
   // Enrich from AniList when title or poster is missing
   const hasMissingData = !posterOf(baseItem) || titleOf(baseItem) === "Untitled";
