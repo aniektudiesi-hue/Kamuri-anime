@@ -9,9 +9,10 @@ import { useSettings } from "@/lib/settings";
 import { SearchBox } from "./search-box";
 
 const nav = [
-  { href: "/search?q=popular", label: "Browse" },
-  { href: "/search?q=airing", label: "New Releases" },
-  { href: "/search?q=top+rated", label: "Top Rated" },
+  { href: "/popular", label: "Browse" },
+  { href: "/new-releases", label: "New Releases" },
+  { href: "/top-rated", label: "Top Rated" },
+  { href: "/schedule", label: "Schedule" },
 ];
 
 export function Header() {
