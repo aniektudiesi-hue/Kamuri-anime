@@ -12,7 +12,6 @@ import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { historySocketUrl } from "@/lib/history-realtime";
-import { warmStreamManifest } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, titleOf } from "@/lib/utils";
@@ -104,10 +103,12 @@ export default function WatchPage({
     : undefined;
   const activeServerId = selectedServer?.id;
   const megaQuery = streamQueries[SERVERS.findIndex((s) => s.id === "mega")];
-  const streamsLoading = streamQueries.some((q) => q.isLoading || q.isFetching);
+  const selectedQueryIndex = selectedServer ? SERVERS.findIndex((s) => s.id === selectedServer.id) : 0;
+  const selectedQuery = streamQueries[selectedQueryIndex];
+  const backupLoading = loadBackupServers && !selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching);
+  const streamsLoading = Boolean(selectedQuery?.isLoading || selectedQuery?.isFetching || backupLoading);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
-  const streamWarmKey = streamQueries.map((query) => query.data?.m3u8_url || query.data?.stream_url || query.data?.url || "").join("|");
 
   const episodes = useQuery({
     queryKey: ["episodes", malId, 0],
@@ -223,7 +224,7 @@ export default function WatchPage({
     ({ currentTime, duration }: { currentTime: number; duration: number }) => {
       if (!Number.isFinite(currentTime) || currentTime < 1) return;
       const now = Date.now();
-      if (now - lastProgressSave.current < 5000 && currentTime + 2 < duration) return;
+      if (now - lastProgressSave.current < 12000 && currentTime + 2 < duration) return;
       lastProgressSave.current = now;
       const body = {
         mal_id: malId, anime_id: malId, title: animeTitleRef.current,
@@ -238,7 +239,7 @@ export default function WatchPage({
       const sentRealtime = sendRealtimeHistory(body);
       const shouldHttpFallback =
         !sentRealtime ||
-        now - lastHttpProgressSave.current > 30000 ||
+        now - lastHttpProgressSave.current > 60000 ||
         currentTime + 2 >= duration;
 
       if (shouldHttpFallback) {
@@ -268,9 +269,8 @@ export default function WatchPage({
   useEffect(() => {
     if (!malId || !Number.isFinite(episodeNum)) return;
     queryClient.prefetchQuery({ queryKey: ["episodes", malId, 0], queryFn: () => api.episodes(malId), staleTime: 1000 * 60 * 20 });
-    queryClient.prefetchQuery({ queryKey: ["stream", malId, episodeNum + 1, "mega", type], queryFn: () => api.stream(malId, episodeNum + 1, type), staleTime: 1000 * 60 * 2 });
     router.prefetch(`/watch/${malId}/${episodeNum + 1}`);
-  }, [episodeNum, malId, queryClient, router, type]);
+  }, [episodeNum, malId, queryClient, router]);
 
   const maxEpisode = useMemo(
     () => episodes.data?.num_episodes || episodes.data?.episodes.at(-1)?.episode_number || 0,
@@ -290,26 +290,21 @@ export default function WatchPage({
   }, [episode, malId, type]);
 
   useEffect(() => {
-    const resetId = window.setTimeout(() => setLoadBackupServers(false), 0);
     if (!malId || !Number.isFinite(episodeNum)) {
-      return () => window.clearTimeout(resetId);
+      return;
     }
     if (!megaQuery?.data && !megaQuery?.isError) {
-      return () => window.clearTimeout(resetId);
+      return;
     }
-    const loadId = window.setTimeout(() => setLoadBackupServers(true), 900);
-    return () => {
-      window.clearTimeout(resetId);
-      window.clearTimeout(loadId);
-    };
+    if (megaQuery?.isError || (megaQuery?.data && !hasPlayableStream(megaQuery.data))) {
+      setLoadBackupServers(true);
+      return;
+    }
+    const loadId = window.setTimeout(() => {
+      if (document.visibilityState === "visible") setLoadBackupServers(true);
+    }, 12000);
+    return () => window.clearTimeout(loadId);
   }, [episodeNum, malId, megaQuery?.data, megaQuery?.isError]);
-
-  useEffect(() => {
-    const streams = streamQueries.map((query) => query.data).filter(Boolean);
-    streams.forEach((stream) => warmStreamManifest(stream));
-  // streamQueries is intentionally read here; streamWarmKey is the stable change signal.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamWarmKey]);
 
   return (
     <AppShell>
@@ -369,7 +364,7 @@ export default function WatchPage({
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
                 autoPlay={settings.autoResume}
-                deepBuffer={settings.autoFetchWhileWatching || activeServerId === "moon"}
+                deepBuffer={settings.autoFetchWhileWatching}
                 nextHref={nextHref}
                 onProgress={saveWatchProgress}
               />

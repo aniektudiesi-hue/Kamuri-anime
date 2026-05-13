@@ -50,7 +50,22 @@ export function Providers({ children }: { children: React.ReactNode }) {
         dehydrateOptions: {
           shouldDehydrateQuery: (query) => {
             const key = String(query.queryKey[0]);
-            return query.state.status === "success" && !["me", "stream", "history", "watchlist", "downloads"].includes(key);
+            return (
+              query.state.status === "success" &&
+              ![
+                "me",
+                "stream",
+                "history",
+                "watchlist",
+                "downloads",
+                "episodes",
+                "banners",
+                "thumbnails",
+                "recently-added",
+                "top-rated",
+                "schedule",
+              ].includes(key)
+            );
           },
         },
       }}

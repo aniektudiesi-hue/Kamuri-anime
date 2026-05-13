@@ -296,9 +296,9 @@ export function VideoPlayer({
     lastTimeRef.current = initialTime;
     let playRequested = false;
     const targetForwardBuffer = deepBuffer
-      ? (isMoonStream ? 13 * 60 : 7 * 60)
-      : (isMoonStream ? 5 * 60 : 3 * 60);
-    const initialForwardBuffer = Math.min(targetForwardBuffer, isMoonStream ? 120 : 75);
+      ? (isMoonStream ? 8 * 60 : 5 * 60)
+      : (isMoonStream ? 90 : 60);
+    const initialForwardBuffer = Math.min(targetForwardBuffer, isMoonStream ? 45 : 30);
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
@@ -310,8 +310,8 @@ export function VideoPlayer({
       };
       config.maxBufferLength = targetForwardBuffer;
       config.maxMaxBufferLength = Math.max(targetForwardBuffer, targetForwardBuffer + 120);
-      config.maxBufferSize = deepBuffer ? 512 * 1000 * 1000 : 240 * 1000 * 1000;
-      config.backBufferLength = isMoonStream ? 60 : 35;
+      config.maxBufferSize = deepBuffer ? 384 * 1000 * 1000 : 96 * 1000 * 1000;
+      config.backBufferLength = isMoonStream ? 35 : 20;
     };
     let lastBufferUiAt = 0;
     const updateBuffered = (force = false) => {
@@ -410,16 +410,16 @@ export function VideoPlayer({
         hls = new Hls({
           enableWorker: true,
           progressive: true,
-          lowLatencyMode: true,
+          lowLatencyMode: false,
           startFragPrefetch: true,
           startPosition: initialTime > 2 ? initialTime : -1,
           testBandwidth: true,
           capLevelToPlayerSize: true,
           maxBufferLength: initialForwardBuffer,
-          maxMaxBufferLength: Math.max(initialForwardBuffer, 180),
-          maxBufferSize: 220 * 1000 * 1000,
+          maxMaxBufferLength: Math.max(initialForwardBuffer, 120),
+          maxBufferSize: deepBuffer ? 180 * 1000 * 1000 : 82 * 1000 * 1000,
           maxBufferHole: 0.35,
-          backBufferLength: isMoonStream ? 45 : 25,
+          backBufferLength: isMoonStream ? 25 : 15,
           fragLoadingMaxRetry: isMoonStream ? 8 : 5,
           manifestLoadingMaxRetry: isMoonStream ? 5 : 3,
           levelLoadingMaxRetry: isMoonStream ? 5 : 3,
@@ -908,7 +908,7 @@ export function VideoPlayer({
       {/* Bottom controls gradient + bar */}
       <div
         className={`absolute inset-x-0 bottom-0 z-30 transition-opacity duration-300 ${
-          controlsOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          controlsOpen || captionSettingsOpen || showSpeedMenu || showQualityMenu ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onMouseEnter={() => showControls(true)}
         onMouseLeave={() => {
@@ -1051,7 +1051,7 @@ export function VideoPlayer({
                 {captionSettingsOpen ? (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setCaptionSettingsOpen(false)} />
-                    <div className="absolute bottom-full right-0 z-50 mb-2 w-[280px] overflow-hidden rounded-2xl border border-white/15 bg-black/95 p-3 shadow-2xl">
+                    <div className="fixed inset-x-3 bottom-20 z-50 overflow-hidden rounded-2xl border border-white/15 bg-black/95 p-3 shadow-2xl sm:absolute sm:bottom-full sm:right-0 sm:left-auto sm:mb-2 sm:w-[280px]">
                       <div className="mb-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Captions</p>
                         <p className="mt-1 text-xs text-white/42">Live preview is on the video. Drag it where you want.</p>

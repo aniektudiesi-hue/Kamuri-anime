@@ -35,13 +35,6 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
       queryFn: () => api.episodes(id, episodes),
       staleTime: 1000 * 60 * 20,
     });
-    if (resume.hasResume) {
-      queryClient.prefetchQuery({
-        queryKey: ["stream", id, resume.episode, "mega", "sub"],
-        queryFn: () => api.stream(id, resume.episode, "sub"),
-        staleTime: 1000 * 60 * 3,
-      });
-    }
   }
 
   return (

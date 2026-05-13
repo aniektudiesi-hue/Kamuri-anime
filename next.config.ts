@@ -3,9 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost", "10.88.55.120"],
   images: {
-    formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 60 * 60 * 24 * 30,
-    qualities: [50, 60, 75, 85, 92],
+    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "myanimelist.net" },
       { protocol: "https", hostname: "cdn.myanimelist.net" },
