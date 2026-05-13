@@ -3,12 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Clock, Play, Plus, Star, Tv, CheckCircle2, Loader2 } from "lucide-react";
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { SidebarLayout } from "@/components/sidebar";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { warmMoonPipeline, warmStreamManifest } from "@/lib/stream-cache";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
 import {
@@ -103,13 +104,32 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     },
   });
 
-  function prefetchWatch(ep: number) {
+  const prefetchWatch = useCallback((ep: number) => {
+    const episode = String(ep);
     queryClient.prefetchQuery({
-      queryKey: ["stream", malId, ep, "mega", "sub"],
-      queryFn: () => api.stream(malId, ep, "sub"),
-      staleTime: 1000 * 60 * 3,
+      queryKey: ["stream", malId, episode, "mega", "sub"],
+      queryFn: () => api.stream(malId, episode, "sub"),
+      staleTime: 1000 * 60 * 25,
     });
-  }
+    queryClient.prefetchQuery({
+      queryKey: ["stream", malId, episode, "moon", "any"],
+      queryFn: async () => {
+        const stream = await api.moon(malId, episode);
+        warmMoonPipeline(stream, 6);
+        return stream;
+      },
+      staleTime: 1000 * 60 * 25,
+    });
+    queryClient.prefetchQuery({
+      queryKey: ["stream", malId, episode, "hd1", "any"],
+      queryFn: async () => {
+        const stream = await api.hd1(malId, episode);
+        warmStreamManifest(stream, { segments: 1, timeoutMs: 10_000 });
+        return stream;
+      },
+      staleTime: 1000 * 60 * 25,
+    });
+  }, [malId, queryClient]);
 
   const episodeTotal = episodes.data?.num_episodes || hint;
   const poster = posterOf(known);
@@ -133,6 +153,11 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   useEffect(() => {
     setEpisodeLimit(24);
   }, [activeRange, malId]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => prefetchWatch(lastEp || 1), 350);
+    return () => window.clearTimeout(id);
+  }, [lastEp, prefetchWatch]);
 
   const rangeEpisodes = ranges.length
     ? allEpisodes.filter(
@@ -322,6 +347,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     href={href}
                     onMouseEnter={() => prefetchWatch(ep.episode_number)}
                     onFocus={() => prefetchWatch(ep.episode_number)}
+                    onTouchStart={() => prefetchWatch(ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
                     className={`group relative mb-2 grid grid-cols-[96px_1fr_auto] items-center gap-2.5 rounded-2xl border p-2 text-left transition last:mb-0 sm:grid-cols-[118px_1fr_auto] ${
                       isCurrent
