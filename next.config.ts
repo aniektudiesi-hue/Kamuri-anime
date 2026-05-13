@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost", "10.88.55.120"],
   images: {
     unoptimized: true,
+    qualities: [75, 92, 94, 95],
     remotePatterns: [
       { protocol: "https", hostname: "myanimelist.net" },
       { protocol: "https", hostname: "cdn.myanimelist.net" },

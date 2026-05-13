@@ -47,7 +47,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
     <article
       onMouseEnter={prefetch}
       onFocus={prefetch}
-      className={`card-lift group ${className ?? "w-[160px] shrink-0 sm:w-[180px]"}`}
+      className={`card-lift scroll-card group ${className ?? "w-[160px] shrink-0 sm:w-[180px]"}`}
     >
       <Link href={href} onClick={() => rememberAnime(anime)} className="block">
 

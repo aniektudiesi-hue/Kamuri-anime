@@ -206,7 +206,7 @@ function SearchContent() {
             <GridSkeleton count={20} />
           ) : merged.length > 0 ? (
             <>
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
+              <div className="content-visibility-auto grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
                 {merged.map((anime, i) => (
                   <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 8} />
                 ))}

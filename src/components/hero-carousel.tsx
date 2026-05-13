@@ -222,18 +222,46 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
 
 export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loading?: boolean }) {
   const [index, setIndex] = useState(0);
+  const [isVisible, setIsVisible] = useState(true);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const sectionRef = useRef<HTMLElement | null>(null);
   const len = Math.max(items.length, 1);
   const current = items[index % len];
 
   useEffect(() => {
-    if (!items.length) return;
+    const node = sectionRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { threshold: 0.1 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let timeout: number | undefined;
+    const onScroll = () => {
+      setIsScrolling(true);
+      if (timeout) window.clearTimeout(timeout);
+      timeout = window.setTimeout(() => setIsScrolling(false), 220);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (timeout) window.clearTimeout(timeout);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!items.length || !isVisible || isScrolling || document.hidden) return;
     const timer = window.setInterval(() => setIndex((value) => (value + 1) % items.length), HERO_AUTO_ADVANCE_MS);
     return () => window.clearInterval(timer);
-  }, [items.length]);
+  }, [items.length, isVisible, isScrolling]);
 
   if (loading) {
     return (
-      <section className="relative -mt-1 min-h-[420px] overflow-hidden pb-6 sm:hidden">
+      <section ref={sectionRef} className="relative -mt-1 min-h-[420px] overflow-hidden pb-6 sm:hidden">
         <div className="absolute inset-0 animate-pulse bg-[#141828]" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/35 to-transparent" />
         <div className="relative flex min-h-[420px] items-end px-4">
@@ -259,7 +287,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const count = episodeCount(current);
 
   return (
-    <section className="relative -mt-1 min-h-[430px] overflow-hidden pb-4 sm:hidden">
+    <section ref={sectionRef} className="relative -mt-1 min-h-[430px] overflow-hidden pb-4 sm:hidden">
       <div className="absolute inset-0 bg-[#080a12]">
         {banner || poster ? (
           <Image
@@ -267,7 +295,8 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             src={banner || poster}
             alt=""
             fill
-            priority
+            priority={index === 0}
+            loading={index === 0 ? undefined : "lazy"}
             quality={92}
             sizes="100vw"
             className="object-cover opacity-85"

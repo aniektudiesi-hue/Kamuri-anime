@@ -18,7 +18,7 @@ type RowProps = {
 
 export function AnimeRow({ title, subtitle, viewAllHref, items, loading, priorityCards = false }: RowProps) {
   return (
-    <section className="mx-auto max-w-screen-2xl px-4 py-8 lg:px-6">
+    <section className="content-visibility-auto mx-auto max-w-screen-2xl px-4 py-8 lg:px-6">
       {/* Section header */}
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
@@ -36,7 +36,7 @@ export function AnimeRow({ title, subtitle, viewAllHref, items, loading, priorit
       </div>
 
       {/* Horizontal scroll */}
-      <div className="no-scrollbar -mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
+      <div className="no-scrollbar scroll-strip -mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
         {loading
           ? Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)
           : items?.map((anime, i) => (
@@ -76,9 +76,9 @@ export function LazyAnimeRow(props: RowProps) {
       {visible ? (
         <AnimeRow {...props} />
       ) : (
-        <section className="mx-auto max-w-screen-2xl px-4 py-8 lg:px-6">
+        <section className="content-visibility-auto mx-auto max-w-screen-2xl px-4 py-8 lg:px-6">
           <div className="mb-5 h-6 w-40 rounded-full bg-[#141828]" />
-          <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
+          <div className="no-scrollbar scroll-strip flex gap-4 overflow-x-auto pb-2">
             {Array.from({ length: 10 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
         </section>

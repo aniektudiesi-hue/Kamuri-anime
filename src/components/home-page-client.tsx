@@ -157,7 +157,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
   const statusKey = (anime.status || "").toLowerCase();
 
   return (
-    <article className="card-lift group">
+    <article className="card-lift scroll-card group">
       <Link href={`/anime/${id}`} onClick={() => rememberAnime(anime)} className="block">
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.055] transition group-hover:ring-[#cf2442]/28">
           {poster && !imageFailed ? (
@@ -167,6 +167,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
               fill
               sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 20vw"
               priority={priority}
+              loading={priority ? undefined : "lazy"}
               onError={() => setImageFailed(true)}
               className="object-cover transition-transform duration-700 group-hover:scale-105"
             />
@@ -255,7 +256,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
               key={`${item.id}-${item.episode}-${item.airingAt}`}
               href={`/anime/${item.id}`}
               onClick={() => rememberAnime(item.anime)}
-              className="group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#0d1020]/70 p-2 transition hover:border-[#cf2442]/30 hover:bg-[#141828]"
+              className="scroll-card group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#0d1020]/70 p-2 transition hover:border-[#cf2442]/30 hover:bg-[#141828]"
             >
               <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
                 {posterOf(item.anime) ? (

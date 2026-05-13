@@ -223,7 +223,7 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
   const displayPoster = posterOf(displayItem) || (enrich.data as { image_url?: string })?.image_url || "";
 
   return (
-    <div className="grid grid-cols-[78px_1fr_auto] items-center gap-4 rounded-3xl border border-white/[0.075] bg-panel/86 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition hover:border-[#cf2442]/28 hover:bg-panel">
+    <div className="scroll-card grid grid-cols-[78px_1fr_auto] items-center gap-4 rounded-3xl border border-white/[0.075] bg-panel/86 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition hover:border-[#cf2442]/28 hover:bg-panel">
       <Link href={href} className="relative h-[112px] overflow-hidden rounded-2xl bg-panel-strong ring-1 ring-white/[0.06]">
         {displayPoster
           ? <Image src={displayPoster} alt="" width={78} height={117} className="h-full w-full object-cover" />

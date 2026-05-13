@@ -112,7 +112,10 @@
 }
 
 /* ── Base ─────────────────────────────────────────────── */
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  overscroll-behavior-y: none;
+}
 
 body {
   background:
@@ -237,6 +240,7 @@ button, a, input { outline-color: var(--accent); }
 
 /* ── Card hover lift — compositor-only (no repaint) ─── */
 .card-lift {
+  transform: translateZ(0);
   transition: transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94),
               filter 0.25s cubic-bezier(0.25,0.46,0.45,0.94);
 }
@@ -247,7 +251,30 @@ button, a, input { outline-color: var(--accent); }
 
 .content-visibility-auto {
   content-visibility: auto;
-  contain-intrinsic-size: 760px;
+  contain-intrinsic-size: auto 760px;
+  contain: layout paint style;
+}
+
+.scroll-card {
+  contain: layout paint style;
+  transform: translateZ(0);
+}
+
+.scroll-strip {
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll-strip > * {
+  scroll-snap-align: start;
+}
+
+@supports (content-visibility: auto) {
+  .scroll-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 280px;
+  }
 }
 
 /* ── Shine overlay on hover ──────────────────────────── */
@@ -397,6 +424,38 @@ input[type="range"] { accent-color: var(--accent-2); }
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 640px), (hover: none) and (pointer: coarse) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  body {
+    background: #05060b;
+  }
+
+  .card-lift,
+  .card-lift:hover {
+    filter: none;
+    transform: none;
+    transition: none;
+  }
+
+  .card-lift img {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .shine::after,
+  .hero-book-sheen {
+    display: none;
   }
 }
 
