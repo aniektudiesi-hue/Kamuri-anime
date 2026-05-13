@@ -127,10 +127,13 @@ export const api = {
     }).catch(() => undefined);
   },
   adminOverview: (token: string, adminKey?: string | null) => request<Record<string, unknown>>("/admin/overview", { token, adminKey }),
-  adminUsers: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/users", { token, adminKey }),
-  adminUserActivity: (token: string, userId: string | number, adminKey?: string | null) =>
-    request<Record<string, unknown>>(`/admin/users/${userId}/activity`, { token, adminKey }),
-  adminLogins: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/logins", { token, adminKey }),
-  adminVisits: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/visits", { token, adminKey }),
+  adminUsers: (token: string, adminKey?: string | null, limit = 200) =>
+    request<{ items: Record<string, unknown>[] }>(`/admin/users?limit=${limit}`, { token, adminKey }),
+  adminUserActivity: (token: string, userId: string | number, adminKey?: string | null, limit = 80) =>
+    request<Record<string, unknown>>(`/admin/users/${userId}/activity?limit=${limit}`, { token, adminKey }),
+  adminLogins: (token: string, adminKey?: string | null, limit = 200) =>
+    request<{ items: Record<string, unknown>[] }>(`/admin/logins?limit=${limit}`, { token, adminKey }),
+  adminVisits: (token: string, adminKey?: string | null, limit = 300) =>
+    request<{ items: Record<string, unknown>[] }>(`/admin/visits?limit=${limit}`, { token, adminKey }),
   adminSearchVisibility: (token: string, adminKey?: string | null) => request<Record<string, unknown>>("/admin/search-visibility", { token, adminKey }),
 };

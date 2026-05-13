@@ -120,7 +120,7 @@ function BigSection({
   viewAllHref?: string;
 }) {
   const allItems = items ?? [];
-  const visibleItems = allItems.slice(0, 36);
+  const visibleItems = allItems.slice(0, 18);
 
   return (
     <section className="content-visibility-auto border-t border-white/[0.055] py-8 first:border-t-0">
@@ -131,10 +131,10 @@ function BigSection({
         viewAllHref={viewAllHref}
       />
 
-      <div className="grid grid-cols-3 gap-x-2.5 gap-y-5 sm:grid-cols-4 sm:gap-x-3 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+      <div className="no-scrollbar scroll-strip -mx-1 flex gap-3 overflow-x-auto px-1 pb-3 sm:gap-4">
         {loading
-          ? Array.from({ length: 18 }).map((_, i) => (
-              <div key={i}>
+          ? Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="w-[132px] shrink-0 sm:w-[154px]">
                 <Skeleton className="aspect-[2/3] rounded-2xl bg-[#141828]" style={{ animationDelay: `${i * 20}ms` }} />
                 <Skeleton className="mt-3 h-3 w-4/5 rounded-full bg-[#141828]" />
                 <Skeleton className="mt-1.5 h-2.5 w-2/5 rounded-full bg-[#0d1020]" />
@@ -144,6 +144,14 @@ function BigSection({
               <AnimeGridCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 6} />
             ))}
       </div>
+
+      {!loading && allItems.length > visibleItems.length && viewAllHref ? (
+        <div className="mt-2 flex justify-center sm:hidden">
+          <Link href={viewAllHref} className="rounded-full border border-white/[0.075] bg-white/[0.035] px-4 py-2 text-xs font-black text-white/50">
+            See more
+          </Link>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -152,14 +160,15 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
   const id = animeId(anime);
   const poster = posterOf(anime);
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const title = titleOf(anime);
   const count = episodeCount(anime);
   const statusKey = (anime.status || "").toLowerCase();
 
   return (
-    <article className="card-lift scroll-card group">
+    <article className="card-lift scroll-card group w-[132px] shrink-0 sm:w-[154px]">
       <Link href={`/anime/${id}`} onClick={() => rememberAnime(anime)} className="block">
-        <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.055] transition group-hover:ring-[#cf2442]/28">
+        <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.055] transition group-hover:ring-[#cf2442]/28" data-loaded={imageLoaded || imageFailed}>
           {poster && !imageFailed ? (
             <Image
               src={poster}
@@ -168,8 +177,9 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
               sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 20vw"
               priority={priority}
               loading={priority ? undefined : "lazy"}
+              onLoad={() => setImageLoaded(true)}
               onError={() => setImageFailed(true)}
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
+              className={`object-cover transition duration-700 group-hover:scale-105 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
             />
           ) : (
             <PosterFallback title={title} />

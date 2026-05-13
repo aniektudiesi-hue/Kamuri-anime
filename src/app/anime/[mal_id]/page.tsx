@@ -41,6 +41,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const [clickedAnime, setClickedAnime] = useState<Anime | undefined>();
   const [watchlistSaved, setWatchlistSaved] = useState(false);
   const [activeRange, setActiveRange] = useState(0);
+  const [episodeLimit, setEpisodeLimit] = useState(24);
 
   useEffect(() => {
     const id = window.setTimeout(() => setClickedAnime(rememberedAnime(malId)), 0);
@@ -129,11 +130,16 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastEp, ranges.length]);
 
-  const visibleEpisodes = ranges.length
+  useEffect(() => {
+    setEpisodeLimit(24);
+  }, [activeRange, malId]);
+
+  const rangeEpisodes = ranges.length
     ? allEpisodes.filter(
         (ep) => ep.episode_number >= ranges[activeRange].start && ep.episode_number <= ranges[activeRange].end,
       )
     : allEpisodes;
+  const visibleEpisodes = rangeEpisodes.slice(0, episodeLimit);
 
   return (
     <AppShell>
@@ -305,7 +311,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                 <div key={i} className="h-20 animate-pulse rounded-xl bg-[#141828]" />
               ))}
             </div>
-          ) : visibleEpisodes.length ? (
+          ) : rangeEpisodes.length ? (
             <div className="no-scrollbar max-h-[620px] overflow-y-auto rounded-3xl border border-white/[0.065] bg-[#0d1020]/72 p-2.5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
               {visibleEpisodes.map((ep) => {
                 const isCurrent = ep.episode_number === lastEp && Boolean(last);
@@ -371,6 +377,15 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   </Link>
                 );
               })}
+              {visibleEpisodes.length < rangeEpisodes.length ? (
+                <button
+                  type="button"
+                  onClick={() => setEpisodeLimit((value) => value + 24)}
+                  className="mt-2 flex h-11 w-full items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.04] text-sm font-black text-white/50 transition hover:border-[#cf2442]/30 hover:bg-[#cf2442]/10 hover:text-white"
+                >
+                  See more episodes
+                </button>
+              ) : null}
             </div>
           ) : (
             <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-10 text-center">

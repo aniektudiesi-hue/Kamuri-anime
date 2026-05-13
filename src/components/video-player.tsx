@@ -1,6 +1,7 @@
 "use client";
 
 import Hls from "hls.js";
+import Image from "next/image";
 import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StreamResponse, Subtitle } from "@/lib/types";
@@ -668,7 +669,7 @@ export function VideoPlayer({
 
       {poster && !hasVideoFrame && !playbackError ? (
         <div className="pointer-events-none absolute inset-0 z-10 bg-black">
-          <img src={poster} alt="" className="h-full w-full object-cover opacity-78 blur-[1px] scale-105" />
+          <Image src={poster} alt="" fill sizes="100vw" className="scale-105 object-cover opacity-80 blur-[1px]" unoptimized />
           <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/28 to-black/32" />
           <div className="absolute inset-0 bg-black/12 backdrop-blur-[1px]" />
         </div>
@@ -698,9 +699,9 @@ export function VideoPlayer({
 
       {/* Captions */}
       {captionsOn && activeCaption ? (
-        <div className="pointer-events-none absolute inset-x-4 bottom-[72px] z-20 flex justify-center">
+        <div className="anime-caption-wrap pointer-events-none absolute inset-x-4 bottom-[72px] z-20 flex justify-center">
           <p
-            className="max-w-5xl whitespace-pre-line text-center text-[20px] font-black leading-7 text-white sm:text-[26px] sm:leading-9"
+            className="anime-caption-text max-w-5xl whitespace-pre-line text-center text-white"
             style={{
               textShadow:
                 "2px 2px 4px #000, -1px -1px 3px #000, 1px -1px 3px #000, -1px 1px 3px #000, 0 0 12px rgba(0,0,0,0.8)",

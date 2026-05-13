@@ -122,9 +122,11 @@ body {
     radial-gradient(circle at 18% -10%, rgba(207,36,66,0.12), transparent 34%),
     radial-gradient(circle at 82% 0%, rgba(200,206,216,0.08), transparent 28%),
     linear-gradient(180deg, #05060b 0%, #070912 48%, #05060b 100%);
+  background-color: #05060b;
   color: var(--foreground);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 html[data-theme="light"] {
@@ -270,6 +272,49 @@ button, a, input { outline-color: var(--accent); }
   scroll-snap-align: start;
 }
 
+.netflix-image-shell {
+  isolation: isolate;
+  transform: translateZ(0);
+  background:
+    linear-gradient(100deg, transparent 34%, rgba(255,255,255,0.055) 44%, transparent 56%),
+    linear-gradient(180deg, #171b2d 0%, #080a12 100%);
+  background-size: 240% 100%, 100% 100%;
+  animation: netflixImageShimmer 1.25s linear infinite;
+}
+
+.netflix-image-shell[data-loaded="true"] {
+  animation: none;
+  background: #101322;
+}
+
+.netflix-image-shell[data-loaded="false"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  transform: translateX(-100%);
+  animation: netflixImageSweep 1.05s ease-in-out infinite;
+}
+
+.admin-table-scroll {
+  scrollbar-gutter: stable;
+}
+
+.anime-caption-text {
+  max-width: min(88vw, 920px);
+  border-radius: 10px;
+  background: rgba(0,0,0,0.22);
+  padding: 0.14em 0.48em;
+  font-size: clamp(16px, 2.15vw, 25px);
+  font-weight: 800;
+  line-height: 1.28;
+  letter-spacing: 0;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 @supports (content-visibility: auto) {
   .scroll-card {
     content-visibility: auto;
@@ -357,6 +402,17 @@ input[type="range"] { accent-color: var(--accent-2); }
   100% { transform: translateX(145%) skewX(-16deg); opacity: 0; }
 }
 
+@keyframes netflixImageShimmer {
+  0% { background-position: 130% 0, 0 0; }
+  100% { background-position: -130% 0, 0 0; }
+}
+
+@keyframes netflixImageSweep {
+  0% { transform: translateX(-100%); opacity: 0; }
+  35% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
 .hero-book-stage {
   perspective: 1300px;
   transform-style: preserve-3d;
@@ -427,6 +483,23 @@ input[type="range"] { accent-color: var(--accent-2); }
   }
 }
 
+@media (max-height: 540px) {
+  .anime-caption-wrap {
+    top: 12%;
+    bottom: auto;
+  }
+
+  .anime-caption-text {
+    max-width: min(76vw, 720px);
+    border-radius: 8px;
+    background: rgba(0,0,0,0.18);
+    padding: 0.08em 0.38em;
+    font-size: clamp(12px, 3vh, 16px);
+    font-weight: 700;
+    line-height: 1.18;
+  }
+}
+
 @media (max-width: 640px), (hover: none) and (pointer: coarse) {
   html {
     scroll-behavior: auto;
@@ -456,6 +529,10 @@ input[type="range"] { accent-color: var(--accent-2); }
   .shine::after,
   .hero-book-sheen {
     display: none;
+  }
+
+  .netflix-image-shell {
+    animation-duration: 1.8s;
   }
 }
 

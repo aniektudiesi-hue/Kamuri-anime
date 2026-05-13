@@ -94,19 +94,19 @@ export function AdminDashboard() {
   });
   const users = useQuery({
     queryKey: ["admin", "users", token, adminKey],
-    queryFn: () => api.adminUsers(token!, adminKey),
+    queryFn: () => api.adminUsers(token!, adminKey, 250),
     enabled: Boolean(token),
     retry: false,
   });
   const logins = useQuery({
     queryKey: ["admin", "logins", token, adminKey],
-    queryFn: () => api.adminLogins(token!, adminKey),
+    queryFn: () => api.adminLogins(token!, adminKey, 120),
     enabled: Boolean(token),
     retry: false,
   });
   const visits = useQuery({
     queryKey: ["admin", "visits", token, adminKey],
-    queryFn: () => api.adminVisits(token!, adminKey),
+    queryFn: () => api.adminVisits(token!, adminKey, 160),
     enabled: Boolean(token),
     retry: false,
   });
@@ -118,18 +118,12 @@ export function AdminDashboard() {
   });
   const activity = useQuery({
     queryKey: ["admin", "user-activity", token, adminKey, selectedUserId],
-    queryFn: () => api.adminUserActivity(token!, selectedUserId!, adminKey),
+    queryFn: () => api.adminUserActivity(token!, selectedUserId!, adminKey, 50),
     enabled: Boolean(token && selectedUserId),
     retry: false,
   });
 
   const userRows = useMemo(() => asItems(users.data), [users.data]);
-
-  useEffect(() => {
-    if (selectedUserId === null && userRows.length) {
-      setSelectedUserId(number(userRows[0], "id"));
-    }
-  }, [selectedUserId, userRows]);
 
   const anyError = overview.error || users.error || logins.error || visits.error;
   const overviewData = overview.data ?? {};
@@ -211,6 +205,7 @@ export function AdminDashboard() {
               <Panel title="Users database" icon={<UserRound size={16} />} loading={users.isLoading}>
                 <Table
                   rows={userRows}
+                  initialRows={24}
                   columns={[
                     [
                       "Username",
@@ -245,8 +240,9 @@ export function AdminDashboard() {
 
               <div className="grid gap-5">
                 <Panel title="Top locations" icon={<MapPin size={16} />} loading={overview.isLoading}>
-                  <Table
-                    rows={topLocations}
+                <Table
+                  rows={topLocations}
+                  initialRows={8}
                     columns={[
                       ["Approx location", (row) => <span className="font-bold text-white/78">{text(row, "label", locationLabel(row))}</span>],
                       ["Visits", (row) => number(row, "visits")],
@@ -256,8 +252,9 @@ export function AdminDashboard() {
                 </Panel>
 
                 <Panel title="Top devices" icon={<MonitorSmartphone size={16} />} loading={overview.isLoading}>
-                  <Table
-                    rows={topDevices}
+                <Table
+                  rows={topDevices}
+                  initialRows={8}
                     columns={[
                       ["Device", (row) => <span className="font-bold text-white/78">{text(row, "device", "Unknown")}</span>],
                       ["Visits", (row) => number(row, "visits")],
@@ -279,6 +276,7 @@ export function AdminDashboard() {
               <Panel title="Top pages" icon={<Activity size={16} />} loading={overview.isLoading}>
                 <Table
                   rows={topPaths}
+                  initialRows={8}
                   columns={[
                     ["Path", (row) => <span className="line-clamp-1 font-semibold text-white/80">{text(row, "path", "/")}</span>],
                     ["Visits", (row) => number(row, "visits")],
@@ -290,6 +288,7 @@ export function AdminDashboard() {
               <Panel title="Recent logins" icon={<Lock size={16} />} loading={logins.isLoading}>
                 <Table
                   rows={asItems(logins.data)}
+                  initialRows={14}
                   columns={[
                     ["User", (row) => text(row, "username", "-")],
                     [
@@ -310,6 +309,7 @@ export function AdminDashboard() {
               <Panel title="Recent visitors" icon={<MonitorSmartphone size={16} />} loading={visits.isLoading}>
                 <Table
                   rows={asItems(visits.data)}
+                  initialRows={14}
                   columns={[
                     ["Path", (row) => <span className="line-clamp-1">{text(row, "path", "/")}</span>],
                     ["User", (row) => text(row, "username", "Guest")],
@@ -394,6 +394,7 @@ function UserActivityPanel({
             <ActivitySection title="Watch history" icon={<ListVideo size={15} />}>
               <Table
                 rows={history}
+                initialRows={8}
                 columns={[
                   ["Anime", (row) => <span className="font-bold text-white/80">{text(row, "title", text(row, "mal_id", "-"))}</span>],
                   ["Ep", (row) => number(row, "episode")],
@@ -406,6 +407,7 @@ function UserActivityPanel({
             <ActivitySection title="Visits" icon={<Eye size={15} />}>
               <Table
                 rows={visits}
+                initialRows={8}
                 columns={[
                   ["Path", (row) => <span className="line-clamp-1">{text(row, "path", "/")}</span>],
                   ["Location", (row) => locationLabel(row)],
@@ -418,6 +420,7 @@ function UserActivityPanel({
             <ActivitySection title="Logins" icon={<Lock size={15} />}>
               <Table
                 rows={logins}
+                initialRows={8}
                 columns={[
                   ["Event", (row) => text(row, "event_type", "login")],
                   [
@@ -438,6 +441,7 @@ function UserActivityPanel({
             <ActivitySection title="Saved library" icon={<Bookmark size={15} />}>
               <Table
                 rows={watchlist}
+                initialRows={8}
                 columns={[
                   ["Anime", (row) => <span className="font-bold text-white/80">{text(row, "title", text(row, "mal_id", "-"))}</span>],
                   ["Episodes", (row) => number(row, "episodes") || "-"],
@@ -449,6 +453,7 @@ function UserActivityPanel({
             <ActivitySection title="Downloads metadata" icon={<Download size={15} />}>
               <Table
                 rows={downloads}
+                initialRows={8}
                 columns={[
                   ["Anime", (row) => <span className="font-bold text-white/80">{text(row, "title", text(row, "mal_id", "-"))}</span>],
                   ["Ep", (row) => number(row, "episode")],
@@ -522,7 +527,7 @@ function Panel({
   className?: string;
 }) {
   return (
-    <section className={`overflow-hidden rounded-3xl border border-white/[0.07] bg-[#0d1020]/78 shadow-xl shadow-black/20 ${className}`}>
+    <section className={`content-visibility-auto overflow-hidden rounded-3xl border border-white/[0.07] bg-[#0d1020]/78 shadow-xl shadow-black/20 ${className}`}>
       <div className="flex items-center gap-2 border-b border-white/[0.055] px-4 py-3">
         <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/[0.045] text-[#ff8ca0]">{icon}</span>
         <h2 className="text-sm font-black uppercase tracking-[0.18em] text-white/58">{title}</h2>
@@ -545,18 +550,26 @@ function Panel({
 function Table({
   rows,
   columns,
+  initialRows = 12,
+  stepRows = 12,
 }: {
   rows: Row[];
   columns: [string, (row: Row) => ReactNode][];
+  initialRows?: number;
+  stepRows?: number;
 }) {
+  const [limit, setLimit] = useState(initialRows);
+  const visibleRows = rows.slice(0, limit);
+
   if (!rows.length) {
     return <div className="rounded-2xl border border-white/[0.055] bg-white/[0.03] p-5 text-sm text-white/38">No data recorded yet.</div>;
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-3">
+      <div className="admin-table-scroll max-h-[430px] overflow-auto overscroll-contain rounded-2xl border border-white/[0.045]">
       <table className="min-w-full text-left text-sm">
-        <thead>
+        <thead className="sticky top-0 z-10 bg-[#0d1020]">
           <tr className="border-b border-white/[0.055] text-[10px] uppercase tracking-[0.18em] text-white/28">
             {columns.map(([label]) => (
               <th key={label} className="whitespace-nowrap px-3 py-2 font-black">
@@ -566,7 +579,7 @@ function Table({
           </tr>
         </thead>
         <tbody className="divide-y divide-white/[0.045]">
-          {rows.map((row, rowIndex) => (
+          {visibleRows.map((row, rowIndex) => (
             <tr key={String(row.id ?? `${row.mal_id ?? "row"}-${rowIndex}`)} className="text-white/54">
               {columns.map(([label, render]) => (
                 <td key={label} className="max-w-[300px] whitespace-nowrap px-3 py-3 align-top">
@@ -577,6 +590,16 @@ function Table({
           ))}
         </tbody>
       </table>
+      </div>
+      {visibleRows.length < rows.length ? (
+        <button
+          type="button"
+          onClick={() => setLimit((value) => value + stepRows)}
+          className="h-10 w-full rounded-2xl border border-white/[0.06] bg-white/[0.035] text-xs font-black text-white/44 transition hover:border-[#cf2442]/30 hover:bg-[#cf2442]/10 hover:text-white"
+        >
+          See more ({rows.length - visibleRows.length} left)
+        </button>
+      ) : null}
     </div>
   );
 }

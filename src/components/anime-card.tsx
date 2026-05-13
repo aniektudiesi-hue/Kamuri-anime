@@ -22,6 +22,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
   const episodes = episodeCount(anime);
   const poster = posterOf(anime);
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const title = titleOf(anime);
   const statusKey = (anime.status || "").toLowerCase();
   const resume = useResumeHistory(id);
@@ -52,7 +53,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
       <Link href={href} onClick={() => rememberAnime(anime)} className="block">
 
         {/* Poster container */}
-        <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828]">
+        <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828]" data-loaded={imageLoaded || imageFailed}>
           {poster && !imageFailed ? (
             <Image
               src={poster}
@@ -60,8 +61,9 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
               fill
               sizes="190px"
               priority={priority}
+              onLoad={() => setImageLoaded(true)}
               onError={() => setImageFailed(true)}
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
+              className={`object-cover transition duration-700 group-hover:scale-105 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
             />
           ) : (
             <PosterFallback title={title} />

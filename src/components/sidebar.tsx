@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Star, Clock, TrendingUp, ChevronRight, Moon, Sun, Wifi } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
@@ -269,16 +269,32 @@ function SettingSwitch({
 }
 
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
+  const showSidebar = useDesktopSidebar();
+
   return (
     <div className="mx-auto max-w-screen-2xl px-4 lg:px-6">
       <div className="flex items-start gap-6">
         <div className="min-w-0 flex-1">{children}</div>
-        <div className="hidden lg:block">
+        <div className="hidden w-[280px] shrink-0 lg:block">
           <div className="sticky top-[80px]">
-            <Sidebar />
+            {showSidebar ? <Sidebar /> : <div className="h-[540px] rounded-2xl border border-white/[0.05] bg-[#0d1020]/35" />}
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+function useDesktopSidebar() {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setShow(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+
+  return show;
 }
