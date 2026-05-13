@@ -2,8 +2,8 @@
 
 import Hls from "hls.js";
 import Image from "next/image";
-import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Settings2, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StreamResponse, Subtitle } from "@/lib/types";
 
 type CaptionCue = {
@@ -16,6 +16,25 @@ type QualityLevel = {
   hlsIndex: number;
   height: number;
   label: string;
+};
+
+type CaptionSettings = {
+  x: number;
+  y: number;
+  size: number;
+  weight: number;
+  opacity: number;
+  boxOpacity: number;
+};
+
+const CAPTION_SETTINGS_KEY = "anime-tv-caption-settings-v1";
+const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
+  x: 50,
+  y: 78,
+  size: 24,
+  weight: 800,
+  opacity: 1,
+  boxOpacity: 0.22,
 };
 
 export function VideoPlayer({
@@ -48,6 +67,9 @@ export function VideoPlayer({
   const playIntentRef = useRef(autoPlay);
   const deepBufferArmedRef = useRef(false);
   const captionCuesRef = useRef<CaptionCue[]>([]);
+  const activeCaptionRef = useRef("");
+  const captionDragRef = useRef(false);
+  const captionRafRef = useRef<number | undefined>(undefined);
   const controlsTimerRef = useRef<number | undefined>(undefined);
   // Stable refs so callbacks never cause the HLS effect to re-run
   const onProgressRef = useRef(onProgress);
@@ -69,6 +91,8 @@ export function VideoPlayer({
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [captionSettingsOpen, setCaptionSettingsOpen] = useState(false);
+  const [captionSettings, setCaptionSettings] = useState<CaptionSettings>(DEFAULT_CAPTION_SETTINGS);
   const [pipSupported, setPipSupported] = useState(false);
   const [pipActive, setPipActive] = useState(false);
   const [seekFlash, setSeekFlash] = useState<{ dir: "forward" | "backward"; n: number } | null>(null);
@@ -114,6 +138,23 @@ export function VideoPlayer({
     onFatalErrorRef.current = onFatalError;
   }, [onFatalError]);
 
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(CAPTION_SETTINGS_KEY);
+      if (saved) {
+        setCaptionSettings({ ...DEFAULT_CAPTION_SETTINGS, ...JSON.parse(saved) });
+      } else if (window.innerHeight <= 540) {
+        setCaptionSettings((current) => ({ ...current, y: 20, size: 16, boxOpacity: 0.16 }));
+      }
+    } catch {
+      setCaptionSettings(DEFAULT_CAPTION_SETTINGS);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(CAPTION_SETTINGS_KEY, JSON.stringify(captionSettings));
+  }, [captionSettings]);
+
   const hideControlsSoon = useCallback(() => {
     if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
     controlsTimerRef.current = window.setTimeout(() => setControlsOpen(false), 2500);
@@ -121,14 +162,21 @@ export function VideoPlayer({
 
   const syncCaptionAt = useCallback((time: number) => {
     if (!Number.isFinite(time)) {
-      setActiveCaption("");
+      if (activeCaptionRef.current) {
+        activeCaptionRef.current = "";
+        setActiveCaption("");
+      }
       return;
     }
     const caption = captionCuesRef.current
       .filter((cue) => time >= cue.start && time < cue.end)
       .map((cue) => cue.text)
       .join("\n");
-    setActiveCaption(caption ? cleanCaptionText(caption) : "");
+    const next = caption ? cleanCaptionText(caption) : "";
+    if (activeCaptionRef.current !== next) {
+      activeCaptionRef.current = next;
+      setActiveCaption(next);
+    }
   }, []);
 
   useEffect(() => {
@@ -159,7 +207,46 @@ export function VideoPlayer({
     return () => {
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       if (seekFlashTimer.current) window.clearTimeout(seekFlashTimer.current);
+      if (captionRafRef.current) window.cancelAnimationFrame(captionRafRef.current);
     };
+  }, []);
+
+  const updateCaptionPosition = useCallback((clientX: number, clientY: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const x = clamp(((clientX - rect.left) / rect.width) * 100, 7, 93);
+    const y = clamp(((clientY - rect.top) / rect.height) * 100, 8, 90);
+    setCaptionSettings((current) => ({
+      ...current,
+      x: Math.round(x),
+      y: Math.round(y),
+    }));
+  }, []);
+
+  const handleCaptionPointerDown = useCallback((event: PointerEvent<HTMLParagraphElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    captionDragRef.current = true;
+    updateCaptionPosition(event.clientX, event.clientY);
+  }, [updateCaptionPosition]);
+
+  const handleCaptionPointerMove = useCallback((event: PointerEvent<HTMLParagraphElement>) => {
+    if (!captionDragRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const { clientX, clientY } = event;
+    if (captionRafRef.current) return;
+    captionRafRef.current = window.requestAnimationFrame(() => {
+      captionRafRef.current = undefined;
+      updateCaptionPosition(clientX, clientY);
+    });
+  }, [updateCaptionPosition]);
+
+  const stopCaptionDrag = useCallback((event: PointerEvent<HTMLParagraphElement>) => {
+    event.stopPropagation();
+    captionDragRef.current = false;
   }, []);
 
   const flashSeek = useCallback((dir: "forward" | "backward", seconds: number) => {
@@ -192,6 +279,7 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video || !src) return;
     let hls: Hls | null = null;
+    activeCaptionRef.current = "";
     setActiveCaption("");
     setPlaybackError("");
     setIsBuffering(true);
@@ -225,19 +313,25 @@ export function VideoPlayer({
       config.maxBufferSize = deepBuffer ? 512 * 1000 * 1000 : 240 * 1000 * 1000;
       config.backBufferLength = isMoonStream ? 60 : 35;
     };
-    const updateBuffered = () => {
+    let lastBufferUiAt = 0;
+    const updateBuffered = (force = false) => {
       const ranges: Array<{ start: number; end: number }> = [];
       for (let i = 0; i < video.buffered.length; i++) {
         ranges.push({ start: video.buffered.start(i), end: video.buffered.end(i) });
       }
-      setBufferedRanges(ranges);
       const ahead = bufferedAheadOf(video);
-      setBufferAhead(ahead);
       const furthest = ranges.reduce((max, range) => Math.max(max, range.end), 0);
-      setBufferedPercent(video.duration ? Math.min(100, (furthest / video.duration) * 100) : 0);
+      const percent = video.duration ? Math.min(100, (furthest / video.duration) * 100) : 0;
+      const now = performance.now();
+      if (force || now - lastBufferUiAt > 1000) {
+        lastBufferUiAt = now;
+        setBufferedRanges(ranges);
+        setBufferAhead(ahead);
+        setBufferedPercent(percent);
+      }
       return ahead;
     };
-    const hasEnoughBuffer = () => updateBuffered() > 0.7 || video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+    const hasEnoughBuffer = () => updateBuffered(true) > 0.7 || video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
     const rememberTime = () => {
       if (Number.isFinite(video.currentTime) && video.currentTime > 0) {
         lastTimeRef.current = video.currentTime;
@@ -308,7 +402,8 @@ export function VideoPlayer({
     video.addEventListener("timeupdate", rememberTime);
     video.addEventListener("waiting", markWaiting);
     video.addEventListener("stalled", markWaiting);
-    video.addEventListener("progress", updateBuffered);
+    const updateBufferedFromEvent = () => updateBuffered(true);
+    video.addEventListener("progress", updateBufferedFromEvent);
 
     if (isHlsStream) {
       if (Hls.isSupported()) {
@@ -349,7 +444,7 @@ export function VideoPlayer({
         });
         hls.on(Hls.Events.FRAG_BUFFERED, () => {
           setIsBuffering(false);
-          updateBuffered();
+          updateBuffered(true);
           armDeepBuffer();
           playWhenReady();
         });
@@ -393,7 +488,7 @@ export function VideoPlayer({
       video.removeEventListener("timeupdate", rememberTime);
       video.removeEventListener("waiting", markWaiting);
       video.removeEventListener("stalled", markWaiting);
-      video.removeEventListener("progress", updateBuffered);
+      video.removeEventListener("progress", updateBufferedFromEvent);
     };
   }, [autoPlay, deepBuffer, hideControlsSoon, initialTime, isHlsStream, isMoonStream, src, syncCaptionAt]);
 
@@ -631,6 +726,7 @@ export function VideoPlayer({
     selectedQuality === -1
       ? "Auto"
       : qualityLevels.find((l) => l.hlsIndex === selectedQuality)?.label ?? "Auto";
+  const displayedCaption = activeCaption || (captionSettingsOpen ? "Caption preview - drag me anywhere" : "");
 
   if (!src) {
     return (
@@ -698,16 +794,32 @@ export function VideoPlayer({
       </div>
 
       {/* Captions */}
-      {captionsOn && activeCaption ? (
-        <div className="anime-caption-wrap pointer-events-none absolute inset-x-4 bottom-[72px] z-20 flex justify-center">
+      {captionsOn && displayedCaption ? (
+        <div
+          className="anime-caption-wrap absolute z-20 flex justify-center"
+          style={{
+            left: `${captionSettings.x}%`,
+            top: `${captionSettings.y}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
           <p
             className="anime-caption-text max-w-5xl whitespace-pre-line text-center text-white"
+            onPointerDown={handleCaptionPointerDown}
+            onPointerMove={handleCaptionPointerMove}
+            onPointerUp={stopCaptionDrag}
+            onPointerCancel={stopCaptionDrag}
             style={{
+              background: `rgba(0,0,0,${captionSettings.boxOpacity})`,
+              fontSize: `${captionSettings.size}px`,
+              fontWeight: captionSettings.weight,
+              opacity: captionSettings.opacity,
               textShadow:
                 "2px 2px 4px #000, -1px -1px 3px #000, 1px -1px 3px #000, -1px 1px 3px #000, 0 0 12px rgba(0,0,0,0.8)",
             }}
+            title="Drag captions"
           >
-            {activeCaption}
+            {displayedCaption}
           </p>
         </div>
       ) : null}
@@ -917,12 +1029,107 @@ export function VideoPlayer({
               </button>
             ) : null}
 
+            {subtitleCount > 0 ? (
+              <div className="relative">
+                <button
+                  aria-label="Caption settings"
+                  aria-expanded={captionSettingsOpen}
+                  onClick={() => {
+                    setCaptionSettingsOpen((value) => !value);
+                    setShowSpeedMenu(false);
+                    setShowQualityMenu(false);
+                    setCaptionsOn(true);
+                    showControls(true);
+                  }}
+                  title="Caption settings"
+                  className={`grid h-8 w-8 place-items-center rounded-xl transition-colors ${
+                    captionSettingsOpen ? "bg-white/10 text-white" : "text-white/55 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Settings2 size={17} />
+                </button>
+                {captionSettingsOpen ? (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setCaptionSettingsOpen(false)} />
+                    <div className="absolute bottom-full right-0 z-50 mb-2 w-[280px] overflow-hidden rounded-2xl border border-white/15 bg-black/95 p-3 shadow-2xl">
+                      <div className="mb-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Captions</p>
+                        <p className="mt-1 text-xs text-white/42">Live preview is on the video. Drag it where you want.</p>
+                      </div>
+
+                      <div
+                        className="mb-3 rounded-xl border border-white/[0.08] p-3 text-center text-white"
+                        style={{
+                          background: `rgba(0,0,0,${captionSettings.boxOpacity})`,
+                          fontSize: `${Math.max(13, Math.min(20, captionSettings.size - 4))}px`,
+                          fontWeight: captionSettings.weight,
+                          opacity: captionSettings.opacity,
+                        }}
+                      >
+                        Caption preview
+                      </div>
+
+                      <CaptionSlider
+                        label="Size"
+                        value={captionSettings.size}
+                        min={12}
+                        max={42}
+                        suffix="px"
+                        onChange={(size) => setCaptionSettings((current) => ({ ...current, size }))}
+                      />
+                      <CaptionSlider
+                        label="Boldness"
+                        value={captionSettings.weight}
+                        min={400}
+                        max={900}
+                        step={100}
+                        onChange={(weight) => setCaptionSettings((current) => ({ ...current, weight }))}
+                      />
+                      <CaptionSlider
+                        label="Text opacity"
+                        value={Math.round(captionSettings.opacity * 100)}
+                        min={45}
+                        max={100}
+                        suffix="%"
+                        onChange={(opacity) => setCaptionSettings((current) => ({ ...current, opacity: opacity / 100 }))}
+                      />
+                      <CaptionSlider
+                        label="Box transparency"
+                        value={Math.round((1 - captionSettings.boxOpacity) * 100)}
+                        min={20}
+                        max={100}
+                        suffix="%"
+                        onChange={(transparency) => setCaptionSettings((current) => ({ ...current, boxOpacity: (100 - transparency) / 100 }))}
+                      />
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCaptionSettings(DEFAULT_CAPTION_SETTINGS)}
+                          className="h-9 rounded-xl border border-white/[0.1] bg-white/[0.05] text-xs font-black text-white/62 hover:bg-white/[0.08] hover:text-white"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCaptionSettings((current) => ({ ...current, y: window.innerHeight <= 540 ? 20 : 78 }))}
+                          className="h-9 rounded-xl bg-[#cf2442] text-xs font-black text-white hover:bg-[#dc2d4b]"
+                        >
+                          Smart position
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+
             {/* Speed selector */}
             <div className="relative">
               <button
                 aria-label="Playback speed"
                 aria-expanded={showSpeedMenu}
-                onClick={() => { setShowSpeedMenu((v) => !v); setShowQualityMenu(false); }}
+                onClick={() => { setShowSpeedMenu((v) => !v); setShowQualityMenu(false); setCaptionSettingsOpen(false); }}
                 title="Playback speed (< / >)"
                 className={`flex h-8 items-center gap-1 rounded-xl px-2 text-xs font-bold transition-colors ${
                   showSpeedMenu || playbackRate !== 1
@@ -961,7 +1168,7 @@ export function VideoPlayer({
                 <button
                   aria-label="Quality"
                   aria-expanded={showQualityMenu}
-                  onClick={() => setShowQualityMenu((v) => !v)}
+                  onClick={() => { setShowQualityMenu((v) => !v); setCaptionSettingsOpen(false); }}
                   className={`h-8 rounded-xl px-2 text-xs font-bold transition-colors ${
                     showQualityMenu || selectedQuality !== -1
                       ? "bg-white/10 text-white"
@@ -1043,10 +1250,52 @@ export function VideoPlayer({
   );
 }
 
+function CaptionSlider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  suffix = "",
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="mb-2 block rounded-xl bg-white/[0.035] p-2.5">
+      <span className="mb-2 flex items-center justify-between text-[11px] font-bold text-white/55">
+        <span>{label}</span>
+        <span className="font-mono text-white/78">
+          {value}{suffix}
+        </span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-1 w-full cursor-pointer appearance-none rounded-full bg-white/18 accent-[#cf2442]"
+      />
+    </label>
+  );
+}
+
 function preferredSubtitles(subtitles: Subtitle[] | undefined) {
   const valid = (subtitles ?? []).filter((subtitle) => subtitle.file);
   const english = valid.filter((subtitle) => subtitleRank(subtitle) === 0);
   return (english.length ? english : valid).sort((a, b) => subtitleRank(a) - subtitleRank(b));
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function subtitleRank(subtitle: Subtitle) {

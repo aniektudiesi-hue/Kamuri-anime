@@ -313,6 +313,14 @@ button, a, input { outline-color: var(--accent); }
   letter-spacing: 0;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+.anime-caption-text:active {
+  cursor: grabbing;
 }
 
 @supports (content-visibility: auto) {

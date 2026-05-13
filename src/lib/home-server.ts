@@ -42,11 +42,11 @@ export async function getHomeInitialData(): Promise<HomeInitialData> {
   ]);
 
   return {
-    banners,
-    thumbnails,
-    recent,
-    topRated,
-    schedule,
+    banners: banners.slice(0, 10),
+    thumbnails: thumbnails.slice(0, 24),
+    recent: recent.slice(0, 24),
+    topRated: topRated.slice(0, 24),
+    schedule: schedule.slice(0, 72),
     generatedAt: new Date().toISOString(),
   };
 }
