@@ -43,25 +43,44 @@ export function clearCachedStream(key: string) {
   }
 }
 
-export function warmStreamManifest(stream: StreamResponse | undefined) {
+export function warmStreamManifest(
+  stream: StreamResponse | undefined,
+  options: { segments?: number; timeoutMs?: number } = {},
+) {
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
   if (!src || warmedManifests.has(src) || !isPlaylist(src)) return;
   warmedManifests.add(src);
+  preconnectTo(src);
 
   const controller = new AbortController();
-  const id = window.setTimeout(() => controller.abort(), 7000);
+  const id = window.setTimeout(() => controller.abort(), options.timeoutMs ?? 12_000);
+  const segmentCount = options.segments ?? 1;
 
-  fetch(src, { cache: "force-cache", signal: controller.signal })
-    .then(async (response) => {
-      if (!response.ok) return;
-      const text = await response.text();
-      const variant = firstVariantUrl(text, src);
-      if (variant) {
-        await fetch(variant, { cache: "force-cache", signal: controller.signal }).catch(() => undefined);
-      }
-    })
+  warmPlaylist(src, segmentCount, controller.signal)
     .catch(() => undefined)
     .finally(() => window.clearTimeout(id));
+}
+
+async function warmPlaylist(src: string, segmentCount: number, signal: AbortSignal) {
+  const response = await fetch(src, { cache: "force-cache", signal });
+  if (!response.ok) return;
+  const text = await response.text();
+  const variant = firstVariantUrl(text, src);
+  if (variant) {
+    preconnectTo(variant);
+    await warmPlaylist(variant, segmentCount, signal);
+    return;
+  }
+
+  const keys = keyUrls(text, src);
+  const segments = segmentUrls(text, src).slice(0, segmentCount);
+  await Promise.allSettled(
+    [...keys, ...segments].map(async (url) => {
+      preconnectTo(url);
+      const res = await fetch(url, { cache: "force-cache", signal });
+      if (res.ok) await res.arrayBuffer();
+    }),
+  );
 }
 
 function firstVariantUrl(text: string, src: string) {
@@ -74,6 +93,40 @@ function firstVariantUrl(text: string, src: string) {
   return "";
 }
 
+function segmentUrls(text: string, src: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !/\.m3u8(?:$|[?#])/i.test(line))
+    .map((line) => new URL(line, src).toString());
+}
+
+function keyUrls(text: string, src: string) {
+  const urls: string[] = [];
+  const keyPattern = /#EXT-X-KEY:[^\n\r]*URI=(?:"([^"]+)"|([^,\s]+))/gi;
+  let match: RegExpExecArray | null;
+  while ((match = keyPattern.exec(text))) {
+    const url = match[1] || match[2];
+    if (url) urls.push(new URL(url, src).toString());
+  }
+  return urls;
+}
+
 function isPlaylist(url: string) {
   return /\.m3u8(?:$|[?#])/i.test(url) || /\/m3u8(?:$|[?#])/i.test(url) || /\/proxy\/(?:m3u8|moon)\b/i.test(url);
+}
+
+function preconnectTo(url: string) {
+  try {
+    const origin = new URL(url).origin;
+    if (document.head.querySelector(`link[data-stream-origin="${origin}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "preconnect";
+    link.href = origin;
+    link.crossOrigin = "anonymous";
+    link.dataset.streamOrigin = origin;
+    document.head.appendChild(link);
+  } catch {
+    // Ignore invalid upstream URLs.
+  }
 }

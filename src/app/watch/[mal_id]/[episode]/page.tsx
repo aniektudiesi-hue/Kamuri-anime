@@ -12,7 +12,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { historySocketUrl } from "@/lib/history-realtime";
-import { clearCachedStream } from "@/lib/stream-cache";
+import { clearCachedStream, warmStreamManifest } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, titleOf } from "@/lib/utils";
@@ -109,6 +109,8 @@ export default function WatchPage({
     : undefined;
   const activeServerId = selectedServer?.id;
   const megaQuery = streamQueries[SERVERS.findIndex((s) => s.id === "mega")];
+  const moonQuery = streamQueries[SERVERS.findIndex((s) => s.id === "moon")];
+  const hd1Query = streamQueries[SERVERS.findIndex((s) => s.id === "hd1")];
   const selectedQueryIndex = selectedServer ? SERVERS.findIndex((s) => s.id === selectedServer.id) : 0;
   const selectedQuery = streamQueries[selectedQueryIndex];
   const availableServerIds = availableServers.map((s) => s.id).join("|");
@@ -295,6 +297,11 @@ export default function WatchPage({
       setServer(firstAvailableServerId);
     }
   }, [availableServerIds, firstAvailableServerId, megaQuery?.data, megaQuery?.isError, server, type]);
+
+  useEffect(() => {
+    if (moonQuery?.data) warmStreamManifest(moonQuery.data, { segments: 2, timeoutMs: 15_000 });
+    if (hd1Query?.data) warmStreamManifest(hd1Query.data, { segments: 1, timeoutMs: 10_000 });
+  }, [hd1Query?.data, moonQuery?.data]);
 
   function handlePlayerFatalError() {
     if (!activeServerId) return;

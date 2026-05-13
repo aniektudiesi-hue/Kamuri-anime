@@ -297,8 +297,8 @@ export function VideoPlayer({
     let playRequested = false;
     const targetForwardBuffer = deepBuffer
       ? (isMoonStream ? 10 * 60 : 6 * 60)
-      : (isMoonStream ? 3 * 60 : 2 * 60);
-    const initialForwardBuffer = Math.min(targetForwardBuffer, isMoonStream ? 90 : 60);
+      : (isMoonStream ? 2 * 60 : 2 * 60);
+    const initialForwardBuffer = Math.min(targetForwardBuffer, isMoonStream ? 45 : 60);
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
@@ -411,10 +411,12 @@ export function VideoPlayer({
           enableWorker: true,
           progressive: true,
           lowLatencyMode: true,
+          autoStartLoad: true,
           startFragPrefetch: true,
-          startPosition: initialTime > 2 ? initialTime : -1,
+          startPosition: initialTime > 2 ? initialTime : 0,
           testBandwidth: false,
           capLevelToPlayerSize: true,
+          startLevel: isMoonStream ? 0 : -1,
           maxBufferLength: initialForwardBuffer,
           maxMaxBufferLength: Math.max(initialForwardBuffer, 180),
           maxBufferSize: deepBuffer ? 240 * 1000 * 1000 : 140 * 1000 * 1000,
@@ -427,7 +429,14 @@ export function VideoPlayer({
         hlsRef.current = hls;
         hls.loadSource(src);
         hls.attachMedia(video);
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+          hls?.startLoad(initialTime > 2 ? initialTime : 0);
+        });
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+          if (isMoonStream) {
+            hls!.startLevel = 0;
+            hls!.nextLevel = 0;
+          }
           const seen = new Set<number>();
           const levels: QualityLevel[] = data.levels
             .map((level, i) => ({ hlsIndex: i, height: level.height || 0, bitrate: level.bitrate || 0 }))
