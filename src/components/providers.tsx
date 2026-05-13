@@ -8,6 +8,7 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import { AuthProvider } from "@/lib/auth";
 import { makeQueryClient } from "@/lib/query";
 import { SettingsProvider } from "@/lib/settings";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => makeQueryClient());
@@ -28,7 +29,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
         <SettingsProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </AuthProvider>
         </SettingsProvider>
       </QueryClientProvider>
     );
@@ -49,7 +52,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }}
     >
       <SettingsProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+        </AuthProvider>
       </SettingsProvider>
     </PersistQueryClientProvider>
   );

@@ -33,7 +33,7 @@ export function SeoAnimeCard({ anime, priority = false }: { anime: Anime; priori
               {Number(anime.score).toFixed(1)}
             </span>
           ) : null}
-          <span className="absolute bottom-2 left-2 right-2 inline-flex items-center justify-center gap-1 rounded-xl bg-[#c8223d] py-2 text-xs font-black text-white opacity-0 shadow-lg shadow-[#c8223d]/20 transition-opacity group-hover:opacity-100">
+          <span className="absolute bottom-2 left-2 right-2 inline-flex items-center justify-center gap-1 rounded-xl bg-[#cf2442] py-2 text-xs font-black text-white opacity-0 shadow-lg shadow-[#cf2442]/20 transition-opacity group-hover:opacity-100">
             <Play size={13} fill="currentColor" />
             View Anime
           </span>

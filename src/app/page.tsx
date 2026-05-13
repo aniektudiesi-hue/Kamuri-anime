@@ -1,7 +1,14 @@
 import { HomePageClient } from "@/components/home-page-client";
 import { getHomeInitialData } from "@/lib/home-server";
+import { buildPageMetadata } from "@/lib/seo";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 export const revalidate = 1800;
+export const metadata = buildPageMetadata({
+  title: `${SITE_NAME} - Watch Free Anime Online in HD`,
+  description: SITE_DESCRIPTION,
+  path: "/",
+});
 
 export default async function Home() {
   const initialData = await getHomeInitialData();

@@ -2,7 +2,7 @@
   <defs>
     <linearGradient id="ruby" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
       <stop stop-color="#ff4a6c"/>
-      <stop offset="0.52" stop-color="#c8223d"/>
+      <stop offset="0.52" stop-color="#cf2442"/>
       <stop offset="1" stop-color="#7c1326"/>
     </linearGradient>
   </defs>

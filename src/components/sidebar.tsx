@@ -75,7 +75,7 @@ export function Sidebar() {
                   onClick={() => settings.setTheme(theme)}
                   className={`h-8 rounded-lg text-xs font-bold capitalize transition ${
                     settings.theme === theme
-            ? "bg-[#c8223d] text-white"
+            ? "bg-[#cf2442] text-white"
                       : "bg-white/[0.05] text-white/35 hover:text-white"
                   }`}
                 >
@@ -97,7 +97,7 @@ export function Sidebar() {
             <Link
               key={g}
               href={`/genre/${encodeURIComponent(g)}`}
-              className="rounded-lg bg-white/[0.05] px-2.5 py-1 text-[11px] font-medium text-white/50 transition-colors hover:bg-[#c8223d]/15 hover:text-[#c8223d]"
+              className="rounded-lg bg-white/[0.05] px-2.5 py-1 text-[11px] font-medium text-white/50 transition-colors hover:bg-[#cf2442]/15 hover:text-[#cf2442]"
             >
               {g}
             </Link>
@@ -109,7 +109,7 @@ export function Sidebar() {
       <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d1020]">
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <div className="flex items-center gap-2">
-          <TrendingUp size={13} className="text-[#c8223d]" />
+          <TrendingUp size={13} className="text-[#cf2442]" />
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">Top Anime</h3>
           </div>
           <div className="flex gap-1">
@@ -118,7 +118,7 @@ export function Sidebar() {
                 key={t}
                 onClick={() => setTab(t)}
                 className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors ${
-              tab === t ? "bg-[#c8223d] text-white" : "text-white/25 hover:text-white"
+              tab === t ? "bg-[#cf2442] text-white" : "text-white/25 hover:text-white"
                 }`}
               >
                 {t === "popular" ? "Popular" : "Top Rated"}
@@ -261,7 +261,7 @@ function SettingSwitch({
           <span className="block truncate text-[10px] text-white/25">{hint}</span>
         </span>
       </span>
-      <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${checked ? "bg-[#c8223d]" : "bg-white/[0.12]"}`}>
+      <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${checked ? "bg-[#cf2442]" : "bg-white/[0.12]"}`}>
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${checked ? "left-4" : "left-0.5"}`} />
       </span>
     </button>

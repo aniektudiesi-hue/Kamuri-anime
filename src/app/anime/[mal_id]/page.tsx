@@ -17,9 +17,9 @@ import {
 } from "@/lib/utils";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  currently_airing: { label: "Airing Now", color: "text-emerald-400 bg-emerald-500/10 ring-emerald-500/20", dot: "bg-emerald-400 animate-pulse" },
+  currently_airing: { label: "Airing Now", color: "text-[#ffd7dd] bg-[#cf2442]/14 ring-[#cf2442]/24", dot: "bg-[#cf2442] animate-pulse" },
   finished_airing: { label: "Completed", color: "text-white/50 bg-white/[0.06] ring-white/10", dot: "bg-white/40" },
-  not_yet_aired: { label: "Upcoming", color: "text-blue-300 bg-blue-500/10 ring-blue-400/20", dot: "bg-blue-400" },
+  not_yet_aired: { label: "Upcoming", color: "text-[#dce2ea] bg-[#c8ced8]/10 ring-[#c8ced8]/18", dot: "bg-[#c8ced8]" },
 };
 
 const RANGE_SIZE = 100;
@@ -141,11 +141,11 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 -bottom-12">
           {backdrop ? (
-            <Image src={backdrop} alt="" fill sizes="100vw" className="scale-105 object-cover object-center opacity-[0.46] blur-[1px] sm:opacity-[0.38]" />
+            <Image src={backdrop} alt="" fill sizes="100vw" className="scale-105 object-cover object-center opacity-[0.58] blur-[1px] sm:opacity-[0.48]" />
           ) : null}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/24 via-[#06070d]/62 to-[#06070d]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#06070d] via-[#06070d]/74 to-[#06070d]/22" />
-          <div className="absolute inset-0 hidden bg-[radial-gradient(circle_at_78%_20%,rgba(200,34,61,0.16),transparent_32%),radial-gradient(circle_at_82%_76%,rgba(200,206,216,0.10),transparent_30%)] lg:block" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#05060b]/24 via-[#05060b]/66 to-[#05060b]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#05060b] via-[#05060b]/70 to-[#05060b]/18" />
+          <div className="absolute inset-0 hidden bg-[radial-gradient(circle_at_78%_20%,rgba(207,36,66,0.18),transparent_32%),radial-gradient(circle_at_82%_76%,rgba(200,206,216,0.10),transparent_30%)] lg:block" />
         </div>
 
         <div className="relative mx-auto max-w-screen-2xl px-4 py-6 sm:py-10 lg:px-6 lg:py-16">
@@ -161,7 +161,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           <div className="grid gap-4 sm:gap-8 md:grid-cols-[200px_minmax(0,620px)] lg:min-h-[430px] lg:items-center">
             {/* Poster */}
             <div className="mx-auto w-[132px] sm:w-[160px] md:mx-0 md:w-auto">
-              <div className="relative aspect-[2/3] overflow-hidden rounded-[22px] bg-[#141828] shadow-2xl shadow-black/70 ring-1 ring-white/[0.12] sm:rounded-2xl sm:ring-white/[0.08]">
+              <div className="relative aspect-[2/3] overflow-hidden rounded-[28px] bg-[#141828] shadow-[0_28px_90px_rgba(0,0,0,0.58)] ring-1 ring-white/[0.12] sm:ring-white/[0.08]">
                 {poster ? (
                   <Image src={poster} alt={title} fill priority sizes="200px" className="object-cover" />
                 ) : (
@@ -171,7 +171,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
             </div>
 
             {/* Info panel */}
-            <div className="mx-auto flex w-full max-w-[360px] flex-col justify-end rounded-3xl border border-white/[0.1] bg-[#090b13]/30 p-3.5 text-center shadow-2xl shadow-black/35 backdrop-blur-xl sm:mx-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0 sm:pb-2 sm:text-left sm:shadow-none sm:backdrop-blur-0">
+            <div className="mx-auto flex w-full max-w-[360px] flex-col justify-end rounded-3xl border border-white/[0.1] bg-[#090b13]/24 p-3.5 text-center shadow-2xl shadow-black/35 backdrop-blur-lg sm:mx-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0 sm:pb-2 sm:text-left sm:shadow-none sm:backdrop-blur-0">
               <div className="mb-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 {statusCfg ? (
                   <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ring-1 ${statusCfg.color}`}>
@@ -219,7 +219,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   </div>
                   <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.07]">
                     <div
-                      className="h-full rounded-full bg-[#c8223d]"
+                      className="h-full rounded-full bg-[#cf2442]"
                       style={{ width: `${Math.min(100, (localProgress / (last.duration || 1440)) * 100)}%` }}
                     />
                   </div>
@@ -229,7 +229,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
                 <Link
                   href={resumeHref}
-                  className="shine inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl bg-[#c8223d] px-6 text-sm font-bold text-white shadow-xl shadow-[#c8223d]/25 transition hover:bg-[#d62a47] sm:rounded-xl"
+                  className="shine inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl bg-[#cf2442] px-6 text-sm font-bold text-white shadow-xl shadow-[#cf2442]/25 transition hover:bg-[#dc2d4b] sm:rounded-xl"
                 >
                   <Play size={16} fill="currentColor" />
                   {last ? "Continue Watching" : "Watch Episode 1"}
@@ -240,7 +240,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   className={`inline-flex h-11 items-center justify-center gap-2.5 rounded-2xl border px-5 text-sm font-bold transition disabled:cursor-not-allowed sm:rounded-xl ${
                     inWatchlist
                       ? "border-white/15 bg-white/[0.08] text-[#c8ced8]"
-                      : "border-[#c8223d]/35 bg-[#c8223d]/10 text-white/82 hover:border-[#c8223d]/60 hover:bg-[#c8223d]/18 hover:text-white disabled:opacity-40"
+                      : "border-[#cf2442]/35 bg-[#cf2442]/10 text-white/82 hover:border-[#cf2442]/60 hover:bg-[#cf2442]/18 hover:text-white disabled:opacity-40"
                   }`}
                 >
                   {addWatchlist.isPending ? (
@@ -255,7 +255,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     : inWatchlist
                       ? "Saved"
                       : addWatchlist.isPending
-                        ? "Saving…"
+                        ? "Saving..."
                         : "Add to Watchlist"}
                 </button>
               </div>
@@ -269,7 +269,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
         <div className="py-6 pb-16">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="h-5 w-1 rounded-full bg-[#c8223d]" />
+              <span className="h-5 w-1 rounded-full bg-[#cf2442]" />
               <h2 className="text-base font-black text-white">Episodes</h2>
               {episodeTotal > 0 && (
                 <span className="rounded-lg bg-white/[0.05] px-2.5 py-0.5 text-[11px] font-bold text-white/30">
@@ -288,7 +288,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   onClick={() => setActiveRange(i)}
                   className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
                     activeRange === i
-                      ? "bg-[#c8223d] text-white shadow-md shadow-[#c8223d]/20"
+                      ? "bg-[#cf2442] text-white shadow-md shadow-[#cf2442]/20"
                       : "border border-white/[0.07] bg-[#0d1020] text-white/40 hover:border-white/[0.13] hover:text-white"
                   }`}
                 >
@@ -306,7 +306,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               ))}
             </div>
           ) : visibleEpisodes.length ? (
-            <div className="no-scrollbar max-h-[620px] overflow-y-auto rounded-2xl border border-white/[0.055] bg-[#0d1020]/72 p-2 shadow-2xl shadow-black/20">
+            <div className="no-scrollbar max-h-[620px] overflow-y-auto rounded-3xl border border-white/[0.065] bg-[#0d1020]/72 p-2.5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
               {visibleEpisodes.map((ep) => {
                 const isCurrent = ep.episode_number === lastEp && Boolean(last);
                 const href = isCurrent ? resumeHref : `/watch/${malId}/${ep.episode_number}`;
@@ -317,20 +317,20 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     onMouseEnter={() => prefetchWatch(ep.episode_number)}
                     onFocus={() => prefetchWatch(ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
-                    className={`group mb-2 grid grid-cols-[96px_1fr_auto] items-center gap-2.5 rounded-xl border p-2 text-left transition last:mb-0 sm:grid-cols-[118px_1fr_auto] ${
+                    className={`group relative mb-2 grid grid-cols-[96px_1fr_auto] items-center gap-2.5 rounded-2xl border p-2 text-left transition last:mb-0 sm:grid-cols-[118px_1fr_auto] ${
                       isCurrent
-                        ? "border-[#c8223d]/40 bg-[#c8223d]/12 shadow-md shadow-[#c8223d]/12"
+                        ? "border-[#cf2442]/40 bg-[#cf2442]/12 shadow-md shadow-[#cf2442]/12"
                         : "border-white/[0.055] bg-[#111527] hover:border-white/[0.12] hover:bg-[#171c31]"
                     }`}
                   >
-                    <div className="relative h-[58px] overflow-hidden rounded-lg bg-[#080a12] sm:h-[68px]">
+                    <div className="relative h-[58px] overflow-hidden rounded-xl bg-[#080a12] sm:h-[68px]">
                       {poster ? (
                         <Image
                           src={poster}
                           alt=""
                           fill
                           sizes="118px"
-                          className="object-cover object-top transition-transform duration-300 group-hover:scale-[1.04]"
+                          className="object-contain p-1.5 transition-transform duration-300 group-hover:scale-[1.03]"
                         />
                       ) : null}
                       <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/72 to-transparent" />
@@ -338,14 +338,14 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                         EP {ep.episode_number}
                       </span>
                       {isCurrent ? (
-                        <span className="absolute right-1.5 top-1.5 rounded-full bg-[#c8223d] px-2 py-0.5 text-[9px] font-black uppercase text-white">
+                        <span className="absolute right-1.5 top-1.5 rounded-full bg-[#cf2442] px-2 py-0.5 text-[9px] font-black uppercase text-white">
                           Resume
                         </span>
                       ) : null}
                     </div>
 
                     <div className="min-w-0">
-                      <p className={`text-[11px] font-black uppercase tracking-wide ${isCurrent ? "text-[#c8223d]" : "text-white/35"}`}>
+                      <p className={`text-[11px] font-black uppercase tracking-wide ${isCurrent ? "text-[#cf2442]" : "text-white/35"}`}>
                         {isCurrent ? "Continue watching" : `Episode ${ep.episode_number}`}
                       </p>
                       <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-white/82 group-hover:text-white">
@@ -359,13 +359,13 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     </div>
 
                     <span className={`hidden h-10 w-10 place-items-center rounded-full sm:grid ${
-                      isCurrent ? "bg-[#c8223d] text-white" : "bg-white/[0.06] text-white/45 group-hover:text-white"
+                      isCurrent ? "bg-[#cf2442] text-white" : "bg-white/[0.06] text-white/45 group-hover:text-white"
                     }`}>
                       <Play size={15} fill="currentColor" />
                     </span>
                     {isCurrent ? (
                       <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-[#c8ced8]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#06070d]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#05060b]" />
                       </span>
                     ) : null}
                   </Link>

@@ -71,7 +71,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
   const statusLabel = STATUS_LABEL[statusKey] || (current.status ? current.status.replace(/_/g, " ") : "");
 
   return (
-    <section className="relative h-[72vh] max-h-[640px] min-h-[420px] overflow-hidden bg-[#06070d]">
+    <section className="relative h-[76vh] max-h-[700px] min-h-[460px] overflow-hidden bg-[#05060b]">
 
       {/* Background image */}
       <div key={`bg-${index}`} className="absolute inset-0 animate-[heroBackdropTurn_0.82s_cubic-bezier(0.2,0.8,0.18,1)]">
@@ -83,34 +83,35 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
             priority
             quality={95}
             sizes="100vw"
-            className="object-cover object-center opacity-60"
+            className="object-cover object-center opacity-72"
           />
         ) : null}
       </div>
 
       {/* Translucent overlays — lighter so the image shows through */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#06070d]/94 via-[#06070d]/62 to-[#06070d]/10" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#06070d]/86 via-transparent to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#06070d]/30 to-transparent" style={{ height: "30%" }} />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#05060b]/96 via-[#05060b]/58 to-[#05060b]/12" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#05060b]/90 via-[#05060b]/10 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#05060b]/46 to-transparent" style={{ height: "34%" }} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_30%,rgba(207,36,66,0.14),transparent_34%)]" />
 
       {/* Content grid */}
       <div className="relative mx-auto flex h-full max-w-screen-2xl items-center gap-8 px-6 py-16 lg:px-16">
 
         {/* Left: metadata + CTAs */}
-        <div key={`info-${index}`} className="flex-1 max-w-2xl animate-[slideUp_0.6s_cubic-bezier(0.22,1,0.36,1)]">
+        <div key={`info-${index}`} className="flex-1 max-w-3xl animate-[slideUp_0.6s_cubic-bezier(0.22,1,0.36,1)]">
 
           {/* Status + meta badges */}
           <div className="mb-5 flex flex-wrap items-center gap-2">
             {statusLabel ? (
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ${
                 statusKey === "currently_airing"
-                  ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/25"
+                  ? "bg-[#cf2442]/18 text-[#ffd7dd] ring-1 ring-[#cf2442]/30"
                   : statusKey === "not_yet_aired"
-                    ? "bg-blue-500/15 text-blue-300 ring-1 ring-blue-400/25"
+                    ? "bg-[#c8ced8]/12 text-[#dce2ea] ring-1 ring-[#c8ced8]/18"
                     : "bg-white/[0.07] text-white/50 ring-1 ring-white/10"
               }`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${
-                  statusKey === "currently_airing" ? "bg-emerald-400 animate-pulse" : "bg-current"
+                  statusKey === "currently_airing" ? "bg-[#cf2442] animate-pulse" : "bg-current"
                 }`} />
                 {statusLabel}
               </span>
@@ -130,7 +131,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
           </div>
 
           {/* Title */}
-          <h1 className="mb-4 text-3xl font-black leading-[1.1] tracking-tight text-white drop-shadow-2xl sm:text-4xl lg:text-5xl">
+          <h1 className="mb-4 max-w-3xl text-4xl font-black leading-[1.02] tracking-tight text-white drop-shadow-2xl sm:text-5xl lg:text-6xl">
             {title}
           </h1>
 
@@ -138,14 +139,14 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href={`/watch/${id}/1`}
-              className="shine group inline-flex h-12 items-center gap-2.5 rounded-2xl bg-[#c8223d] px-6 text-sm font-bold text-white shadow-xl shadow-[#c8223d]/24 transition hover:bg-[#d62a47] hover:shadow-[#c8223d]/36 hover:shadow-2xl"
+              className="shine group inline-flex h-[52px] items-center gap-2.5 rounded-full bg-[#cf2442] px-7 text-sm font-black text-white shadow-xl shadow-[#cf2442]/28 transition hover:bg-[#dc2d4b] hover:shadow-[#cf2442]/36 hover:shadow-2xl"
             >
               <Play size={18} fill="currentColor" />
               Watch Now
             </Link>
             <Link
               href={`/anime/${id}`}
-              className="inline-flex h-12 items-center gap-2.5 rounded-2xl border border-white/[0.12] bg-white/[0.06] px-6 text-sm font-bold text-white transition-colors hover:border-white/20 hover:bg-white/10"
+              className="inline-flex h-[52px] items-center gap-2.5 rounded-full border border-white/[0.12] bg-white/[0.06] px-7 text-sm font-black text-white backdrop-blur-xl transition hover:border-white/20 hover:bg-white/10"
             >
               <Info size={16} />
               More Info
@@ -162,7 +163,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
                   onClick={() => goTo(i, i > index ? 1 : -1)}
                   className={`rounded-full transition duration-400 ${
                     i === index
-                      ? "w-7 h-[5px] bg-[#c8223d]"
+                      ? "w-8 h-[5px] bg-[#cf2442] shadow-[0_0_18px_rgba(207,36,66,0.45)]"
                       : "w-[5px] h-[5px] bg-white/20 hover:bg-white/40"
                   }`}
                 />
@@ -175,12 +176,12 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
         {poster ? (
           <div
             key={`poster-${index}-${flipKey}`}
-            className="hero-book-stage hidden lg:block relative w-[240px] xl:w-[280px] shrink-0"
+            className="hero-book-stage hidden lg:block relative w-[250px] xl:w-[306px] shrink-0"
           >
             <div className="hero-book-page hero-book-page-a" />
             <div className="hero-book-page hero-book-page-b" />
             <div
-              className="hero-book-card relative aspect-[2/3] w-full overflow-hidden rounded-3xl shadow-2xl shadow-black/70 ring-1 ring-white/10"
+              className="hero-book-card relative aspect-[2/3] w-full overflow-hidden rounded-[34px] shadow-[0_34px_110px_rgba(0,0,0,0.72)] ring-1 ring-white/12"
               style={{ "--book-start": dir === 1 ? "-34deg" : "34deg", "--book-shift": dir === 1 ? "-28px" : "28px" } as CSSProperties}
             >
               <Image src={poster} alt={title} fill sizes="280px" priority quality={94} className="object-cover" />
@@ -214,7 +215,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
       ) : null}
 
       {/* Bottom fade */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#06070d] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#05060b] to-transparent" />
     </section>
   );
 }
@@ -279,7 +280,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
       <div className="relative flex min-h-[430px] items-end px-4">
         <div className="w-[92%] max-w-[360px] rounded-3xl border border-white/[0.1] bg-[#090b13]/28 p-3.5 shadow-2xl shadow-black/35 backdrop-blur-xl">
           <div className="mb-2 flex items-center gap-2">
-            <span className="rounded-full bg-[#c8223d]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#c8223d]/30">
+            <span className="rounded-full bg-[#cf2442]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#cf2442]/30">
               Featured
             </span>
             {count > 0 ? (
@@ -296,7 +297,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
           <div className="mt-3 flex gap-2">
             <Link
               href={`/watch/${id}/1`}
-              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#c8223d] text-sm font-black text-white shadow-lg shadow-[#c8223d]/22"
+              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#cf2442] text-sm font-black text-white shadow-lg shadow-[#cf2442]/22"
             >
               <Play size={16} fill="currentColor" />
               Watch
@@ -317,7 +318,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
                   aria-label={`Featured ${i + 1}`}
                   onClick={() => setIndex(i)}
                   className={`h-1.5 rounded-full transition-all ${
-                    i === index ? "w-7 bg-[#c8223d]" : "w-1.5 bg-white/25"
+                    i === index ? "w-7 bg-[#cf2442]" : "w-1.5 bg-white/25"
                   }`}
                 />
               ))}

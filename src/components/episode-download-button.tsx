@@ -98,7 +98,7 @@ export function EpisodeDownloadButton({
           type="button"
         disabled={!src || busy}
           onClick={startDownload}
-          className="inline-flex h-10 items-center gap-2 rounded-2xl bg-[#c8223d] px-4 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/15 transition hover:bg-[#d62a47] disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex h-10 items-center gap-2 rounded-2xl bg-[#cf2442] px-4 text-sm font-bold text-white shadow-lg shadow-[#cf2442]/15 transition hover:bg-[#dc2d4b] disabled:cursor-not-allowed disabled:opacity-45"
         >
           {state === "done" ? <CheckCircle2 size={16} /> : <Download size={16} />}
           {busy ? "Saving offline" : state === "done" ? "Saved offline" : prefetch?.ready ? "Save offline" : "Save offline"}

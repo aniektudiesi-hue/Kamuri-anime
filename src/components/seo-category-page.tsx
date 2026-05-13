@@ -36,7 +36,7 @@ export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
           />
 
           <header className="mb-7 max-w-3xl">
-            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-[#c8223d]">
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-[#cf2442]">
               {category.eyebrow}
             </p>
             <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl">
@@ -51,6 +51,8 @@ export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
                 { label: "New Releases", href: "/new-releases" },
                 { label: "Popular", href: "/popular" },
                 { label: "Top Rated", href: "/top-rated" },
+                { label: "Free Anime", href: "/free-anime" },
+                { label: "Hindi Anime", href: "/hindi-anime" },
                 { label: "Schedule", href: "/schedule" },
               ].map((link) => (
                 <Link
@@ -58,7 +60,7 @@ export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
                   href={link.href}
                   className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
                     link.href === category.path
-                      ? "border-[#c8223d]/45 bg-[#c8223d]/14 text-white"
+                      ? "border-[#cf2442]/45 bg-[#cf2442]/14 text-white"
                       : "border-white/[0.08] bg-[#0d1020] text-white/45 hover:border-white/[0.16] hover:text-white"
                   }`}
                 >
@@ -83,10 +85,10 @@ export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
           </section>
 
           <section className="mt-10 rounded-2xl border border-white/[0.06] bg-[#0d1020]/72 p-5">
-            <h2 className="text-lg font-black text-white">Browse anime legally for search engines</h2>
+            <h2 className="text-lg font-black text-white">Fast anime discovery on animeTv</h2>
             <p className="mt-2 text-sm leading-6 text-white/42">
-              This page gives search engines a clear, crawlable list of anime categories, titles, posters, and internal links.
-              It helps discovery without using paid backlinks, link farms, cloaking, or keyword spam.
+              Browse anime with clear category pages, title pages, posters, ratings, episode lists, and weekly release links.
+              animeTv is built for quick discovery across free anime, subbed anime, dubbed anime, Hindi anime searches, new releases, and top rated shows.
             </p>
           </section>
         </div>

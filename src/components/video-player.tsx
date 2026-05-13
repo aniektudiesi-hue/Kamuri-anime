@@ -633,7 +633,7 @@ export function VideoPlayer({
 
   if (!src) {
     return (
-      <div className="grid aspect-video w-full place-items-center bg-black text-sm text-white/50">
+      <div className="grid aspect-video w-full place-items-center rounded-[28px] border border-white/[0.08] bg-black text-sm text-white/50">
         <div className="text-center">
           <p className="font-semibold text-white">No stream available</p>
           <p className="mt-1 text-white/40">Try switching to another server below.</p>
@@ -647,7 +647,7 @@ export function VideoPlayer({
       ref={containerRef}
       tabIndex={0}
       aria-label={`Video player: ${title}`}
-      className="group relative aspect-video w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] outline-none ring-1 ring-white/[0.025]"
+      className="video-player-shell group relative aspect-video w-full overflow-hidden rounded-[28px] border border-white/[0.095] bg-black shadow-[0_32px_110px_rgba(0,0,0,0.78)] outline-none ring-1 ring-white/[0.035]"
       style={{ cursor: controlsOpen ? "default" : "none" }}
       onMouseMove={() => showControls()}
       onMouseLeave={() => {
@@ -674,7 +674,7 @@ export function VideoPlayer({
         </div>
       ) : null}
 
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.55)_0%,transparent_24%,transparent_60%,rgba(0,0,0,0.86)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.62)_0%,transparent_24%,transparent_58%,rgba(0,0,0,0.92)_100%)]" />
 
       {/* Top glass title rail */}
       <div
@@ -682,7 +682,7 @@ export function VideoPlayer({
           controlsOpen ? "opacity-100" : "opacity-0"
         }`}
       >
-        <div className="min-w-0 rounded-2xl border border-white/[0.08] bg-black/28 px-3 py-2 shadow-2xl backdrop-blur-2xl sm:px-4">
+        <div className="min-w-0 rounded-3xl border border-white/[0.09] bg-black/34 px-3 py-2 shadow-2xl backdrop-blur-2xl sm:px-4">
           <p className="line-clamp-1 text-sm font-semibold text-white sm:text-base">{title}</p>
           <div className="mt-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/42">
             <span>{stream?.server || "HLS"}</span>
@@ -691,7 +691,7 @@ export function VideoPlayer({
           </div>
         </div>
 
-        <div className="hidden rounded-full border border-white/[0.08] bg-black/28 px-3 py-1.5 text-[11px] font-semibold text-white/55 shadow-2xl backdrop-blur-2xl sm:block">
+        <div className="hidden rounded-full border border-white/[0.08] bg-black/32 px-3 py-1.5 text-[11px] font-black text-white/58 shadow-2xl backdrop-blur-2xl sm:block">
           {bufferAhead > 2 ? `${bufferAheadLabel} ready` : "Starting"}
         </div>
       </div>
@@ -714,9 +714,9 @@ export function VideoPlayer({
       {/* Buffering spinner */}
       {isBuffering && !playbackError ? (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center">
-          <div className="relative grid h-16 w-16 place-items-center rounded-full border border-white/[0.08] bg-black/18 shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-            <div className="absolute inset-2 animate-spin rounded-full border-2 border-white/10 border-t-white/90" />
-            <div className="h-1.5 w-1.5 rounded-full bg-white/90 shadow-[0_0_18px_rgba(255,255,255,0.75)]" />
+          <div className="relative grid h-[72px] w-[72px] place-items-center rounded-full border border-white/[0.1] bg-black/22 shadow-[0_24px_80px_rgba(0,0,0,0.62)] backdrop-blur-2xl">
+            <div className="absolute inset-2.5 animate-spin rounded-full border-[3px] border-white/10 border-t-white/95" />
+            <div className="h-2 w-2 rounded-full bg-white/95 shadow-[0_0_22px_rgba(255,255,255,0.85)]" />
           </div>
         </div>
       ) : null}
@@ -759,7 +759,7 @@ export function VideoPlayer({
       {showSkipIntro ? (
         <button
           onClick={(e) => { e.stopPropagation(); skipIntro(); }}
-          className="absolute bottom-[76px] right-4 z-50 inline-flex h-10 items-center gap-2 rounded-full border border-white/15 bg-black/70 px-4 text-sm font-bold text-white shadow-[0_18px_45px_rgba(0,0,0,0.45)] backdrop-blur-xl transition hover:border-[#c8223d]/55 hover:bg-[#c8223d]/88 active:scale-95"
+          className="absolute bottom-[86px] right-4 z-50 inline-flex h-11 items-center gap-2 rounded-full border border-[#cf2442]/35 bg-[#cf2442]/88 px-4 text-sm font-black text-white shadow-[0_18px_48px_rgba(207,36,66,0.28)] backdrop-blur-xl transition hover:border-[#ff8a9d]/50 hover:bg-[#dc2d4b] active:scale-95"
         >
           <span className="grid h-6 w-6 place-items-center rounded-full bg-white/10">
             <SkipForward size={13} />
@@ -772,7 +772,7 @@ export function VideoPlayer({
       {showNextPrompt && nextHref && !showSkipIntro ? (
         <a
           href={nextHref}
-          className="absolute bottom-[116px] right-4 z-50 inline-flex h-10 items-center gap-1.5 rounded-full bg-[#c8223d] px-4 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/20 transition-colors hover:bg-[#d62a47] sm:bottom-[112px]"
+          className="absolute bottom-[132px] right-4 z-50 inline-flex h-10 items-center gap-1.5 rounded-full bg-[#cf2442] px-4 text-sm font-black text-white shadow-lg shadow-[#cf2442]/22 transition-colors hover:bg-[#dc2d4b] sm:bottom-[126px]"
         >
           Next Episode
           <ChevronRight size={15} />
@@ -786,7 +786,7 @@ export function VideoPlayer({
           onClick={togglePlay}
           className="absolute inset-0 z-10 flex items-center justify-center"
         >
-          <span className="grid h-16 w-16 place-items-center rounded-full border border-white/15 bg-black/38 text-white shadow-[0_20px_80px_rgba(0,0,0,0.7)] backdrop-blur-2xl transition hover:scale-105 hover:bg-black/58">
+          <span className="grid h-[72px] w-[72px] place-items-center rounded-full border border-white/18 bg-black/42 text-white shadow-[0_24px_90px_rgba(0,0,0,0.72)] backdrop-blur-2xl transition hover:scale-105 hover:bg-black/58">
             <Play size={26} fill="currentColor" />
           </span>
         </button>
@@ -814,7 +814,7 @@ export function VideoPlayer({
             aria-valuenow={Math.round(progress)}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="group/seek relative mb-3 h-1 cursor-pointer rounded-full bg-white/[0.14] transition-[height] duration-150 hover:h-[6px] sm:mb-4"
+            className="group/seek relative mb-3 h-1.5 cursor-pointer rounded-full bg-white/[0.16] transition-[height] duration-150 hover:h-[7px] sm:mb-4"
             onPointerDown={handleSeekPointerDown}
             onPointerMove={handleSeekPointerMove}
           >
@@ -822,7 +822,7 @@ export function VideoPlayer({
             {duration > 0 && bufferedRanges.map((range, i) => (
               <div
                 key={i}
-                className="absolute inset-y-0 rounded-full bg-white/28 pointer-events-none"
+                className="absolute inset-y-0 rounded-full bg-white/30 pointer-events-none"
                 style={{
                   left: `${(range.start / duration) * 100}%`,
                   width: `${Math.min(100, ((range.end - range.start) / duration) * 100)}%`,
@@ -831,7 +831,7 @@ export function VideoPlayer({
             ))}
             {/* Played portion — sits on top of green */}
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-[#c8223d] pointer-events-none shadow-[0_0_18px_rgba(200,34,61,0.52)]"
+              className="absolute inset-y-0 left-0 rounded-full bg-[#cf2442] pointer-events-none shadow-[0_0_20px_rgba(207,36,66,0.58)]"
               style={{ width: `${progress}%` }}
             />
             {/* Knob */}
@@ -842,7 +842,7 @@ export function VideoPlayer({
           </div>
 
           {/* Control row */}
-          <div className="flex items-center gap-1.5 rounded-[18px] border border-white/[0.09] bg-black/42 px-2 py-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.48)] backdrop-blur-2xl sm:gap-2">
+          <div className="flex items-center gap-1.5 rounded-[24px] border border-white/[0.1] bg-black/50 px-2.5 py-2 shadow-[0_22px_70px_rgba(0,0,0,0.56)] backdrop-blur-2xl sm:gap-2">
             {/* Play/Pause */}
             <button
               aria-label={playing ? "Pause" : "Play"}

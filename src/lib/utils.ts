@@ -1,8 +1,9 @@
 import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 import type { Anime, LibraryItem } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
-  return clsx(inputs);
+  return twMerge(clsx(inputs));
 }
 
 export function listFromPayload<T>(payload: unknown): T[] {

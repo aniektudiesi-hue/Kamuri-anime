@@ -59,7 +59,7 @@ export function animeDescription(anime: Anime | undefined, malId: string) {
   const score = anime?.score ? ` Rated ${Number(anime.score).toFixed(1)} out of 10.` : "";
   const status = anime?.status ? ` Status: ${displayStatus(anime.status)}.` : "";
   const episodes = count > 0 ? ` Stream ${count} episodes` : " Stream episodes";
-  return `${episodes} of ${title === "Untitled" ? `anime ${malId}` : title} on ${SITE_NAME} with fast browsing, watch history, and smooth playback.${score}${status}`;
+  return `${episodes} of ${title === "Untitled" ? `anime ${malId}` : title} on ${SITE_NAME} with free anime discovery, fast browsing, watch history, subtitles, and smooth HD playback.${score}${status}`;
 }
 
 export function animeJsonLd(anime: Anime | undefined, malId: string) {

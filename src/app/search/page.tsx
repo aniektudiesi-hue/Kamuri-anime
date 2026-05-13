@@ -164,7 +164,7 @@ function SearchContent() {
                 <a
                   key={chip}
                   href={GENRE_LINKS.has(chip) ? `/genre/${encodeURIComponent(chip)}` : `/search?q=${encodeURIComponent(chip)}`}
-                  className="shrink-0 rounded-xl border border-white/[0.07] bg-[#0d1020] px-3.5 py-1.5 text-[12px] font-semibold text-white/50 transition-colors hover:border-[#c8223d]/30 hover:bg-[#c8223d]/10 hover:text-[#ff6f86]"
+                  className="shrink-0 rounded-xl border border-white/[0.07] bg-[#0d1020] px-3.5 py-1.5 text-[12px] font-semibold text-white/50 transition-colors hover:border-[#cf2442]/30 hover:bg-[#cf2442]/10 hover:text-[#ff6f86]"
                 >
                   {chip}
                 </a>

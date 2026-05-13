@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ mal_id: s
 
   return buildPageMetadata({
     title: `Watch ${animeTitle} Episode ${episode}`,
-    description: `Watch ${episodeTitle} on ${SITE_NAME}. Continue with smooth HLS playback, server switching, subtitles, and watch history.`,
+    description: `Watch ${episodeTitle} on ${SITE_NAME}. Enjoy fast HD anime streaming with smooth HLS playback, server switching, subtitles, and watch history.`,
     path: `/watch/${malId}/${episode}`,
     image: posterOf(anime),
   });

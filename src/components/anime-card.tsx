@@ -91,7 +91,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
               {resume.hasResume ? `Episode ${resume.episode}` : episodeLabel(anime)}
             </p>
             {/* Play button */}
-            <div className="flex items-center justify-center rounded-xl bg-[#c8223d] py-2.5 text-sm font-bold text-white shadow-lg shadow-[#c8223d]/24 transition hover:bg-[#d62a47]">
+            <div className="flex items-center justify-center rounded-xl bg-[#cf2442] py-2.5 text-sm font-bold text-white shadow-lg shadow-[#cf2442]/24 transition hover:bg-[#dc2d4b]">
               <Play size={14} fill="currentColor" className="mr-1.5" />
               {resume.hasResume ? "Continue" : "Watch Now"}
             </div>
@@ -122,7 +122,7 @@ function PosterFallback({ title }: { title: string }) {
     .join("");
 
   return (
-    <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_28%_18%,rgba(200,34,61,0.25),transparent_34%),linear-gradient(145deg,#171b2d,#080a12)]">
+    <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_28%_18%,rgba(207,36,66,0.25),transparent_34%),linear-gradient(145deg,#171b2d,#080a12)]">
       <div className="grid h-16 w-16 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.06] text-xl font-black text-white/70 shadow-2xl shadow-black/35">
         {initials || "AT"}
       </div>

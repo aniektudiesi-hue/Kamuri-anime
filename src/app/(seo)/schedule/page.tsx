@@ -32,7 +32,7 @@ export default async function SchedulePage() {
         <div className="py-7">
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
           <header className="mb-7 max-w-3xl">
-            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-[#c8223d]">
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-[#cf2442]">
               Weekly schedule
             </p>
             <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl">
@@ -47,7 +47,7 @@ export default async function SchedulePage() {
             {grouped.length ? grouped.map((group) => (
               <section key={group.label}>
                 <div className="mb-3 flex items-center gap-2">
-                  <span className="h-5 w-1 rounded-full bg-[#c8223d]" />
+                  <span className="h-5 w-1 rounded-full bg-[#cf2442]" />
                   <h2 className="text-lg font-black text-white">{group.label}</h2>
                   <span className="rounded-lg bg-white/[0.05] px-2 py-0.5 text-[11px] font-bold text-white/30">
                     {group.items.length} episodes

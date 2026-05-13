@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 export const runtime = "edge";
-export const alt = `${SITE_NAME} - Watch Anime Online`;
+export const alt = `${SITE_NAME} - Watch Free Anime Online`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -41,19 +41,19 @@ export default function OpenGraphImage() {
                 height: 0,
                 borderTop: "18px solid transparent",
                 borderBottom: "18px solid transparent",
-                borderLeft: "30px solid #c8223d",
+                borderLeft: "30px solid #cf2442",
                 marginLeft: 8,
               }}
             />
           </div>
           <div style={{ fontSize: 54, fontWeight: 900, letterSpacing: 0 }}>
-            anime<span style={{ color: "#c8223d" }}>Tv</span>
+            anime<span style={{ color: "#cf2442" }}>Tv</span>
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ maxWidth: 920, fontSize: 82, fontWeight: 900, lineHeight: 0.95 }}>
-            Watch anime online with fast HLS playback
+            Watch free anime online in HD
           </div>
           <div style={{ maxWidth: 860, color: "rgba(255,255,255,0.68)", fontSize: 30, lineHeight: 1.35 }}>
             {SITE_DESCRIPTION}

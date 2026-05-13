@@ -1,24 +1,21 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
-import { absoluteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import { absoluteUrl, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
   title: {
-    default: `${SITE_NAME} - Watch Anime Online`,
+    default: `${SITE_NAME} - Watch Free Anime Online in HD`,
     template: `%s | ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
-  keywords: [
-    "animeTv",
-    "watch anime online",
-    "anime streaming",
-    "subbed anime",
-    "dubbed anime",
-    "anime episodes",
-  ],
+  keywords: SITE_KEYWORDS,
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
@@ -27,23 +24,24 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/logo.svg", type: "image/svg+xml", sizes: "any" },
     ],
     shortcut: "/favicon.svg",
-    apple: "/apple-icon.svg",
+    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml", sizes: "180x180" }],
   },
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
     url: SITE_URL,
-    title: `${SITE_NAME} - Watch Anime Online`,
+    title: `${SITE_NAME} - Watch Free Anime Online in HD`,
     description: SITE_DESCRIPTION,
     images: [{ url: absoluteUrl("/opengraph-image"), width: 1200, height: 630, alt: SITE_NAME }],
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME} - Watch Anime Online`,
+    title: `${SITE_NAME} - Watch Free Anime Online in HD`,
     description: SITE_DESCRIPTION,
     images: [absoluteUrl("/opengraph-image")],
   },
@@ -67,8 +65,19 @@ const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: SITE_NAME,
+  alternateName: ["animetvplus", "AnimeTV Plus", "animeTv Plus"],
   url: SITE_URL,
   description: SITE_DESCRIPTION,
+  inLanguage: ["en", "hi", "ja"],
+  keywords: SITE_KEYWORDS.join(", "),
+  about: [
+    "free anime streaming",
+    "subbed anime",
+    "dubbed anime",
+    "Hindi anime search",
+    "new anime releases",
+    "weekly anime schedule",
+  ],
   potentialAction: {
     "@type": "SearchAction",
     target: `${SITE_URL}/search?q={search_term_string}`,
@@ -82,6 +91,7 @@ const organizationJsonLd = {
   name: SITE_NAME,
   url: SITE_URL,
   logo: absoluteUrl("/logo.svg"),
+  image: absoluteUrl("/logo.svg"),
 };
 
 export default function RootLayout({
@@ -92,8 +102,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className="h-full antialiased"
+      className={cn("h-full antialiased", "font-sans", geist.variable)}
     >
+      <head>
+        <link rel="preconnect" href="https://anime-search-api-burw.onrender.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://anime-search-api-burw.onrender.com" />
+        <link rel="preconnect" href="https://s4.anilist.co" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://cdn.myanimelist.net" />
+      </head>
       <body className="min-h-full bg-background text-foreground">
         <script
           type="application/ld+json"

@@ -11,7 +11,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy" updated="May 12, 2026">
       <p>
-        animeTv stores account-related watch history and watchlist data only when a user signs in. Offline downloads are saved on the user's own browser or device.
+        animeTv stores account-related watch history and watchlist data only when a user signs in. Offline downloads are saved on the user&apos;s own browser or device.
       </p>
       <p>
         We use basic technical data such as browser requests and logs to keep the website working, improve performance, and protect the service from abuse.

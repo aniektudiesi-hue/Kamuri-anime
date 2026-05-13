@@ -8,6 +8,7 @@ import { CalendarDays, ChevronRight, Flame, Play, Radio, Star, Trophy } from "lu
 import { AppShell } from "@/components/app-shell";
 import { HeroCarousel, MobileHeroBanner } from "@/components/hero-carousel";
 import { SidebarLayout } from "@/components/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import type { AiringScheduleItem, Anime, HomeInitialData } from "@/lib/types";
 import { animeId, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
@@ -35,10 +36,10 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
       <SidebarLayout>
         <BigSection
           title="Popular Today"
-          icon={<Flame size={14} className="text-[#c8223d]" />}
+          icon={<Flame size={14} className="text-[#cf2442]" />}
           items={thumbnails.data}
           loading={thumbnails.isLoading && !initialData.thumbnails.length}
-          viewAllHref="/search?q=popular"
+          viewAllHref="/popular"
         />
 
         <BigSection
@@ -46,7 +47,7 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
           icon={<Radio size={14} className="text-[#c8ced8]" />}
           items={recent.data}
           loading={recent.isLoading && !initialData.recent.length}
-          viewAllHref="/search?q=airing"
+          viewAllHref="/new-releases"
         />
 
         <BigSection
@@ -54,11 +55,13 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
           icon={<Trophy size={14} className="text-[#d8b56a]" />}
           items={topRated.data}
           loading={topRated.isLoading && !initialData.topRated.length}
-          viewAllHref="/search?q=top+rated"
+          viewAllHref="/top-rated"
         />
 
         <AiringScheduleSection items={initialData.schedule} />
       </SidebarLayout>
+
+      <HomeSeoSection />
     </AppShell>
   );
 }
@@ -75,13 +78,18 @@ function SectionHeader({
   viewAllHref?: string;
 }) {
   return (
-    <div className="mb-4 flex items-center justify-between">
+    <div className="mb-5 flex items-end justify-between gap-3">
       <div className="flex items-center gap-2.5">
-        <span className="h-5 w-1 rounded-full bg-[#c8223d]" />
-        {icon}
-        <h2 className="text-base font-black text-white">{title}</h2>
+        <span className="h-7 w-1 rounded-full bg-[#cf2442] shadow-[0_0_18px_rgba(207,36,66,0.44)]" />
+        <span className="grid h-8 w-8 place-items-center rounded-2xl border border-white/[0.075] bg-white/[0.045]">{icon}</span>
+        <div>
+          <h2 className="text-lg font-black tracking-tight text-white">{title}</h2>
+          <p className="mt-0.5 hidden text-[11px] font-semibold uppercase tracking-[0.22em] text-white/24 sm:block">
+            Curated for fast watching
+          </p>
+        </div>
         {count ? (
-          <span className="rounded-lg bg-white/[0.05] px-2.5 py-0.5 text-[11px] font-bold text-white/30">
+          <span className="rounded-full border border-white/[0.07] bg-white/[0.045] px-2.5 py-1 text-[11px] font-black text-white/36">
             {count}
           </span>
         ) : null}
@@ -89,7 +97,7 @@ function SectionHeader({
       {viewAllHref ? (
         <Link
           href={viewAllHref}
-          className="flex items-center gap-1 text-xs font-semibold text-white/35 transition-colors hover:text-white"
+          className="hidden items-center gap-1 rounded-full border border-white/[0.075] bg-white/[0.035] px-3 py-1.5 text-xs font-black text-white/42 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/10 hover:text-white sm:flex"
         >
           View All <ChevronRight size={13} />
         </Link>
@@ -115,7 +123,7 @@ function BigSection({
   const visibleItems = allItems.slice(0, 36);
 
   return (
-    <section className="content-visibility-auto border-t border-white/[0.05] py-6 first:border-t-0">
+    <section className="content-visibility-auto border-t border-white/[0.055] py-8 first:border-t-0">
       <SectionHeader
         title={title}
         icon={icon}
@@ -123,13 +131,13 @@ function BigSection({
         viewAllHref={viewAllHref}
       />
 
-      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+      <div className="grid grid-cols-3 gap-x-2.5 gap-y-5 sm:grid-cols-4 sm:gap-x-3 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
         {loading
           ? Array.from({ length: 18 }).map((_, i) => (
               <div key={i}>
-                <div className="aspect-[2/3] animate-pulse rounded-xl bg-[#141828]" style={{ animationDelay: `${i * 20}ms` }} />
-                <div className="mt-2 h-3 w-4/5 animate-pulse rounded-full bg-[#141828]" />
-                <div className="mt-1.5 h-2.5 w-2/5 animate-pulse rounded-full bg-[#0d1020]" />
+                <Skeleton className="aspect-[2/3] rounded-2xl bg-[#141828]" style={{ animationDelay: `${i * 20}ms` }} />
+                <Skeleton className="mt-3 h-3 w-4/5 rounded-full bg-[#141828]" />
+                <Skeleton className="mt-1.5 h-2.5 w-2/5 rounded-full bg-[#0d1020]" />
               </div>
             ))
           : visibleItems.map((anime, i) => (
@@ -151,7 +159,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
   return (
     <article className="card-lift group">
       <Link href={`/anime/${id}`} onClick={() => rememberAnime(anime)} className="block">
-        <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
+        <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.055] transition group-hover:ring-[#cf2442]/28">
           {poster && !imageFailed ? (
             <Image
               src={poster}
@@ -160,43 +168,46 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
               sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 20vw"
               priority={priority}
               onError={() => setImageFailed(true)}
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              className="object-cover transition-transform duration-700 group-hover:scale-105"
             />
           ) : (
             <PosterFallback title={title} />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/8 to-transparent" />
+          <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
+            <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/[0.12] to-transparent" />
+          </div>
 
           {statusKey === "currently_airing" && (
-            <span className="absolute right-1.5 top-1.5 flex h-4 items-center gap-1 rounded bg-emerald-500/20 px-1 text-[8px] font-bold text-emerald-400 ring-1 ring-emerald-500/30">
-              <span className="h-1 w-1 animate-pulse rounded-full bg-emerald-400" />
+            <span className="absolute right-1.5 top-1.5 flex h-5 items-center gap-1 rounded-full bg-[#cf2442]/22 px-2 text-[8px] font-black text-[#ffd7dd] ring-1 ring-[#cf2442]/30">
+              <span className="h-1 w-1 animate-pulse rounded-full bg-[#cf2442]" />
               AIRING
             </span>
           )}
 
           {count > 0 && (
-            <span className="absolute bottom-1.5 left-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-bold text-white/80">
+            <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/76 px-2 py-1 text-[8px] font-black text-white/82 backdrop-blur-md">
               EP {count}
             </span>
           )}
 
           {anime.score ? (
-            <span className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-bold text-[#d8b56a]">
+            <span className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-black/76 px-2 py-1 text-[8px] font-black text-[#d8b56a] backdrop-blur-md">
               <Star size={7} className="fill-[#d8b56a]" />
               {Number(anime.score).toFixed(1)}
             </span>
           ) : null}
 
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-[#c8223d] shadow-lg shadow-[#c8223d]/30">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/42 opacity-0 backdrop-blur-[1px] transition-opacity duration-200 group-hover:opacity-100">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-[#cf2442] shadow-lg shadow-[#cf2442]/30">
               <Play size={14} fill="white" className="text-white" />
             </span>
           </div>
         </div>
 
         <div className="mt-2 px-0.5">
-          <h3 className="line-clamp-2 text-[11px] font-semibold leading-4 text-white/80">{title}</h3>
-          <p className="mt-1 text-[10px] text-white/30">{episodeLabel(anime)}</p>
+          <h3 className="line-clamp-2 text-[12px] font-bold leading-4 text-white/84 transition group-hover:text-white">{title}</h3>
+          <p className="mt-1 text-[10px] font-semibold text-white/30">{episodeLabel(anime)}</p>
         </div>
       </Link>
     </article>
@@ -216,7 +227,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
     <section className="content-visibility-auto border-t border-white/[0.05] py-6">
       <SectionHeader
         title="Airing Schedule"
-        icon={<CalendarDays size={14} className="text-[#c8223d]" />}
+        icon={<CalendarDays size={14} className="text-[#cf2442]" />}
         count={items.length}
       />
 
@@ -227,7 +238,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
             onClick={() => setActiveDay(day.key)}
             className={`shrink-0 rounded-xl border px-3.5 py-2 text-left transition ${
               activeDay === day.key
-                ? "border-[#c8223d]/40 bg-[#c8223d]/16 text-white shadow-lg shadow-[#c8223d]/10"
+                ? "border-[#cf2442]/40 bg-[#cf2442]/16 text-white shadow-lg shadow-[#cf2442]/10"
                 : "border-white/[0.07] bg-[#0d1020] text-white/45 hover:border-white/[0.14] hover:text-white"
             }`}
           >
@@ -244,7 +255,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
               key={`${item.id}-${item.episode}-${item.airingAt}`}
               href={`/anime/${item.id}`}
               onClick={() => rememberAnime(item.anime)}
-              className="group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#0d1020]/70 p-2 transition hover:border-[#c8223d]/30 hover:bg-[#141828]"
+              className="group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#0d1020]/70 p-2 transition hover:border-[#cf2442]/30 hover:bg-[#141828]"
             >
               <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
                 {posterOf(item.anime) ? (
@@ -252,7 +263,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
                 ) : null}
               </div>
               <div className="min-w-0 py-1">
-                <p className="text-[10px] font-black uppercase tracking-wide text-[#c8223d]">
+                <p className="text-[10px] font-black uppercase tracking-wide text-[#cf2442]">
                   {formatAiringTime(item.airingAt)}
                 </p>
                 <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-white/82 group-hover:text-white">
@@ -277,11 +288,49 @@ function PosterFallback({ title }: { title: string }) {
     .join("");
 
   return (
-    <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_28%_18%,rgba(200,34,61,0.25),transparent_34%),linear-gradient(145deg,#171b2d,#080a12)]">
+    <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_28%_18%,rgba(207,36,66,0.25),transparent_34%),linear-gradient(145deg,#171b2d,#080a12)]">
       <div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.06] text-lg font-black text-white/70 shadow-2xl shadow-black/35">
         {initials || "AT"}
       </div>
     </div>
+  );
+}
+
+function HomeSeoSection() {
+  const links = [
+    { label: "Watch free anime online", href: "/free-anime" },
+    { label: "Hindi anime discovery", href: "/hindi-anime" },
+    { label: "New anime releases", href: "/new-releases" },
+    { label: "Currently airing anime", href: "/airing" },
+    { label: "Top rated anime", href: "/top-rated" },
+    { label: "Anime schedule", href: "/schedule" },
+  ];
+
+  return (
+    <section className="mx-auto max-w-screen-2xl px-4 pb-4 pt-2 lg:px-6">
+      <div className="rounded-3xl border border-white/[0.055] bg-[#0d1020]/68 p-5 sm:p-7">
+        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#cf2442]">AnimeTV Plus</p>
+        <h2 className="mt-2 max-w-3xl text-2xl font-black tracking-tight text-white sm:text-3xl">
+          Watch anime online with fast browsing, HD playback, and fresh episode discovery.
+        </h2>
+        <p className="mt-3 max-w-4xl text-sm leading-7 text-white/44">
+          animeTv helps viewers find free anime, subbed anime, dubbed anime, Hindi anime searches, top rated shows,
+          newly released episodes, and weekly airing schedules from one clean streaming interface. Browse titles,
+          open anime detail pages, continue from watch history, and switch between available servers quickly.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 py-1.5 text-xs font-bold text-white/44 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/10 hover:text-white"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
