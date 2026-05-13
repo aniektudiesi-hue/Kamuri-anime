@@ -1,7 +1,7 @@
 import type { StreamResponse } from "./types";
 
 const STREAM_CACHE_PREFIX = "anime-tv-stream-meta:";
-const STREAM_CACHE_TTL = 1000 * 60 * 3;
+const STREAM_CACHE_TTL = 1000 * 60 * 15;
 const warmedManifests = new Set<string>();
 
 type CachedStream = {

@@ -68,7 +68,6 @@ export default function WatchPage({
   const [type, setType] = useState<"sub" | "dub">("sub");
   const [known, setKnown] = useState<Anime | undefined>();
   const [playedEps, setPlayedEps] = useState<number[]>([]);
-  const [loadBackupServers, setLoadBackupServers] = useState(false);
   const { token } = useAuth();
   const settings = useSettings();
   const queryClient = useQueryClient();
@@ -93,7 +92,7 @@ export default function WatchPage({
     queries: SERVERS.map((s) => ({
       queryKey: ["stream", malId, episode, s.id, s.id === "mega" ? type : "any"],
       queryFn: () => fetchServer(s.id, malId, episode, type),
-      enabled: Boolean(malId) && Number.isFinite(episodeNum) && (s.id === "mega" || server === s.id || loadBackupServers),
+      enabled: Boolean(malId) && Number.isFinite(episodeNum),
       retry: s.id === "moon" ? 1 : false,
       staleTime: 1000 * 60 * 25,
       gcTime: 1000 * 60 * 120,
@@ -112,8 +111,9 @@ export default function WatchPage({
   const megaQuery = streamQueries[SERVERS.findIndex((s) => s.id === "mega")];
   const selectedQueryIndex = selectedServer ? SERVERS.findIndex((s) => s.id === selectedServer.id) : 0;
   const selectedQuery = streamQueries[selectedQueryIndex];
-  const backupLoading = loadBackupServers && !selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching);
-  const streamsLoading = Boolean(selectedQuery?.isLoading || selectedQuery?.isFetching || backupLoading);
+  const availableServerIds = availableServers.map((s) => s.id).join("|");
+  const firstAvailableServerId = availableServers[0]?.id;
+  const streamsLoading = Boolean((selectedQuery?.isLoading || selectedQuery?.isFetching) || (!selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching)));
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
 
@@ -288,6 +288,14 @@ export default function WatchPage({
   const nextHref = hasNext ? `/watch/${malId}/${episodeNum + 1}` : undefined;
   const displayTitle = animeTitle === "Untitled" ? `Anime ${malId}` : animeTitle;
 
+  useEffect(() => {
+    if (!firstAvailableServerId) return;
+    if (server === "mega" && type === "dub" && !megaQuery?.isError && !hasPlayableStream(megaQuery?.data)) return;
+    if (!availableServerIds.split("|").includes(server)) {
+      setServer(firstAvailableServerId);
+    }
+  }, [availableServerIds, firstAvailableServerId, megaQuery?.data, megaQuery?.isError, server, type]);
+
   function handlePlayerFatalError() {
     if (!activeServerId) return;
     clearCachedStream(streamCacheKey(activeServerId, malId, episode, type));
@@ -298,27 +306,9 @@ export default function WatchPage({
   useEffect(() => {
     const id = window.setTimeout(() => {
       setServer("mega");
-      setLoadBackupServers(false);
     }, 0);
     return () => window.clearTimeout(id);
   }, [episode, malId, type]);
-
-  useEffect(() => {
-    if (!malId || !Number.isFinite(episodeNum)) {
-      return;
-    }
-    if (!megaQuery?.data && !megaQuery?.isError) {
-      return;
-    }
-    if (megaQuery?.isError || (megaQuery?.data && !hasPlayableStream(megaQuery.data))) {
-      setLoadBackupServers(true);
-      return;
-    }
-    const loadId = window.setTimeout(() => {
-      if (document.visibilityState === "visible") setLoadBackupServers(true);
-    }, 12000);
-    return () => window.clearTimeout(loadId);
-  }, [episodeNum, malId, megaQuery?.data, megaQuery?.isError]);
 
   return (
     <AppShell>
