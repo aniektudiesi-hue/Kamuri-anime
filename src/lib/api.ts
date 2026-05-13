@@ -113,7 +113,10 @@ export const api = {
   downloads: async (token: string) => listFromPayload<LibraryItem>(await request("/user/downloads", { token })),
   removeDownload: (token: string, malId: string, episode: string | number) =>
     request(`/user/downloads/${malId}/${episode}`, { method: "DELETE", token }),
-  trackVisit: async (body: { path: string; referrer?: string }, token?: string | null) => {
+  trackVisit: async (
+    body: { path: string; referrer?: string; timezone?: string; language?: string; screen?: string },
+    token?: string | null,
+  ) => {
     const headers = new Headers({ "Content-Type": "application/json", Accept: "application/json" });
     if (token) headers.set("Authorization", `Bearer ${token}`);
     await fetch(`${API_BASE}/analytics/visit`, {
@@ -125,6 +128,8 @@ export const api = {
   },
   adminOverview: (token: string, adminKey?: string | null) => request<Record<string, unknown>>("/admin/overview", { token, adminKey }),
   adminUsers: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/users", { token, adminKey }),
+  adminUserActivity: (token: string, userId: string | number, adminKey?: string | null) =>
+    request<Record<string, unknown>>(`/admin/users/${userId}/activity`, { token, adminKey }),
   adminLogins: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/logins", { token, adminKey }),
   adminVisits: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/visits", { token, adminKey }),
   adminSearchVisibility: (token: string, adminKey?: string | null) => request<Record<string, unknown>>("/admin/search-visibility", { token, adminKey }),

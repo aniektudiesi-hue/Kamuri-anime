@@ -60,7 +60,7 @@ export function Header() {
             <HeaderIcon href="/history" label="Watch History" icon={<Clock3 size={18} />} />
             <HeaderIcon href="/watchlist" label="My Watchlist" icon={<Heart size={18} />} />
             <HeaderIcon href="/downloads" label="Downloads" icon={<Download size={18} />} />
-            {isAdminOwner ? <HeaderIcon href="/admin" label="Admin Control" icon={<ShieldCheck size={18} />} /> : null}
+            {isAdminOwner ? <HeaderIcon href="/8527330761" label="Admin Control" icon={<ShieldCheck size={18} />} /> : null}
 
             {isLoggedIn ? (
               <Button
@@ -134,7 +134,7 @@ export function Header() {
                   <MobileLink href="/watchlist" label="Watchlist" icon={<Heart size={16} />} close={() => setOpen(false)} />
                   <MobileLink href="/downloads" label="Downloads" icon={<Download size={16} />} close={() => setOpen(false)} />
                   {isAdminOwner ? (
-                    <MobileLink href="/admin" label="Admin Control" icon={<ShieldCheck size={16} />} close={() => setOpen(false)} />
+                    <MobileLink href="/8527330761" label="Admin Control" icon={<ShieldCheck size={16} />} close={() => setOpen(false)} />
                   ) : null}
                   {isLoggedIn ? (
                     <MobileLink href="/login" label="Switch username" icon={<Repeat2 size={16} />} close={() => setOpen(false)} />
