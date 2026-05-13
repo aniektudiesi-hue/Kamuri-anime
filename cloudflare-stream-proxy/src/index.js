@@ -6,6 +6,7 @@ const DESKTOP_UA =
 const STREAM_API_PREFIXES = ["/api/stream/", "/api/moon/", "/api/hd1/"];
 const MOON_CACHE_TTL = 1800;
 const MOON_SEGMENT_CACHE_TTL = 3600;
+const moonInflight = new Map();
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -24,13 +25,13 @@ const worker = {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/health") return json({ ok: true, worker: "anime-tv-stream-proxy" });
-      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/warm")) return warmMoon(request, env, ctx);
-      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return proxyMoonM3u8(request, env, ctx);
-      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/chunk")) return proxyMoonChunk(request, env, ctx);
-      if (url.pathname === "/proxy/m3u8") return proxyM3u8(request, env);
-      if (url.pathname === "/proxy/chunk") return proxyChunk(request, env);
-      if (url.pathname === "/proxy/vtt") return proxyVtt(request, env);
-      return proxyOrigin(request, env);
+      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/warm")) return await warmMoon(request, env, ctx);
+      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return await proxyMoonM3u8(request, env, ctx);
+      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/chunk")) return await proxyMoonChunk(request, env, ctx);
+      if (url.pathname === "/proxy/m3u8") return await proxyM3u8(request, env);
+      if (url.pathname === "/proxy/chunk") return await proxyChunk(request, env);
+      if (url.pathname === "/proxy/vtt") return await proxyVtt(request, env);
+      return await proxyOrigin(request, env);
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : "Proxy error" }, 502);
     }
@@ -103,9 +104,19 @@ async function proxyMoonM3u8(request, env, ctx) {
   const variant = url.searchParams.get("variant");
   const fastStart = url.searchParams.get("fast") === "1" || url.searchParams.get("direct") === "1";
   const seededPlayback = moonSeedPlaybackFromUrl(url);
-  if (seededPlayback) ctx.waitUntil(cacheMoonPlayback(videoId, seededPlayback));
-  const playback = seededPlayback || await fetchMoonPlaybackCached(videoId);
-  const master = await fetchMoonTextCached(playback.url, env, `moon-master:${videoId}`);
+  let playback = seededPlayback || await fetchMoonPlaybackCached(videoId);
+  let master;
+  try {
+    master = await fetchMoonTextCached(playback.url, env, `moon-master:${videoId}`);
+    if (seededPlayback) {
+      ctx.waitUntil(cacheMoonPlayback(videoId, seededPlayback).catch((error) => logMoonError("moon_seed_cache_failed", videoId, error)));
+    }
+  } catch (error) {
+    if (!seededPlayback) throw error;
+    logMoonError("moon_seed_rejected", videoId, error);
+    playback = await fetchMoonPlaybackCached(videoId, true);
+    master = await fetchMoonTextCached(playback.url, env, `moon-master:${videoId}`, true);
+  }
 
   if (variant) {
     const variantUrl = findPlaylistEntry(master.text, playback.url, variant);
@@ -362,6 +373,10 @@ async function fetchMoonText(url, env) {
 }
 
 async function fetchMoonPlaybackCached(videoId, fresh = false) {
+  return moonInflightDedupe(`playback:${videoId}:${fresh ? "fresh" : "cached"}`, async () => fetchMoonPlaybackCachedInner(videoId, fresh));
+}
+
+async function fetchMoonPlaybackCachedInner(videoId, fresh = false) {
   const cache = caches.default;
   const key = moonCacheRequest(`playback:${videoId}`);
   if (!fresh) {
@@ -384,6 +399,10 @@ async function cacheMoonPlayback(videoId, playback) {
 }
 
 async function fetchMoonTextCached(url, env, cacheId, fresh = false) {
+  return moonInflightDedupe(`text:${cacheId}:${fresh ? "fresh" : "cached"}`, async () => fetchMoonTextCachedInner(url, env, cacheId, fresh));
+}
+
+async function fetchMoonTextCachedInner(url, env, cacheId, fresh = false) {
   const cache = caches.default;
   const key = moonCacheRequest(cacheId);
   if (!fresh) {
@@ -399,6 +418,15 @@ async function fetchMoonTextCached(url, env, cacheId, fresh = false) {
     },
   }));
   return result;
+}
+
+function moonInflightDedupe(key, factory) {
+  const existing = moonInflight.get(key);
+  if (existing) return existing;
+  if (moonInflight.size > 100) moonInflight.clear();
+  const promise = factory().finally(() => moonInflight.delete(key));
+  moonInflight.set(key, promise);
+  return promise;
 }
 
 async function resolveMoonSegmentUrl(videoId, variant, segment, env, fresh = false) {
