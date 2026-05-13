@@ -4,7 +4,8 @@ const DESKTOP_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 const STREAM_API_PREFIXES = ["/api/stream/", "/api/moon/", "/api/hd1/"];
-const MOON_CACHE_TTL = 120;
+const MOON_CACHE_TTL = 900;
+const MOON_SEGMENT_CACHE_TTL = 3600;
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -17,14 +18,15 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 const worker = {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return corsPreflight();
 
     const url = new URL(request.url);
     try {
       if (url.pathname === "/health") return json({ ok: true, worker: "anime-tv-stream-proxy" });
-      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return proxyMoonM3u8(request, env);
-      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/chunk")) return proxyMoonChunk(request, env);
+      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/warm")) return warmMoon(request, env, ctx);
+      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return proxyMoonM3u8(request, env, ctx);
+      if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/chunk")) return proxyMoonChunk(request, env, ctx);
       if (url.pathname === "/proxy/m3u8") return proxyM3u8(request, env);
       if (url.pathname === "/proxy/chunk") return proxyChunk(request, env);
       if (url.pathname === "/proxy/vtt") return proxyVtt(request, env);
@@ -84,7 +86,16 @@ async function proxyM3u8(request, env) {
   });
 }
 
-async function proxyMoonM3u8(request, env) {
+async function warmMoon(request, env, ctx) {
+  const url = new URL(request.url);
+  const videoId = url.pathname.split("/")[3];
+  if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
+  const segments = clampInt(url.searchParams.get("segments"), 1, 6, 3);
+  ctx.waitUntil(warmMoonPipeline(videoId, env, segments));
+  return json({ ok: true, video_id: videoId, warming: true, segments }, 202, cacheHeaders("no-store"));
+}
+
+async function proxyMoonM3u8(request, env, ctx) {
   const videoId = new URL(request.url).pathname.split("/")[3];
   if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
   const variant = new URL(request.url).searchParams.get("variant");
@@ -95,29 +106,31 @@ async function proxyMoonM3u8(request, env) {
     const variantUrl = findPlaylistEntry(master.text, playback.url, variant);
     if (!variantUrl) return json({ error: "Moon variant missing", variant }, 404, cacheHeaders("no-store"));
     const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${variant}`);
+    ctx.waitUntil(warmMoonSegments(videoId, variant, child.text, variantUrl, env, 3));
     const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, new URL(request.url).origin, videoId, variant);
     return new Response(rewrittenChild, {
       status: 200,
       headers: {
         ...corsHeaders(),
         "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
-        "cache-control": "no-cache",
+        "cache-control": "public, max-age=60, stale-while-revalidate=300",
       },
     });
   }
 
+  ctx.waitUntil(warmMoonPipeline(videoId, env, 3, playback, master.text));
   const rewritten = rewriteMoonMaster(master.text, playback.url, new URL(request.url).origin, videoId);
   return new Response(rewritten, {
     status: 200,
     headers: {
       ...corsHeaders(),
       "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
-      "cache-control": "no-cache",
+      "cache-control": "public, max-age=60, stale-while-revalidate=300",
     },
   });
 }
 
-async function proxyMoonChunk(request, env) {
+async function proxyMoonChunk(request, env, ctx) {
   const url = new URL(request.url);
   const videoId = url.pathname.split("/")[3];
   const variant = url.searchParams.get("variant") || "";
@@ -125,12 +138,15 @@ async function proxyMoonChunk(request, env) {
   if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
   if (!variant || !segment) return json({ error: "Missing Moon segment info" }, 400);
 
+  const cached = await matchMoonResourceCache(videoId, variant, segment, request.headers.get("range") || "");
+  if (cached) return streamUpstream(cached, detectMime(segment));
+
   let segmentUrl = await resolveMoonSegmentUrl(videoId, variant, segment, env);
-  let upstream = await fetchMoonSegment(segmentUrl, request, env);
+  let upstream = await fetchMoonSegment(segmentUrl, request, env, ctx, videoId, variant, segment);
   if (upstream.status === 403 || upstream.status === 404) {
     await clearMoonPlaylistCache(videoId, variant);
     segmentUrl = await resolveMoonSegmentUrl(videoId, variant, segment, env, true);
-    upstream = await fetchMoonSegment(segmentUrl, request, env);
+    upstream = await fetchMoonSegment(segmentUrl, request, env, ctx, videoId, variant, segment);
   }
   if (!upstream.ok && upstream.status !== 206) return upstreamError(upstream);
   return streamUpstream(upstream, detectMime(segmentUrl));
@@ -343,15 +359,35 @@ async function resolveMoonSegmentUrl(videoId, variant, segment, env, fresh = fal
   return segmentUrl;
 }
 
-async function fetchMoonSegment(segmentUrl, request, env) {
+async function fetchMoonSegment(segmentUrl, request, env, ctx, videoId = "", variant = "", segment = "") {
   const headers = upstreamHeaders(segmentUrl, env);
   const range = request.headers.get("range");
   if (range) headers.set("range", range);
-  return fetch(segmentUrl, {
+
+  const cache = caches.default;
+  const stableKey = videoId && variant && segment ? moonResourceCacheRequest(videoId, variant, segment) : null;
+  if (stableKey) {
+    const cached = await matchMoonResourceCache(videoId, variant, segment, range || "");
+    if (cached) return cached;
+  }
+
+  const upstream = await fetch(segmentUrl, {
     headers,
     redirect: "follow",
-    cf: { cacheTtl: range ? 0 : 3600, cacheEverything: !range },
+    cf: { cacheTtl: range ? 0 : MOON_SEGMENT_CACHE_TTL, cacheEverything: !range },
   });
+
+  if (!range && stableKey && upstream.status === 200) {
+    const cacheable = moonCacheableResponse(upstream, MOON_SEGMENT_CACHE_TTL);
+    if (ctx) {
+      ctx.waitUntil(cache.put(stableKey, cacheable.clone()).catch((error) => logMoonError("moon_segment_cache_put_failed", videoId, error)));
+    } else {
+      await cache.put(stableKey, cacheable.clone());
+    }
+    return cacheable;
+  }
+
+  return upstream;
 }
 
 async function clearMoonPlaylistCache(videoId, variant) {
@@ -365,6 +401,108 @@ async function clearMoonPlaylistCache(videoId, variant) {
 
 function moonCacheRequest(key) {
   return new Request(`https://anime-tv-stream-proxy.local/${encodeURIComponent(key)}`);
+}
+
+function moonResourceCacheRequest(videoId, variant, segment, range = "") {
+  const url = `https://anime-tv-stream-proxy.local/moon-resource/${encodeURIComponent(videoId)}/${encodeURIComponent(variant)}/${encodeURIComponent(segment)}`;
+  const headers = new Headers();
+  if (range) headers.set("range", range);
+  return new Request(url, { headers });
+}
+
+async function matchMoonResourceCache(videoId, variant, segment, range = "") {
+  return caches.default.match(moonResourceCacheRequest(videoId, variant, segment, range));
+}
+
+function moonCacheableResponse(response, ttl) {
+  const headers = new Headers(response.headers);
+  headers.delete("set-cookie");
+  if (headers.get("vary") === "*") headers.delete("vary");
+  headers.set("cache-control", `public, max-age=${ttl}`);
+  return new Response(response.body, { status: response.status, headers });
+}
+
+async function warmMoonPipeline(videoId, env, segmentCount = 3, playback, masterText) {
+  try {
+    const cachedPlayback = playback || await fetchMoonPlaybackCached(videoId);
+    const master = masterText ? { text: masterText } : await fetchMoonTextCached(cachedPlayback.url, env, `moon-master:${videoId}`);
+    const variantUrl = firstMoonVariantUrl(master.text, cachedPlayback.url);
+    if (!variantUrl) return;
+    const variant = new URL(variantUrl).pathname.split("/").pop() || "index-v1-a1.m3u8";
+    const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${variant}`);
+    await warmMoonSegments(videoId, variant, child.text, variantUrl, env, segmentCount);
+  } catch (error) {
+    logMoonError("moon_warm_failed", videoId, error);
+  }
+}
+
+async function warmMoonSegments(videoId, variant, playlistText, playlistUrl, env, segmentCount = 3) {
+  const entries = [
+    ...moonKeyUrls(playlistText, playlistUrl),
+    ...moonSegmentUrls(playlistText, playlistUrl).slice(0, segmentCount),
+  ];
+  await Promise.allSettled(entries.map((entry) => warmMoonResource(videoId, variant, entry.segment, entry.url, env)));
+}
+
+async function warmMoonResource(videoId, variant, segment, url, env) {
+  const cache = caches.default;
+  const key = moonResourceCacheRequest(videoId, variant, segment);
+  if (await cache.match(key)) return;
+
+  const upstream = await fetch(url, {
+    headers: upstreamHeaders(url, env),
+    redirect: "follow",
+    cf: { cacheTtl: MOON_SEGMENT_CACHE_TTL, cacheEverything: true },
+  });
+  if (upstream.status !== 200) return;
+
+  await cache.put(key, moonCacheableResponse(upstream, MOON_SEGMENT_CACHE_TTL));
+}
+
+function firstMoonVariantUrl(text, baseUrl) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!lines[index].startsWith("#EXT-X-STREAM-INF")) continue;
+    const next = lines.slice(index + 1).find((line) => line && !line.startsWith("#"));
+    return next ? new URL(next, baseUrl).toString() : "";
+  }
+  return "";
+}
+
+function moonSegmentUrls(text, baseUrl) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !/\.m3u8(?:$|[?#])/i.test(line))
+    .map((line) => {
+      const url = new URL(line, baseUrl).toString();
+      return { url, segment: new URL(url).pathname.split("/").pop() || line };
+    });
+}
+
+function moonKeyUrls(text, baseUrl) {
+  const urls = [];
+  const keyPattern = /#EXT-X-(?:KEY|MAP):[^\n\r]*URI="([^"]+)"/gi;
+  let match;
+  while ((match = keyPattern.exec(text))) {
+    const url = new URL(match[1], baseUrl).toString();
+    urls.push({ url, segment: new URL(url).pathname.split("/").pop() || match[1] });
+  }
+  return urls;
+}
+
+function clampInt(value, min, max, fallback) {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function logMoonError(event, videoId, error) {
+  console.log(JSON.stringify({
+    event,
+    videoId,
+    error: error instanceof Error ? error.message : String(error),
+  }));
 }
 
 function rewriteMoonMaster(text, originalUrl, workerOrigin, videoId) {
@@ -571,7 +709,12 @@ function copyRequestHeaders(headers) {
 }
 
 function detectMime(src) {
-  const path = new URL(src).pathname.toLowerCase();
+  let path = src.toLowerCase();
+  try {
+    path = new URL(src).pathname.toLowerCase();
+  } catch {
+    // Plain Moon segment names are enough to infer the type.
+  }
   if (path.endsWith(".ts")) return "video/mp2t";
   if (path.endsWith(".m4s")) return "video/iso.segment";
   if (path.endsWith(".mp4")) return "video/mp4";

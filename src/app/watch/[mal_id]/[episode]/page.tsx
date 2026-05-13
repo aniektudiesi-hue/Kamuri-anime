@@ -12,7 +12,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { historySocketUrl } from "@/lib/history-realtime";
-import { clearCachedStream, warmStreamManifest } from "@/lib/stream-cache";
+import { clearCachedStream, warmMoonPipeline, warmStreamManifest } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, titleOf } from "@/lib/utils";
@@ -299,7 +299,9 @@ export default function WatchPage({
   }, [availableServerIds, firstAvailableServerId, megaQuery?.data, megaQuery?.isError, server, type]);
 
   useEffect(() => {
-    if (moonQuery?.data) warmStreamManifest(moonQuery.data, { segments: 2, timeoutMs: 15_000 });
+    if (moonQuery?.data && !warmMoonPipeline(moonQuery.data, 4)) {
+      warmStreamManifest(moonQuery.data, { segments: 2, timeoutMs: 15_000 });
+    }
     if (hd1Query?.data) warmStreamManifest(hd1Query.data, { segments: 1, timeoutMs: 10_000 });
   }, [hd1Query?.data, moonQuery?.data]);
 

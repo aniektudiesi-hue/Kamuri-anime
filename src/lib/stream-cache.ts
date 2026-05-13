@@ -61,6 +61,22 @@ export function warmStreamManifest(
     .finally(() => window.clearTimeout(id));
 }
 
+export function warmMoonPipeline(stream: StreamResponse | undefined, segments = 4) {
+  const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
+  if (!src) return false;
+
+  const match = src.match(/^(https?:\/\/[^/]+)\/proxy\/moon\/([^/?#]+)\/m3u8/i);
+  if (!match) return false;
+
+  const warmUrl = `${match[1]}/proxy/moon/${match[2]}/warm?segments=${Math.max(1, Math.min(6, segments))}`;
+  void fetch(warmUrl, {
+    method: "GET",
+    cache: "no-store",
+    keepalive: true,
+  }).catch(() => undefined);
+  return true;
+}
+
 async function warmPlaylist(src: string, segmentCount: number, signal: AbortSignal) {
   const response = await fetch(src, { cache: "force-cache", signal });
   if (!response.ok) return;
