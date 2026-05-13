@@ -112,8 +112,7 @@ async function proxyMoonM3u8(request, env, ctx) {
       ctx.waitUntil(cacheMoonPlayback(videoId, seededPlayback).catch((error) => logMoonError("moon_seed_cache_failed", videoId, error)));
     }
   } catch (error) {
-    if (!seededPlayback) throw error;
-    logMoonError("moon_seed_rejected", videoId, error);
+    logMoonError(seededPlayback ? "moon_seed_rejected" : "moon_cached_playback_rejected", videoId, error);
     playback = await fetchMoonPlaybackCached(videoId, true);
     master = await fetchMoonTextCached(playback.url, env, `moon-master:${videoId}`, true);
   }
