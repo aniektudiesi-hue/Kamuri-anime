@@ -296,9 +296,9 @@ export function VideoPlayer({
     lastTimeRef.current = initialTime;
     let playRequested = false;
     const targetForwardBuffer = deepBuffer
-      ? (isMoonStream ? 10 * 60 : 6 * 60)
+      ? (isMoonStream ? 2.5 * 60 : 6 * 60)
       : (isMoonStream ? 2 * 60 : 2 * 60);
-    const initialForwardBuffer = Math.min(targetForwardBuffer, isMoonStream ? 45 : 60);
+    const initialForwardBuffer = Math.min(targetForwardBuffer, isMoonStream ? 18 : 60);
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
@@ -310,8 +310,8 @@ export function VideoPlayer({
       };
       config.maxBufferLength = targetForwardBuffer;
       config.maxMaxBufferLength = Math.max(targetForwardBuffer, targetForwardBuffer + 120);
-      config.maxBufferSize = deepBuffer ? 384 * 1000 * 1000 : 96 * 1000 * 1000;
-      config.backBufferLength = isMoonStream ? 35 : 20;
+      config.maxBufferSize = isMoonStream ? 128 * 1000 * 1000 : deepBuffer ? 384 * 1000 * 1000 : 96 * 1000 * 1000;
+      config.backBufferLength = isMoonStream ? 12 : 20;
     };
     let lastBufferUiAt = 0;
     const updateBuffered = (force = false) => {
@@ -419,9 +419,9 @@ export function VideoPlayer({
           startLevel: isMoonStream ? 0 : -1,
           maxBufferLength: initialForwardBuffer,
           maxMaxBufferLength: Math.max(initialForwardBuffer, 180),
-          maxBufferSize: deepBuffer ? 240 * 1000 * 1000 : 140 * 1000 * 1000,
+          maxBufferSize: isMoonStream ? 96 * 1000 * 1000 : deepBuffer ? 240 * 1000 * 1000 : 140 * 1000 * 1000,
           maxBufferHole: 0.35,
-          backBufferLength: isMoonStream ? 25 : 15,
+          backBufferLength: isMoonStream ? 10 : 15,
           fragLoadingMaxRetry: isMoonStream ? 8 : 5,
           manifestLoadingMaxRetry: isMoonStream ? 5 : 3,
           levelLoadingMaxRetry: isMoonStream ? 5 : 3,
@@ -484,8 +484,17 @@ export function VideoPlayer({
     }
 
     return () => {
-      hls?.destroy();
+      try {
+        hls?.stopLoad();
+        hls?.detachMedia();
+        hls?.destroy();
+      } catch {
+        // Best-effort shutdown; a new player instance will own the next source.
+      }
       hlsRef.current = null;
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
       video.removeEventListener("canplay", playWhenReady);
       video.removeEventListener("loadedmetadata", restoreTime);
       video.removeEventListener("loadedmetadata", markDuration);

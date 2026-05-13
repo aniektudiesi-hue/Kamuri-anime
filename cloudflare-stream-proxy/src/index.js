@@ -91,7 +91,7 @@ async function warmMoon(request, env, ctx) {
   const url = new URL(request.url);
   const videoId = url.pathname.split("/")[3];
   if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
-  const segments = clampInt(url.searchParams.get("segments"), 1, 6, 3);
+  const segments = clampInt(url.searchParams.get("segments"), 1, 2, 2);
   const seededPlayback = moonSeedPlaybackFromUrl(url);
   ctx.waitUntil(warmMoonPipeline(videoId, env, segments, seededPlayback));
   return json({ ok: true, video_id: videoId, warming: true, segments }, 202, cacheHeaders("no-store"));
@@ -121,7 +121,7 @@ async function proxyMoonM3u8(request, env, ctx) {
     const variantUrl = findPlaylistEntry(master.text, playback.url, variant);
     if (!variantUrl) return json({ error: "Moon variant missing", variant }, 404, cacheHeaders("no-store"));
     const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${variant}`);
-    ctx.waitUntil(warmMoonSegments(videoId, variant, child.text, variantUrl, env, 3));
+    ctx.waitUntil(warmMoonSegments(videoId, variant, child.text, variantUrl, env, 2));
     const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, new URL(request.url).origin, videoId, variant);
     return new Response(rewrittenChild, {
       status: 200,
@@ -138,7 +138,7 @@ async function proxyMoonM3u8(request, env, ctx) {
     if (variantUrl) {
       const fastVariant = new URL(variantUrl).pathname.split("/").pop() || "index-v1-a1.m3u8";
       const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${fastVariant}`);
-      ctx.waitUntil(warmMoonSegments(videoId, fastVariant, child.text, variantUrl, env, 6));
+      ctx.waitUntil(warmMoonSegments(videoId, fastVariant, child.text, variantUrl, env, 2));
       const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, url.origin, videoId, fastVariant);
       return new Response(rewrittenChild, {
         status: 200,
@@ -150,7 +150,7 @@ async function proxyMoonM3u8(request, env, ctx) {
       });
     }
     const directVariant = "direct.m3u8";
-    ctx.waitUntil(warmMoonSegments(videoId, directVariant, master.text, playback.url, env, 6));
+    ctx.waitUntil(warmMoonSegments(videoId, directVariant, master.text, playback.url, env, 2));
     const rewrittenDirect = rewriteMoonVariant(master.text, playback.url, url.origin, videoId, directVariant);
     return new Response(rewrittenDirect, {
       status: 200,
@@ -162,7 +162,7 @@ async function proxyMoonM3u8(request, env, ctx) {
     });
   }
 
-  ctx.waitUntil(warmMoonPipeline(videoId, env, 6, playback, master.text));
+  ctx.waitUntil(warmMoonPipeline(videoId, env, 2, playback, master.text));
   if (!firstMoonVariantUrl(master.text, playback.url)) {
     const directVariant = "direct.m3u8";
     const rewrittenDirect = rewriteMoonVariant(master.text, playback.url, url.origin, videoId, directVariant);
@@ -521,7 +521,7 @@ function moonCacheableResponse(response, ttl) {
   return new Response(response.body, { status: response.status, headers });
 }
 
-async function warmMoonPipeline(videoId, env, segmentCount = 3, playback, masterText) {
+async function warmMoonPipeline(videoId, env, segmentCount = 2, playback, masterText) {
   try {
     const cachedPlayback = playback || await fetchMoonPlaybackCached(videoId);
     const master = masterText ? { text: masterText } : await fetchMoonTextCached(cachedPlayback.url, env, `moon-master:${videoId}`);
@@ -535,7 +535,7 @@ async function warmMoonPipeline(videoId, env, segmentCount = 3, playback, master
   }
 }
 
-async function warmMoonSegments(videoId, variant, playlistText, playlistUrl, env, segmentCount = 3) {
+async function warmMoonSegments(videoId, variant, playlistText, playlistUrl, env, segmentCount = 2) {
   const entries = [
     ...moonKeyUrls(playlistText, playlistUrl),
     ...moonSegmentUrls(playlistText, playlistUrl).slice(0, segmentCount),
@@ -544,6 +544,10 @@ async function warmMoonSegments(videoId, variant, playlistText, playlistUrl, env
 }
 
 async function warmMoonResource(videoId, variant, segment, url, env) {
+  return moonInflightDedupe(`resource:${videoId}:${variant}:${segment}`, async () => warmMoonResourceInner(videoId, variant, segment, url, env));
+}
+
+async function warmMoonResourceInner(videoId, variant, segment, url, env) {
   const cache = caches.default;
   const key = moonResourceCacheRequest(videoId, variant, segment);
   if (await cache.match(key)) return;

@@ -299,7 +299,7 @@ export default function WatchPage({
   }, [availableServerIds, firstAvailableServerId, megaQuery?.data, megaQuery?.isError, server, type]);
 
   useEffect(() => {
-    if (moonQuery?.data && !warmMoonPipeline(moonQuery.data, 4)) {
+    if (moonQuery?.data && !warmMoonPipeline(moonQuery.data, 2)) {
       warmStreamManifest(moonQuery.data, { segments: 2, timeoutMs: 15_000 });
     }
     if (hd1Query?.data) warmStreamManifest(hd1Query.data, { segments: 1, timeoutMs: 10_000 });

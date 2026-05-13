@@ -115,7 +115,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       queryKey: ["stream", malId, episode, "moon", "any"],
       queryFn: async () => {
         const stream = await api.moon(malId, episode);
-        warmMoonPipeline(stream, 6);
+        warmMoonPipeline(stream, 2);
         return stream;
       },
       staleTime: 1000 * 60 * 25,

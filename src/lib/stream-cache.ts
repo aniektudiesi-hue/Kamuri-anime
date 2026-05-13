@@ -3,6 +3,8 @@ import type { StreamResponse } from "./types";
 const STREAM_CACHE_PREFIX = "anime-tv-stream-meta:";
 const STREAM_CACHE_TTL = 1000 * 60 * 15;
 const warmedManifests = new Set<string>();
+const warmedMoon = new Map<string, number>();
+const MOON_WARM_TTL = 1000 * 60 * 8;
 
 type CachedStream = {
   expiresAt: number;
@@ -68,7 +70,18 @@ export function warmMoonPipeline(stream: StreamResponse | undefined, segments = 
   const match = src.match(/^(https?:\/\/[^/]+)\/proxy\/moon\/([^/?#]+)\/m3u8/i);
   if (!match) return false;
 
-  const warmUrl = `${match[1]}/proxy/moon/${match[2]}/warm?segments=${Math.max(1, Math.min(6, segments))}`;
+  const now = Date.now();
+  const cacheKey = `${match[1]}:${match[2]}`;
+  const warmedAt = warmedMoon.get(cacheKey) || 0;
+  if (now - warmedAt < MOON_WARM_TTL) return true;
+  warmedMoon.set(cacheKey, now);
+  if (warmedMoon.size > 80) {
+    for (const [key, timestamp] of warmedMoon) {
+      if (now - timestamp > MOON_WARM_TTL) warmedMoon.delete(key);
+    }
+  }
+
+  const warmUrl = `${match[1]}/proxy/moon/${match[2]}/warm?segments=${Math.max(1, Math.min(2, segments))}`;
   void fetch(warmUrl, {
     method: "GET",
     cache: "no-store",
