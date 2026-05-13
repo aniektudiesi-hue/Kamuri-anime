@@ -1069,6 +1069,24 @@ export function VideoPlayer({
                         Caption preview
                       </div>
 
+                      <div className="grid grid-cols-2 gap-2">
+                        <CaptionSlider
+                          label="X position"
+                          value={captionSettings.x}
+                          min={7}
+                          max={93}
+                          suffix="%"
+                          onChange={(x) => setCaptionSettings((current) => ({ ...current, x }))}
+                        />
+                        <CaptionSlider
+                          label="Y position"
+                          value={captionSettings.y}
+                          min={8}
+                          max={90}
+                          suffix="%"
+                          onChange={(y) => setCaptionSettings((current) => ({ ...current, y }))}
+                        />
+                      </div>
                       <CaptionSlider
                         label="Size"
                         value={captionSettings.size}

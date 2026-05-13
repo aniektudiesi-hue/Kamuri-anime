@@ -12,6 +12,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { historySocketUrl } from "@/lib/history-realtime";
+import { clearCachedStream } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
 import type { Anime, StreamResponse } from "@/lib/types";
 import { posterOf, progressOf, rememberedAnime, titleOf } from "@/lib/utils";
@@ -32,6 +33,12 @@ function fetchServer(id: ServerId, malId: string, ep: string, type: "sub" | "dub
   if (id === "mega") return api.stream(malId, ep, type);
   if (id === "moon") return api.moon(malId, ep);
   return api.hd1(malId, ep);
+}
+
+function streamCacheKey(id: ServerId, malId: string, ep: string, type: "sub" | "dub") {
+  if (id === "mega") return `mega:${malId}:${ep}:${type}`;
+  if (id === "moon") return `moon:${malId}:${ep}`;
+  return `hd1:${malId}:${ep}`;
 }
 
 function getPlayed(malId: string): number[] {
@@ -281,6 +288,13 @@ export default function WatchPage({
   const nextHref = hasNext ? `/watch/${malId}/${episodeNum + 1}` : undefined;
   const displayTitle = animeTitle === "Untitled" ? `Anime ${malId}` : animeTitle;
 
+  function handlePlayerFatalError() {
+    if (!activeServerId) return;
+    clearCachedStream(streamCacheKey(activeServerId, malId, episode, type));
+    const index = SERVERS.findIndex((s) => s.id === activeServerId);
+    streamQueries[index]?.refetch();
+  }
+
   useEffect(() => {
     const id = window.setTimeout(() => {
       setServer("mega");
@@ -367,6 +381,7 @@ export default function WatchPage({
                 deepBuffer={settings.autoFetchWhileWatching}
                 nextHref={nextHref}
                 onProgress={saveWatchProgress}
+                onFatalError={handlePlayerFatalError}
               />
             )}
 

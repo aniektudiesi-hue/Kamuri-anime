@@ -1,7 +1,7 @@
 import type { StreamResponse } from "./types";
 
 const STREAM_CACHE_PREFIX = "anime-tv-stream-meta:";
-const STREAM_CACHE_TTL = 1000 * 60 * 25;
+const STREAM_CACHE_TTL = 1000 * 60 * 3;
 const warmedManifests = new Set<string>();
 
 type CachedStream = {
@@ -32,6 +32,14 @@ export function writeCachedStream(key: string, value: StreamResponse) {
     );
   } catch {
     // Cache writes are opportunistic.
+  }
+}
+
+export function clearCachedStream(key: string) {
+  try {
+    window.sessionStorage.removeItem(STREAM_CACHE_PREFIX + key);
+  } catch {
+    // Cache clears are opportunistic.
   }
 }
 

@@ -94,20 +94,23 @@ export function AdminDashboard() {
   });
   const users = useQuery({
     queryKey: ["admin", "users", token, adminKey],
-    queryFn: () => api.adminUsers(token!, adminKey, 250),
+    queryFn: () => api.adminUsers(token!, adminKey, 150),
     enabled: Boolean(token),
+    staleTime: 1000 * 20,
     retry: false,
   });
   const logins = useQuery({
     queryKey: ["admin", "logins", token, adminKey],
-    queryFn: () => api.adminLogins(token!, adminKey, 120),
+    queryFn: () => api.adminLogins(token!, adminKey, 80),
     enabled: Boolean(token),
+    staleTime: 1000 * 20,
     retry: false,
   });
   const visits = useQuery({
     queryKey: ["admin", "visits", token, adminKey],
-    queryFn: () => api.adminVisits(token!, adminKey, 160),
+    queryFn: () => api.adminVisits(token!, adminKey, 100),
     enabled: Boolean(token),
+    staleTime: 1000 * 20,
     retry: false,
   });
   const visibility = useQuery({
@@ -118,8 +121,9 @@ export function AdminDashboard() {
   });
   const activity = useQuery({
     queryKey: ["admin", "user-activity", token, adminKey, selectedUserId],
-    queryFn: () => api.adminUserActivity(token!, selectedUserId!, adminKey, 50),
+    queryFn: () => api.adminUserActivity(token!, selectedUserId!, adminKey, 500),
     enabled: Boolean(token && selectedUserId),
+    staleTime: 1000 * 15,
     retry: false,
   });
 
@@ -228,6 +232,7 @@ export function AdminDashboard() {
                     ["Joined", (row) => formatTime(row.created_at)],
                     ["Last seen", (row) => formatTime(row.last_seen_at)],
                     ["Last login", (row) => formatTime(row.last_login_at)],
+                    ["Last watched", (row) => formatTime(row.last_watched_at)],
                     ["Location", (row) => locationLabel(row)],
                     ["Device", (row) => text(row, "last_device", "-")],
                     ["IP", (row) => text(row, "last_ip", "-")],
@@ -363,6 +368,7 @@ function UserActivityPanel({
   const downloads = arrayFrom(data, "downloads");
   const logins = arrayFrom(data, "logins");
   const visits = arrayFrom(data, "visits");
+  const totals = objectFrom(data, "totals");
 
   return (
     <Panel
@@ -385,9 +391,9 @@ function UserActivityPanel({
             <MiniStat label="Username" value={text(selectedUser, "username", "-")} />
             <MiniStat label="Joined" value={formatTime(selectedUser.created_at)} />
             <MiniStat label="Last seen" value={formatTime(selectedUser.last_seen_at)} />
-            <MiniStat label="History" value={String(number(selectedUser, "history_count"))} />
-            <MiniStat label="Watchlist" value={String(number(selectedUser, "watchlist_count"))} />
-            <MiniStat label="Downloads" value={String(number(selectedUser, "downloads_count"))} />
+            <MiniStat label="History" value={String(number(totals, "history") || number(selectedUser, "history_count"))} />
+            <MiniStat label="Visits" value={String(number(totals, "visits") || visits.length)} />
+            <MiniStat label="Logins" value={String(number(totals, "logins") || logins.length)} />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
