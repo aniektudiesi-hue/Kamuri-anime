@@ -6,6 +6,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import type { Persister } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { AuthProvider } from "@/lib/auth";
+import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { makeQueryClient } from "@/lib/query";
 import { SettingsProvider } from "@/lib/settings";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,7 +31,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <SettingsProvider>
           <AuthProvider>
-            <TooltipProvider>{children}</TooltipProvider>
+            <TooltipProvider>
+              <AnalyticsTracker />
+              {children}
+            </TooltipProvider>
           </AuthProvider>
         </SettingsProvider>
       </QueryClientProvider>
@@ -53,7 +57,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <SettingsProvider>
         <AuthProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider>
+            <AnalyticsTracker />
+            {children}
+          </TooltipProvider>
         </AuthProvider>
       </SettingsProvider>
     </PersistQueryClientProvider>

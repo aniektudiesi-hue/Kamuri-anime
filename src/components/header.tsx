@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Clock3, Download, Heart, LogOut, Menu, Moon, Repeat2, Sun, UserRound, Wifi } from "lucide-react";
+import { Clock3, Download, Heart, LogOut, Menu, Moon, Repeat2, ShieldCheck, Sun, UserRound, Wifi } from "lucide-react";
 import { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export function Header() {
   const settings = useSettings();
   const [open, setOpen] = useState(false);
   const userInitial = (user?.username || user?.email || "U")[0].toUpperCase();
+  const isAdminOwner = (user?.username || "").trim().toLowerCase() === "kali";
 
   return (
     <header className="sticky top-0 z-50">
@@ -59,6 +60,7 @@ export function Header() {
             <HeaderIcon href="/history" label="Watch History" icon={<Clock3 size={18} />} />
             <HeaderIcon href="/watchlist" label="My Watchlist" icon={<Heart size={18} />} />
             <HeaderIcon href="/downloads" label="Downloads" icon={<Download size={18} />} />
+            {isAdminOwner ? <HeaderIcon href="/admin" label="Admin Control" icon={<ShieldCheck size={18} />} /> : null}
 
             {isLoggedIn ? (
               <Button
@@ -131,6 +133,9 @@ export function Header() {
                   <MobileLink href="/history" label="History" icon={<Clock3 size={16} />} close={() => setOpen(false)} />
                   <MobileLink href="/watchlist" label="Watchlist" icon={<Heart size={16} />} close={() => setOpen(false)} />
                   <MobileLink href="/downloads" label="Downloads" icon={<Download size={16} />} close={() => setOpen(false)} />
+                  {isAdminOwner ? (
+                    <MobileLink href="/admin" label="Admin Control" icon={<ShieldCheck size={16} />} close={() => setOpen(false)} />
+                  ) : null}
                   {isLoggedIn ? (
                     <MobileLink href="/login" label="Switch username" icon={<Repeat2 size={16} />} close={() => setOpen(false)} />
                   ) : null}

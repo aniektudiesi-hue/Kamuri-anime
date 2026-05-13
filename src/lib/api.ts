@@ -4,7 +4,7 @@ import { readCachedStream, writeCachedStream } from "./stream-cache";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
 
-type RequestOptions = RequestInit & { token?: string | null };
+type RequestOptions = RequestInit & { token?: string | null; adminKey?: string | null };
 
 function numberFrom(value: unknown, fallback = 0) {
   const number = Number(value);
@@ -46,6 +46,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   headers.set("Accept", "application/json");
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
+  if (options.adminKey) headers.set("X-Admin-Key", options.adminKey);
 
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 12_000);
@@ -112,4 +113,19 @@ export const api = {
   downloads: async (token: string) => listFromPayload<LibraryItem>(await request("/user/downloads", { token })),
   removeDownload: (token: string, malId: string, episode: string | number) =>
     request(`/user/downloads/${malId}/${episode}`, { method: "DELETE", token }),
+  trackVisit: async (body: { path: string; referrer?: string }, token?: string | null) => {
+    const headers = new Headers({ "Content-Type": "application/json", Accept: "application/json" });
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    await fetch(`${API_BASE}/analytics/visit`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).catch(() => undefined);
+  },
+  adminOverview: (token: string, adminKey?: string | null) => request<Record<string, unknown>>("/admin/overview", { token, adminKey }),
+  adminUsers: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/users", { token, adminKey }),
+  adminLogins: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/logins", { token, adminKey }),
+  adminVisits: (token: string, adminKey?: string | null) => request<{ items: Record<string, unknown>[] }>("/admin/visits", { token, adminKey }),
+  adminSearchVisibility: (token: string, adminKey?: string | null) => request<Record<string, unknown>>("/admin/search-visibility", { token, adminKey }),
 };
