@@ -37,7 +37,7 @@ function fetchServer(id: ServerId, malId: string, ep: string, type: "sub" | "dub
 
 function streamCacheKey(id: ServerId, malId: string, ep: string, type: "sub" | "dub") {
   if (id === "mega") return `mega:${malId}:${ep}:${type}`;
-  if (id === "moon") return `moon:${malId}:${ep}`;
+  if (id === "moon") return `moon-fast:${malId}:${ep}`;
   return `hd1:${malId}:${ep}`;
 }
 

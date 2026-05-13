@@ -4,7 +4,7 @@ const DESKTOP_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 const STREAM_API_PREFIXES = ["/api/stream/", "/api/moon/", "/api/hd1/"];
-const MOON_CACHE_TTL = 900;
+const MOON_CACHE_TTL = 1800;
 const MOON_SEGMENT_CACHE_TTL = 3600;
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -91,15 +91,20 @@ async function warmMoon(request, env, ctx) {
   const videoId = url.pathname.split("/")[3];
   if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
   const segments = clampInt(url.searchParams.get("segments"), 1, 6, 3);
-  ctx.waitUntil(warmMoonPipeline(videoId, env, segments));
+  const seededPlayback = moonSeedPlaybackFromUrl(url);
+  ctx.waitUntil(warmMoonPipeline(videoId, env, segments, seededPlayback));
   return json({ ok: true, video_id: videoId, warming: true, segments }, 202, cacheHeaders("no-store"));
 }
 
 async function proxyMoonM3u8(request, env, ctx) {
-  const videoId = new URL(request.url).pathname.split("/")[3];
+  const url = new URL(request.url);
+  const videoId = url.pathname.split("/")[3];
   if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
-  const variant = new URL(request.url).searchParams.get("variant");
-  const playback = await fetchMoonPlaybackCached(videoId);
+  const variant = url.searchParams.get("variant");
+  const fastStart = url.searchParams.get("fast") === "1" || url.searchParams.get("direct") === "1";
+  const seededPlayback = moonSeedPlaybackFromUrl(url);
+  if (seededPlayback) ctx.waitUntil(cacheMoonPlayback(videoId, seededPlayback));
+  const playback = seededPlayback || await fetchMoonPlaybackCached(videoId);
   const master = await fetchMoonTextCached(playback.url, env, `moon-master:${videoId}`);
 
   if (variant) {
@@ -118,8 +123,49 @@ async function proxyMoonM3u8(request, env, ctx) {
     });
   }
 
-  ctx.waitUntil(warmMoonPipeline(videoId, env, 3, playback, master.text));
-  const rewritten = rewriteMoonMaster(master.text, playback.url, new URL(request.url).origin, videoId);
+  if (fastStart) {
+    const variantUrl = firstMoonVariantUrl(master.text, playback.url);
+    if (variantUrl) {
+      const fastVariant = new URL(variantUrl).pathname.split("/").pop() || "index-v1-a1.m3u8";
+      const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${fastVariant}`);
+      ctx.waitUntil(warmMoonSegments(videoId, fastVariant, child.text, variantUrl, env, 6));
+      const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, url.origin, videoId, fastVariant);
+      return new Response(rewrittenChild, {
+        status: 200,
+        headers: {
+          ...corsHeaders(),
+          "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
+          "cache-control": "public, max-age=60, stale-while-revalidate=300",
+        },
+      });
+    }
+    const directVariant = "direct.m3u8";
+    ctx.waitUntil(warmMoonSegments(videoId, directVariant, master.text, playback.url, env, 6));
+    const rewrittenDirect = rewriteMoonVariant(master.text, playback.url, url.origin, videoId, directVariant);
+    return new Response(rewrittenDirect, {
+      status: 200,
+      headers: {
+        ...corsHeaders(),
+        "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
+        "cache-control": "public, max-age=60, stale-while-revalidate=300",
+      },
+    });
+  }
+
+  ctx.waitUntil(warmMoonPipeline(videoId, env, 6, playback, master.text));
+  if (!firstMoonVariantUrl(master.text, playback.url)) {
+    const directVariant = "direct.m3u8";
+    const rewrittenDirect = rewriteMoonVariant(master.text, playback.url, url.origin, videoId, directVariant);
+    return new Response(rewrittenDirect, {
+      status: 200,
+      headers: {
+        ...corsHeaders(),
+        "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
+        "cache-control": "public, max-age=60, stale-while-revalidate=300",
+      },
+    });
+  }
+  const rewritten = rewriteMoonMaster(master.text, playback.url, url.origin, videoId);
   return new Response(rewritten, {
     status: 200,
     headers: {
@@ -308,7 +354,7 @@ async function fetchMoonText(url, env) {
   const upstream = await fetch(url, {
     headers: upstreamHeaders(url, env),
     redirect: "follow",
-    cf: { cacheTtl: 0, cacheEverything: false },
+    cf: { cacheTtl: MOON_CACHE_TTL, cacheEverything: true },
   });
   const text = await upstream.text();
   if (!upstream.ok) throw new Error(`Moon CDN ${upstream.status}: ${text.slice(0, 80)}`);
@@ -324,10 +370,17 @@ async function fetchMoonPlaybackCached(videoId, fresh = false) {
   }
 
   const playback = await fetchMoonPlayback(videoId);
-  await cache.put(key, new Response(JSON.stringify(playback), {
-    headers: { "cache-control": `public, max-age=${MOON_CACHE_TTL}` },
-  }));
+  await cacheMoonPlayback(videoId, playback);
   return playback;
+}
+
+async function cacheMoonPlayback(videoId, playback) {
+  await caches.default.put(moonCacheRequest(`playback:${videoId}`), new Response(JSON.stringify(playback), {
+    headers: {
+      "cache-control": `public, max-age=${MOON_CACHE_TTL}`,
+      "content-type": "application/json; charset=utf-8",
+    },
+  }));
 }
 
 async function fetchMoonTextCached(url, env, cacheId, fresh = false) {
@@ -412,6 +465,25 @@ function moonResourceCacheRequest(videoId, variant, segment, range = "") {
 
 async function matchMoonResourceCache(videoId, variant, segment, range = "") {
   return caches.default.match(moonResourceCacheRequest(videoId, variant, segment, range));
+}
+
+function moonSeedPlaybackFromUrl(url) {
+  const raw = url.searchParams.get("src") || url.searchParams.get("source") || "";
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw);
+    if ((parsed.protocol !== "https:" && parsed.protocol !== "http:") || !isAllowedMoonSourceHost(parsed.hostname)) {
+      return null;
+    }
+    return { url: parsed.toString() };
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedMoonSourceHost(hostname) {
+  const host = hostname.toLowerCase();
+  return host.includes("r66nv9ed.com") || host.includes("sprintcdn") || host.includes("bysesayeveum.com") || host.includes("398fitus.com");
 }
 
 function moonCacheableResponse(response, ttl) {

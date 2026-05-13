@@ -94,7 +94,7 @@ export const api = {
   stream: (malId: string, episode: string | number, type: "sub" | "dub") =>
     cachedStreamRequest(`mega:${malId}:${episode}:${type}`, `/api/stream/${malId}/${episode}?type=${type}&embed=false`),
   moon: (malId: string, episode: string | number) =>
-    cachedStreamRequest(`moon:${malId}:${episode}`, `/api/moon/${malId}/${episode}`),
+    cachedStreamRequest(`moon-fast:${malId}:${episode}`, `/api/moon/${malId}/${episode}`),
   hd1: (malId: string, episode: string | number) =>
     cachedStreamRequest(`hd1:${malId}:${episode}`, `/api/hd1/${malId}/${episode}`),
   login: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
