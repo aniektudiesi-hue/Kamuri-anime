@@ -868,7 +868,7 @@ export function VideoPlayer({
       {/* Captions */}
       {captionsOn && displayedCaption ? (
         <div
-          className="anime-caption-wrap absolute z-20 flex justify-center"
+          className="anime-caption-wrap pointer-events-none absolute z-40 flex justify-center"
           style={{
             left: `${captionSettings.x}%`,
             top: `${captionSettings.y}%`,
@@ -876,7 +876,7 @@ export function VideoPlayer({
           }}
         >
           <p
-            className="anime-caption-text max-w-5xl whitespace-pre-line text-center text-white"
+            className="anime-caption-text pointer-events-auto max-w-5xl whitespace-pre-line text-center text-white"
             onPointerDown={handleCaptionPointerDown}
             onPointerMove={handleCaptionPointerMove}
             onPointerUp={stopCaptionDrag}

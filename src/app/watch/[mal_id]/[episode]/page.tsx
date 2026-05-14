@@ -89,9 +89,13 @@ export default function WatchPage({
     })),
   });
 
-  const playableServers = STREAM_PROVIDERS.filter(
-    (provider, i) => hasPlayableStream(streamQueries[i]?.data),
-  );
+  const megaQuery = streamQueries[streamProviderIndex(DEFAULT_STREAM_PROVIDER_ID)];
+  const megaHasPlayableStream = hasPlayableStream(megaQuery?.data);
+  const showAudioControls = megaHasPlayableStream;
+  const playableServers = STREAM_PROVIDERS.filter((provider, i) => {
+    if (type === "dub") return provider.id === DEFAULT_STREAM_PROVIDER_ID && hasPlayableStream(streamQueries[i]?.data);
+    return hasPlayableStream(streamQueries[i]?.data);
+  });
   const availableServers = playableServers;
   const selectedServer = availableServers.find((s) => s.id === server) ?? availableServers[0];
   const selectedStream = selectedServer
@@ -99,7 +103,6 @@ export default function WatchPage({
     : undefined;
   const selectedStreamForPlayer = selectedStream;
   const activeServerId = selectedServer?.id;
-  const megaQuery = streamQueries[streamProviderIndex(DEFAULT_STREAM_PROVIDER_ID)];
   const selectedQueryIndex = selectedServer ? streamProviderIndex(selectedServer.id) : 0;
   const selectedQuery = streamQueries[selectedQueryIndex];
   const availableServerIds = availableServers.map((s) => s.id).join("|");
@@ -143,6 +146,11 @@ export default function WatchPage({
 
   const animeTitle = titleOf(displayAnime);
   const animePoster = posterOf(displayAnime);
+  const blockedAdultShow = isAdultRestrictedAnime(displayAnime);
+  const noStreamTitle = blockedAdultShow ? "This title is not available here." : "Episode not available yet.";
+  const noStreamMessage = blockedAdultShow
+    ? "We do not stream 18+ restricted anime on animeTv."
+    : "This episode is not available on our servers yet. Please try again later.";
 
   useEffect(() => {
     if (titleOf(displayAnime) !== "Untitled") {
@@ -307,12 +315,19 @@ export default function WatchPage({
   const displayTitle = animeTitle === "Untitled" ? `Anime ${malId}` : animeTitle;
 
   useEffect(() => {
+    if (type === "dub" && megaHasPlayableStream && server !== DEFAULT_STREAM_PROVIDER_ID) {
+      setServer(DEFAULT_STREAM_PROVIDER_ID);
+      return;
+    }
+    if (type === "dub" && allSettled && !megaHasPlayableStream) {
+      setType("sub");
+      return;
+    }
     if (!firstAvailableServerId) return;
-    if (server === DEFAULT_STREAM_PROVIDER_ID && type === "dub" && !megaQuery?.isError && !hasPlayableStream(megaQuery?.data)) return;
     if (!availableServerIds.split("|").includes(server)) {
       setServer(firstAvailableServerId);
     }
-  }, [availableServerIds, firstAvailableServerId, megaQuery?.data, megaQuery?.isError, server, type]);
+  }, [allSettled, availableServerIds, firstAvailableServerId, megaHasPlayableStream, server, type]);
 
   useEffect(() => {
     STREAM_PROVIDERS.forEach((provider, index) => {
@@ -360,8 +375,8 @@ export default function WatchPage({
               <div className="grid aspect-video place-items-center border border-red-500/10 bg-red-950/10 text-center">
                 <div>
                   <AlertTriangle className="mx-auto mb-3 text-red-400" size={32} />
-                  <p className="font-bold text-white">No streams available right now.</p>
-                  <p className="mt-1 text-sm text-white/35">All servers are offline for this episode. Please try again.</p>
+                  <p className="font-bold text-white">{noStreamTitle}</p>
+                  <p className="mt-1 text-sm text-white/35">{noStreamMessage}</p>
                   <button
                     onClick={() => streamQueries.forEach((q) => q.refetch())}
                     className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-white/[0.07] px-5 py-2.5 text-sm font-bold text-white hover:bg-white/10 transition-colors"
@@ -442,7 +457,7 @@ export default function WatchPage({
             </div>
 
             {/* Server + Audio bar */}
-            <div className={`mt-3 grid gap-3 ${activeServerId === DEFAULT_STREAM_PROVIDER_ID ? "xl:grid-cols-[1fr_auto_auto]" : "xl:grid-cols-[1fr_auto]"}`}>
+            <div className={`mt-3 grid gap-3 ${showAudioControls && activeServerId === DEFAULT_STREAM_PROVIDER_ID ? "xl:grid-cols-[1fr_auto_auto]" : "xl:grid-cols-[1fr_auto]"}`}>
               {/* Servers */}
               <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3.5">
                 <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-white/25">Stream Server</p>
@@ -511,25 +526,29 @@ export default function WatchPage({
                 </div>
               </div>
 
-              {/* Audio */}
-              <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3.5">
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">Audio Track</p>
-                <div className="flex gap-2">
-                  {(["sub", "dub"] as const).map((a) => (
-                    <button
-                      key={a}
-                      onClick={() => { setType(a); setServer(DEFAULT_STREAM_PROVIDER_ID); }}
-                      className={`rounded-xl px-4 py-2 text-sm font-bold uppercase transition ${
-                        type === a
-                          ? "bg-[#cf2442] text-white shadow-lg shadow-[#cf2442]/20"
-                          : "border border-white/[0.07] bg-[#141828] text-white/40 hover:border-white/[0.14] hover:text-white"
-                      }`}
-                    >
-                      {a}
-                    </button>
-                  ))}
+              {showAudioControls ? (
+                <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3.5">
+                  <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">Audio Track</p>
+                  <div className="flex gap-2">
+                    {(["sub", "dub"] as const).map((a) => (
+                      <button
+                        key={a}
+                        onClick={() => {
+                          setType(a);
+                          if (a === "dub") setServer(DEFAULT_STREAM_PROVIDER_ID);
+                        }}
+                        className={`rounded-xl px-4 py-2 text-sm font-bold uppercase transition ${
+                          type === a
+                            ? "bg-[#cf2442] text-white shadow-lg shadow-[#cf2442]/20"
+                            : "border border-white/[0.07] bg-[#141828] text-white/40 hover:border-white/[0.14] hover:text-white"
+                        }`}
+                      >
+                        {a}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {activeServerId === DEFAULT_STREAM_PROVIDER_ID ? (
                 <EpisodeDownloadButton
@@ -579,6 +598,28 @@ export default function WatchPage({
 }
 
 const RANGE_SIZE = 100;
+
+function isAdultRestrictedAnime(anime: Anime | undefined) {
+  if (!anime) return false;
+  const record = anime as Anime & Record<string, unknown>;
+  const values = [
+    record.rating,
+    record.rated,
+    record.age_rating,
+    record.certification,
+    record.content_rating,
+    record.genres,
+    record.themes,
+    record.demographics,
+  ];
+
+  return values.some((value) => {
+    const text = Array.isArray(value)
+      ? value.map((item) => (typeof item === "string" ? item : JSON.stringify(item))).join(" ")
+      : String(value ?? "");
+    return /\b(rx|r\+|18\+|adult|hentai|ecchi)\b/i.test(text);
+  });
+}
 
 function getRanges(total: number) {
   if (total <= RANGE_SIZE) return [];
