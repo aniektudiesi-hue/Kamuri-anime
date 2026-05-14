@@ -10,20 +10,21 @@ import { animeId, posterOf, titleOf } from "@/lib/utils";
 
 export const revalidate = 900;
 export const metadata = buildPageMetadata({
-  title: "Anime Release Schedule",
-  description: "See this week's anime release schedule and upcoming airing episodes on animeTv.",
+  title: "Monthly Anime Release Schedule",
+  description: "See this month's anime release schedule and upcoming airing episodes on animeTv.",
   path: "/schedule",
 });
 
 export default async function SchedulePage() {
   const { schedule } = await getHomeInitialData();
   const grouped = groupByDay(schedule);
+  const monthLabel = new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" }).format(new Date());
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: `Anime Release Schedule on ${SITE_NAME}`,
+    name: `${monthLabel} Anime Release Schedule on ${SITE_NAME}`,
     url: absoluteUrl("/schedule"),
-    description: "Weekly anime airing schedule with episode links and release times.",
+    description: "Monthly anime airing schedule with episode links and release times.",
   };
 
   return (
@@ -33,13 +34,13 @@ export default async function SchedulePage() {
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }} />
           <header className="mb-7 max-w-3xl">
             <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-[#cf2442]">
-              Weekly schedule
+              Monthly schedule
             </p>
             <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl">
-              Anime Release Schedule
+              {monthLabel} Anime Release Schedule
             </h1>
             <p className="mt-3 text-sm leading-6 text-white/46 sm:text-base">
-              Follow upcoming anime episodes by day. This page gives Google and viewers a crawlable schedule for airing anime.
+              Follow every known airing episode for the current month. This schedule refreshes automatically as the month changes.
             </p>
           </header>
 

@@ -237,7 +237,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
   return (
     <section className="content-visibility-auto border-t border-white/[0.05] py-6">
       <SectionHeader
-        title="Airing Schedule"
+        title="Monthly Airing Schedule"
         icon={<CalendarDays size={14} className="text-[#cf2442]" />}
         count={items.length}
       />
@@ -347,7 +347,7 @@ function HomeSeoSection() {
         </h2>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-white/44">
           animeTv helps viewers find free anime, subbed anime, dubbed anime, Hindi anime searches, top rated shows,
-          newly released episodes, and weekly airing schedules from one clean streaming interface. Browse titles,
+            newly released episodes, and monthly airing schedules from one clean streaming interface. Browse titles,
           open anime detail pages, continue from watch history, and switch between available servers quickly.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">

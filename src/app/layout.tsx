@@ -76,7 +76,7 @@ const websiteJsonLd = {
     "dubbed anime",
     "Hindi anime search",
     "new anime releases",
-    "weekly anime schedule",
+    "monthly anime schedule",
   ],
   potentialAction: {
     "@type": "SearchAction",

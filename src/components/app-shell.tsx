@@ -130,7 +130,7 @@ function Footer() {
         <div className="mt-5 border-t border-white/[0.04] pt-5">
           <p className="max-w-4xl text-[12px] leading-6 text-white/24">
             Popular anime pages on animeTv include currently airing anime, new release anime, top rated anime, anime genres,
-            free anime streaming, Hindi anime discovery, dubbed anime, and a weekly anime release schedule. These internal links help viewers and search engines discover the site naturally.
+            free anime streaming, Hindi anime discovery, dubbed anime, and a monthly anime release schedule. These internal links help viewers and search engines discover the site naturally.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {[

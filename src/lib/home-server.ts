@@ -4,7 +4,8 @@ import { listFromPayload } from "./utils";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
 const ANILIST_URL = "https://graphql.anilist.co";
 const HOME_REVALIDATE_SECONDS = 30 * 60;
-const SCHEDULE_REVALIDATE_SECONDS = 15 * 60;
+const SCHEDULE_REVALIDATE_SECONDS = 6 * 60 * 60;
+const MONTHLY_SCHEDULE_MAX_PAGES = 10;
 
 type AniListMedia = {
   idMal: number | null;
@@ -38,7 +39,7 @@ export async function getHomeInitialData(): Promise<HomeInitialData> {
     fetchHomeList("/home/thumbnails"),
     fetchHomeList("/home/recently-added", 15 * 60),
     fetchHomeList("/home/top-rated"),
-    fetchWeeklyAiringSchedule(),
+    fetchMonthlyAiringSchedule(),
   ]);
 
   return {
@@ -46,7 +47,7 @@ export async function getHomeInitialData(): Promise<HomeInitialData> {
     thumbnails: thumbnails.slice(0, 24),
     recent: recent.slice(0, 24),
     topRated: topRated.slice(0, 24),
-    schedule: schedule.slice(0, 72),
+    schedule,
     generatedAt: new Date().toISOString(),
   };
 }
@@ -62,13 +63,13 @@ async function fetchHomeList(path: string, revalidate = HOME_REVALIDATE_SECONDS)
   }, []);
 }
 
-async function fetchWeeklyAiringSchedule(): Promise<AiringScheduleItem[]> {
+async function fetchMonthlyAiringSchedule(): Promise<AiringScheduleItem[]> {
   return safeJson(async () => {
-    const now = Date.now();
-    const start = Math.floor((now - 12 * 60 * 60 * 1000) / 1000);
-    const end = Math.floor((now + 8 * 24 * 60 * 60 * 1000) / 1000);
+    const now = new Date();
+    const start = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0) / 1000) - 1;
+    const end = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0) / 1000);
     const query = `
-      query WeeklySchedule($page: Int!, $perPage: Int!, $start: Int!, $end: Int!) {
+      query MonthlySchedule($page: Int!, $perPage: Int!, $start: Int!, $end: Int!) {
         Page(page: $page, perPage: $perPage) {
           pageInfo { hasNextPage }
           airingSchedules(airingAt_greater: $start, airingAt_lesser: $end, sort: TIME) {
@@ -87,21 +88,22 @@ async function fetchWeeklyAiringSchedule(): Promise<AiringScheduleItem[]> {
       }
     `;
 
-    const pages = await Promise.all(
-      [1, 2, 3, 4].map(async (page) => {
-        const response = await timedFetch(ANILIST_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ query, variables: { page, perPage: 50, start, end } }),
-          next: { revalidate: SCHEDULE_REVALIDATE_SECONDS },
-        });
-        if (!response.ok) return [];
-        const json = await response.json() as {
-          data?: { Page?: { airingSchedules?: AniListSchedule[] } };
-        };
-        return json.data?.Page?.airingSchedules ?? [];
-      }),
-    );
+    const pages: AniListSchedule[][] = [];
+    for (let page = 1; page <= MONTHLY_SCHEDULE_MAX_PAGES; page += 1) {
+      const response = await timedFetch(ANILIST_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ query, variables: { page, perPage: 50, start, end } }),
+        next: { revalidate: SCHEDULE_REVALIDATE_SECONDS },
+      });
+      if (!response.ok) break;
+      const json = await response.json() as {
+        data?: { Page?: { pageInfo?: { hasNextPage?: boolean }; airingSchedules?: AniListSchedule[] } };
+      };
+      const pageData = json.data?.Page;
+      pages.push(pageData?.airingSchedules ?? []);
+      if (!pageData?.pageInfo?.hasNextPage) break;
+    }
 
     const seen = new Set<string>();
     return pages
