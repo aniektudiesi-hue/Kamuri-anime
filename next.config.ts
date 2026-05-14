@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost", "10.88.55.120"],
   images: {
+    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "cdn.animetvplus.xyz" },
       { protocol: "https", hostname: "anime-tv-stream-proxy.kamuri-anime.workers.dev" },
