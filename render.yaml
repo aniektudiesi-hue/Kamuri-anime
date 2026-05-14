@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: animetvplus-frontend
+    runtime: node
+    plan: free
+    region: oregon
+    branch: master
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- -H 0.0.0.0 -p $PORT
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://anime-search-api-burw.onrender.com
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
