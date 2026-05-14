@@ -104,6 +104,7 @@ export function VideoPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [captionSettingsOpen, setCaptionSettingsOpen] = useState(false);
+  const [captionEditUnlocked, setCaptionEditUnlocked] = useState(false);
   const [captionSettings, setCaptionSettings] = useState<CaptionSettings>(DEFAULT_CAPTION_SETTINGS);
   const [pipSupported, setPipSupported] = useState(false);
   const [pipActive, setPipActive] = useState(false);
@@ -259,12 +260,13 @@ export function VideoPlayer({
   }, []);
 
   const handleCaptionPointerDown = useCallback((event: PointerEvent<HTMLParagraphElement>) => {
+    if (!captionEditUnlocked) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     captionDragRef.current = true;
     updateCaptionPosition(event.clientX, event.clientY);
-  }, [updateCaptionPosition]);
+  }, [captionEditUnlocked, updateCaptionPosition]);
 
   const handleCaptionPointerMove = useCallback((event: PointerEvent<HTMLParagraphElement>) => {
     if (!captionDragRef.current) return;
@@ -876,7 +878,7 @@ export function VideoPlayer({
           }}
         >
           <p
-            className="anime-caption-text pointer-events-auto max-w-5xl whitespace-pre-line text-center text-white"
+            className={`anime-caption-text max-w-5xl whitespace-pre-line text-center text-white ${captionEditUnlocked ? "anime-caption-editable pointer-events-auto" : "pointer-events-none"}`}
             onPointerDown={handleCaptionPointerDown}
             onPointerMove={handleCaptionPointerMove}
             onPointerUp={stopCaptionDrag}
@@ -1106,7 +1108,11 @@ export function VideoPlayer({
                   aria-label="Caption settings"
                   aria-expanded={captionSettingsOpen}
                   onClick={() => {
-                    setCaptionSettingsOpen((value) => !value);
+                    setCaptionSettingsOpen((value) => {
+                      const next = !value;
+                      setCaptionEditUnlocked(next);
+                      return next;
+                    });
                     setShowSpeedMenu(false);
                     setShowQualityMenu(false);
                     setCaptionsOn(true);
@@ -1121,11 +1127,17 @@ export function VideoPlayer({
                 </button>
                 {captionSettingsOpen ? (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setCaptionSettingsOpen(false)} />
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => {
+                        setCaptionSettingsOpen(false);
+                        setCaptionEditUnlocked(false);
+                      }}
+                    />
                     <div className="fixed inset-x-3 bottom-20 z-50 overflow-hidden rounded-2xl border border-white/15 bg-black/95 p-3 shadow-2xl sm:absolute sm:bottom-full sm:right-0 sm:left-auto sm:mb-2 sm:w-[280px]">
                       <div className="mb-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Captions</p>
-                        <p className="mt-1 text-xs text-white/42">Live preview is on the video. Drag it where you want.</p>
+                        <p className="mt-1 text-xs text-white/42">Drag is unlocked. Move captions on the video, then save to lock them.</p>
                       </div>
 
                       <div
@@ -1214,7 +1226,7 @@ export function VideoPlayer({
                         onChange={(transparency) => setCaptionSettings((current) => ({ ...current, boxOpacity: (100 - transparency) / 100 }))}
                       />
 
-                      <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="mt-3 grid grid-cols-3 gap-2">
                         <button
                           type="button"
                           onClick={() => setCaptionSettings(DEFAULT_CAPTION_SETTINGS)}
@@ -1228,6 +1240,17 @@ export function VideoPlayer({
                           className="h-9 rounded-xl bg-[#cf2442] text-xs font-black text-white hover:bg-[#dc2d4b]"
                         >
                           Smart position
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.localStorage.setItem(CAPTION_SETTINGS_KEY, JSON.stringify(captionSettings));
+                            setCaptionSettingsOpen(false);
+                            setCaptionEditUnlocked(false);
+                          }}
+                          className="h-9 rounded-xl bg-white text-xs font-black text-black hover:bg-white/90"
+                        >
+                          Save
                         </button>
                       </div>
                     </div>
