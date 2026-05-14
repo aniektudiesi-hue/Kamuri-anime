@@ -331,7 +331,6 @@ function PosterFallback({ title }: { title: string }) {
 function HomeSeoSection() {
   const links = [
     { label: "Watch free anime online", href: "/free-anime" },
-    { label: "Hindi anime discovery", href: "/hindi-anime" },
     { label: "New anime releases", href: "/new-releases" },
     { label: "Currently airing anime", href: "/airing" },
     { label: "Top rated anime", href: "/top-rated" },
@@ -346,7 +345,7 @@ function HomeSeoSection() {
           Watch anime online with fast browsing, HD playback, and fresh episode discovery.
         </h2>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-white/44">
-          animeTv helps viewers find free anime, subbed anime, dubbed anime, Hindi anime searches, top rated shows,
+          animeTv helps viewers find free anime, subbed anime, dubbed anime, top rated shows,
             newly released episodes, and monthly airing schedules from one clean streaming interface. Browse titles,
           open anime detail pages, continue from watch history, and switch between available servers quickly.
         </p>

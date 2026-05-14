@@ -52,7 +52,6 @@ export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
                 { label: "Popular", href: "/popular" },
                 { label: "Top Rated", href: "/top-rated" },
                 { label: "Free Anime", href: "/free-anime" },
-                { label: "Hindi Anime", href: "/hindi-anime" },
                 { label: "Schedule", href: "/schedule" },
               ].map((link) => (
                 <Link
@@ -88,7 +87,7 @@ export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
             <h2 className="text-lg font-black text-white">Fast anime discovery on animeTv</h2>
             <p className="mt-2 text-sm leading-6 text-white/42">
               Browse anime with clear category pages, title pages, posters, ratings, episode lists, and weekly release links.
-              animeTv is built for quick discovery across free anime, subbed anime, dubbed anime, Hindi anime searches, new releases, and top rated shows.
+              animeTv is built for quick discovery across free anime, subbed anime, dubbed anime, new releases, and top rated shows.
             </p>
           </section>
         </div>

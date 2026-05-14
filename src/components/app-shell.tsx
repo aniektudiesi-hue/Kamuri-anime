@@ -62,7 +62,6 @@ function Footer() {
                 { label: "Top Rated", href: "/top-rated" },
                 { label: "Currently Airing", href: "/airing" },
                 { label: "Free Anime", href: "/free-anime" },
-                { label: "Hindi Anime", href: "/hindi-anime" },
                 { label: "Schedule", href: "/schedule" },
                 { label: "Movies", href: "/search?q=movie" },
               ].map((link) => (
@@ -130,7 +129,7 @@ function Footer() {
         <div className="mt-5 border-t border-white/[0.04] pt-5">
           <p className="max-w-4xl text-[12px] leading-6 text-white/24">
             Popular anime pages on animeTv include currently airing anime, new release anime, top rated anime, anime genres,
-            free anime streaming, Hindi anime discovery, dubbed anime, and a monthly anime release schedule. These internal links help viewers and search engines discover the site naturally.
+            free anime streaming, dubbed anime discovery, subbed anime, and a monthly anime release schedule. These internal links help viewers and search engines discover the site naturally.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {[
@@ -139,7 +138,6 @@ function Footer() {
               { label: "Currently Airing Anime", href: "/airing" },
               { label: "Top Rated Anime", href: "/top-rated" },
               { label: "Watch Free Anime", href: "/free-anime" },
-              { label: "Hindi Anime", href: "/hindi-anime" },
               { label: "Anime Schedule", href: "/schedule" },
             ].map((link) => (
               <Link

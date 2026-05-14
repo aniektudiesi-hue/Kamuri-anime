@@ -4,7 +4,7 @@ import { listFromPayload, rankAnimeForSearch } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
 
-export type SeoCategorySlug = "popular" | "new-releases" | "top-rated" | "airing" | "free-anime" | "hindi-anime";
+export type SeoCategorySlug = "popular" | "new-releases" | "top-rated" | "airing" | "free-anime";
 
 export type SeoCategory = {
   slug: SeoCategorySlug;
@@ -64,17 +64,6 @@ export const SEO_CATEGORIES: SeoCategory[] = [
       "Start with a fast, crawlable collection of popular anime, new episodes, and high-demand series for viewers who want free anime streaming without slow browsing.",
     sourceLabel: "Free anime picks",
   },
-  {
-    slug: "hindi-anime",
-    path: "/hindi-anime",
-    title: "Hindi Anime and Dubbed Anime",
-    eyebrow: "Hindi and dub",
-    description:
-      "Find Hindi anime searches, dubbed anime-friendly titles, subbed anime, and fast anime episode pages on animeTv.",
-    intro:
-      "Browse anime searches around Hindi anime, dubbed anime, and easy episode discovery. Availability depends on the current stream sources and title metadata.",
-    sourceLabel: "Hindi and dubbed anime discovery",
-  },
 ];
 
 export function getSeoCategory(slug: SeoCategorySlug) {
@@ -99,21 +88,6 @@ export async function getSeoCategoryAnime(slug: SeoCategorySlug) {
       fetchHomeList("/home/top-rated", 1800),
     ]);
     return rankAnimeForSearch(mergeAnimeSources(recent, popular, topRated), "airing").slice(0, 48);
-  }
-
-  if (slug === "hindi-anime") {
-    const intent = resolveDiscoveryIntent("hindi dubbed anime");
-    const [anilist, jikan, backendHindi, backendDub, recent] = await Promise.all([
-      fetchAniListDiscovery(intent, 1),
-      fetchJikanDiscovery(intent, 1),
-      fetchHomeList("/search/hindi", 1800),
-      fetchHomeList("/search/dub", 1800),
-      fetchHomeList("/home/recently-added", 900),
-    ]);
-    return rankAnimeForSearch(
-      mergeAnimeSources(backendHindi, backendDub, anilist.media, jikan.media, recent),
-      "hindi dub",
-    ).slice(0, 48);
   }
 
   const path =
