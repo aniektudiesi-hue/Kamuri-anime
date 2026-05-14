@@ -293,7 +293,6 @@ function ScheduleCard({ item }: { item: AiringScheduleItem }) {
             sizes="72px"
             className="object-cover"
             onError={() => setImageFailed(true)}
-            unoptimized
           />
         ) : (
           <PosterFallback title={title} />

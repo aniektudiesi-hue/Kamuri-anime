@@ -107,6 +107,8 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://anime-search-api-burw.onrender.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://anime-search-api-burw.onrender.com" />
+        <link rel="preconnect" href="https://anime-tv-stream-proxy.kamuri-anime.workers.dev" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://cdn.animetvplus.xyz" />
         <link rel="preconnect" href="https://s4.anilist.co" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://cdn.myanimelist.net" />
       </head>

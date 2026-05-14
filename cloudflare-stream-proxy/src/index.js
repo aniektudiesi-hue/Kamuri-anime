@@ -6,6 +6,7 @@ const DESKTOP_UA =
 const STREAM_API_PREFIXES = ["/api/stream/", "/api/moon/", "/api/hd1/"];
 const MOON_CACHE_TTL = 1800;
 const MOON_SEGMENT_CACHE_TTL = 3600;
+const IMAGE_CACHE_TTL = 60 * 60 * 24 * 30;
 const moonInflight = new Map();
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -25,6 +26,7 @@ const worker = {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/health") return json({ ok: true, worker: "anime-tv-stream-proxy" });
+      if (url.pathname === "/image") return await proxyImage(request);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/warm")) return await warmMoon(request, env, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return await proxyMoonM3u8(request, env, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/chunk")) return await proxyMoonChunk(request, env, ctx);
@@ -64,6 +66,47 @@ async function proxyOrigin(request, env) {
   }
 
   return withCors(response, STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)));
+}
+
+async function proxyImage(request) {
+  const url = new URL(request.url);
+  const src = url.searchParams.get("url") || url.searchParams.get("src") || "";
+  if (!src) return json({ error: "Missing image url" }, 400, cacheHeaders("no-store"));
+
+  const source = new URL(src);
+  if (source.protocol !== "https:" && source.protocol !== "http:") return json({ error: "Invalid image url" }, 400, cacheHeaders("no-store"));
+  if (!isAllowedImageHost(source.hostname)) return json({ error: "Image host not allowed" }, 403, cacheHeaders("no-store"));
+
+  const width = clampInt(url.searchParams.get("w"), 80, 1920, 480);
+  const quality = clampInt(url.searchParams.get("q"), 45, 95, 82);
+  const cacheKey = new Request(`${url.origin}/image-cache/${width}/${quality}/${encodeURIComponent(source.toString())}`);
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return withImageHeaders(cached);
+
+  const accept = request.headers.get("accept") || "";
+  const response = await fetch(source.toString(), {
+    headers: {
+      "accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+      "user-agent": DESKTOP_UA,
+      "referer": imageRefererFor(source.hostname),
+    },
+    redirect: "follow",
+    cf: {
+      cacheEverything: true,
+      cacheTtl: IMAGE_CACHE_TTL,
+      image: {
+        width,
+        quality,
+        fit: "scale-down",
+        format: accept.includes("image/avif") ? "avif" : "webp",
+      },
+    },
+  });
+
+  if (!response.ok) return upstreamError(response);
+  const cacheable = withImageHeaders(response);
+  await caches.default.put(cacheKey, cacheable.clone());
+  return cacheable;
 }
 
 async function proxyM3u8(request, env) {
@@ -776,6 +819,35 @@ function proxyPolicy(host, env) {
     return { referer: "https://9animetv.org.lv/", origin: "https://9animetv.org.lv", ua: DESKTOP_UA };
   }
   return { referer: `${env.MEGAPLAY_BASE}/`, origin: env.MEGAPLAY_BASE, ua: ANDROID_UA };
+}
+
+function isAllowedImageHost(hostname) {
+  const host = hostname.toLowerCase();
+  return [
+    "cdn.myanimelist.net",
+    "myanimelist.net",
+    "s4.anilist.co",
+    "media.kitsu.io",
+    "img.youtube.com",
+    "anime-search-api-burw.onrender.com",
+  ].some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+}
+
+function imageRefererFor(hostname) {
+  const host = hostname.toLowerCase();
+  if (host.includes("anilist")) return "https://anilist.co/";
+  if (host.includes("myanimelist")) return "https://myanimelist.net/";
+  if (host.includes("youtube")) return "https://www.youtube.com/";
+  return "https://animetvplus.xyz/";
+}
+
+function withImageHeaders(response) {
+  const headers = new Headers(response.headers);
+  headers.delete("set-cookie");
+  if (headers.get("vary") === "*") headers.delete("vary");
+  headers.set("access-control-allow-origin", "*");
+  headers.set("cache-control", `public, max-age=${IMAGE_CACHE_TTL}, stale-while-revalidate=${IMAGE_CACHE_TTL}`);
+  return new Response(response.body, { status: response.status, headers });
 }
 
 function streamUpstream(upstream, forcedContentType) {

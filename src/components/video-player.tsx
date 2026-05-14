@@ -821,9 +821,9 @@ export function VideoPlayer({
 
       {poster && !hasVideoFrame && !playbackError ? (
         <div className="pointer-events-none absolute inset-0 z-10 bg-black">
-          <Image src={poster} alt="" fill sizes="100vw" className="scale-105 object-cover opacity-80 blur-[1px]" unoptimized />
+          <Image src={poster} alt="" fill sizes="100vw" className="object-cover opacity-80" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/28 to-black/32" />
-          <div className="absolute inset-0 bg-black/12 backdrop-blur-[1px]" />
+          <div className="absolute inset-0 bg-black/12" />
         </div>
       ) : null}
 

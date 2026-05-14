@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { imageCdnUrl } from "./image-cdn";
 import type { Anime, LibraryItem } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
@@ -24,7 +25,7 @@ export function animeId(anime: Anime | undefined) {
 export function posterOf(anime: Anime | undefined) {
   const jpg = anime?.images?.jpg;
   const webp = anime?.images?.webp;
-  return (
+  return imageCdnUrl(
     anime?.poster ||
     anime?.image ||
     anime?.thumbnail ||
@@ -35,12 +36,13 @@ export function posterOf(anime: Anime | undefined) {
     jpg?.large_image_url ||
     webp?.image_url ||
     jpg?.image_url ||
-    ""
+    "",
+    "poster-md",
   );
 }
 
 export function bannerOf(anime: Anime | undefined) {
-  return anime?.banner || anime?.img_url || anime?.image || posterOf(anime);
+  return imageCdnUrl(anime?.banner || anime?.img_url || anime?.image || posterOf(anime), "banner-lg");
 }
 
 export function episodeCount(anime: Anime | undefined) {

@@ -81,6 +81,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
             alt=""
             fill
             priority
+            fetchPriority="high"
             quality={100}
             sizes="100vw"
             className="object-cover object-center opacity-72"
@@ -296,6 +297,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             alt=""
             fill
             priority={index === 0}
+            fetchPriority={index === 0 ? "high" : "auto"}
             loading={index === 0 ? undefined : "lazy"}
             quality={96}
             sizes="100vw"
