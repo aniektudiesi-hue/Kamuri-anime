@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Clock, TrendingUp, ChevronRight, Moon, Sun, Wifi } from "lucide-react";
+import { Star, Clock, TrendingUp, ChevronRight, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -63,27 +63,6 @@ export function Sidebar() {
             onChange={settings.setAutoResume}
             icon={<Clock size={13} />}
           />
-          <div className="rounded-xl bg-white/[0.04] p-2.5">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-white/55">Theme</span>
-          {settings.theme === "dark" ? <Moon size={13} className="text-white/35" /> : <Sun size={13} className="text-[#d8b56a]" />}
-            </div>
-            <div className="grid grid-cols-2 gap-1">
-              {(["dark", "light"] as const).map((theme) => (
-                <button
-                  key={theme}
-                  onClick={() => settings.setTheme(theme)}
-                  className={`h-8 rounded-lg text-xs font-bold capitalize transition ${
-                    settings.theme === theme
-            ? "bg-[#cf2442] text-white"
-                      : "bg-white/[0.05] text-white/35 hover:text-white"
-                  }`}
-                >
-                  {theme}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 

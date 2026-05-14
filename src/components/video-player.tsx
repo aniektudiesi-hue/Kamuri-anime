@@ -27,6 +27,15 @@ type CaptionSettings = {
   boxOpacity: number;
 };
 
+type WebKitFullscreenVideo = HTMLVideoElement & {
+  webkitEnterFullscreen?: () => void;
+};
+
+type LockableScreenOrientation = ScreenOrientation & {
+  lock?: (orientation: "landscape" | "portrait" | "any" | "natural") => Promise<void>;
+  unlock?: () => void;
+};
+
 const CAPTION_SETTINGS_KEY = "anime-tv-caption-settings-v1";
 const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
   x: 50,
@@ -557,13 +566,20 @@ export function VideoPlayer({
     setMuted(nextMuted);
   }, [muted]);
 
-  const fullscreen = useCallback(() => {
+  const fullscreen = useCallback(async () => {
     const container = containerRef.current;
+    const video = videoRef.current as WebKitFullscreenVideo | null;
     if (!container) return;
     if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => undefined);
+      await document.exitFullscreen().catch(() => undefined);
+      (screen.orientation as LockableScreenOrientation | undefined)?.unlock?.();
     } else {
-      container.requestFullscreen().catch(() => undefined);
+      try {
+        await container.requestFullscreen({ navigationUI: "hide" });
+        await (screen.orientation as LockableScreenOrientation | undefined)?.lock?.("landscape").catch(() => undefined);
+      } catch {
+        video?.webkitEnterFullscreen?.();
+      }
     }
   }, []);
 
@@ -800,7 +816,7 @@ export function VideoPlayer({
       ref={containerRef}
       tabIndex={0}
       aria-label={`Video player: ${title}`}
-      className="video-player-shell group relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/[0.095] bg-black shadow-[0_32px_110px_rgba(0,0,0,0.78)] outline-none ring-1 ring-white/[0.035] sm:aspect-video sm:rounded-[22px]"
+      className="video-player-shell group relative aspect-video w-full overflow-hidden rounded-xl border border-white/[0.095] bg-black shadow-[0_32px_110px_rgba(0,0,0,0.78)] outline-none ring-1 ring-white/[0.035] sm:rounded-[22px]"
       style={{ cursor: controlsOpen ? "default" : "none" }}
       onMouseMove={() => showControls()}
       onMouseLeave={() => {
@@ -974,7 +990,7 @@ export function VideoPlayer({
         {/* Gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/54 to-transparent pointer-events-none" />
 
-        <div className="relative px-3 pb-3 pt-10 sm:px-5 sm:pb-5">
+        <div className="relative px-2 pb-2 pt-8 sm:px-5 sm:pb-5 sm:pt-10">
           {/* Custom seek bar */}
           <div
             ref={seekBarRef}
@@ -983,7 +999,7 @@ export function VideoPlayer({
             aria-valuenow={Math.round(progress)}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="group/seek relative mb-3 h-1.5 cursor-pointer rounded-full bg-white/[0.16] transition-[height] duration-150 hover:h-[7px] sm:mb-4"
+            className="group/seek relative mb-2 h-1 cursor-pointer rounded-full bg-white/[0.16] transition-[height] duration-150 hover:h-[7px] sm:mb-4 sm:h-1.5"
             onPointerDown={handleSeekPointerDown}
             onPointerMove={handleSeekPointerMove}
           >
@@ -1011,14 +1027,14 @@ export function VideoPlayer({
           </div>
 
           {/* Control row */}
-          <div className="flex items-center gap-1.5 rounded-[24px] border border-white/[0.1] bg-black/50 px-2.5 py-2 shadow-[0_22px_70px_rgba(0,0,0,0.56)] backdrop-blur-2xl sm:gap-2">
+          <div className="flex items-center gap-1 rounded-2xl border border-white/[0.1] bg-black/50 px-1.5 py-1.5 shadow-[0_22px_70px_rgba(0,0,0,0.56)] backdrop-blur-2xl sm:gap-2 sm:rounded-[24px] sm:px-2.5 sm:py-2">
             {/* Play/Pause */}
             <button
               aria-label={playing ? "Pause" : "Play"}
               onClick={togglePlay}
               className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white transition-colors hover:bg-white/10 hover:text-white"
             >
-              {playing ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+              {playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
             </button>
 
             <button
@@ -1038,7 +1054,7 @@ export function VideoPlayer({
             </button>
 
             {/* Time */}
-            <span className="min-w-[76px] font-mono text-[11px] tabular-nums text-white/70 sm:min-w-[100px] sm:text-xs">
+            <span className="min-w-[62px] font-mono text-[10px] tabular-nums text-white/70 sm:min-w-[100px] sm:text-xs">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
 
@@ -1077,7 +1093,7 @@ export function VideoPlayer({
               disabled={subtitleCount === 0}
               onClick={() => subtitleCount > 0 && setCaptionsOn((v) => !v)}
               title={subtitleCount > 0 ? (captionsOn ? "Hide captions" : "Show captions") : "No captions for this server"}
-              className={`grid h-8 w-8 place-items-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
                 captionsOn && subtitleCount > 0 ? "bg-white/10 text-white" : "text-white/45 hover:bg-white/10 hover:text-white"
               }`}
             >
@@ -1097,7 +1113,7 @@ export function VideoPlayer({
                     showControls(true);
                   }}
                   title="Caption settings"
-                  className={`grid h-8 w-8 place-items-center rounded-xl transition-colors ${
+                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors ${
                     captionSettingsOpen ? "bg-white/10 text-white" : "text-white/55 hover:bg-white/10 hover:text-white"
                   }`}
                 >
@@ -1227,7 +1243,7 @@ export function VideoPlayer({
                 aria-expanded={showSpeedMenu}
                 onClick={() => { setShowSpeedMenu((v) => !v); setShowQualityMenu(false); setCaptionSettingsOpen(false); }}
                 title="Playback speed (< / >)"
-                className={`flex h-8 items-center gap-1 rounded-xl px-2 text-xs font-bold transition-colors ${
+                className={`hidden h-8 items-center gap-1 rounded-xl px-2 text-xs font-bold transition-colors min-[390px]:flex ${
                   showSpeedMenu || playbackRate !== 1
                     ? "bg-white/10 text-white"
                     : "text-white/60 hover:bg-white/10 hover:text-white"
@@ -1264,7 +1280,7 @@ export function VideoPlayer({
                 aria-label="Quality"
                 aria-expanded={showQualityMenu}
                 onClick={() => { setShowQualityMenu((v) => !v); setCaptionSettingsOpen(false); }}
-                className={`h-8 rounded-xl px-2 text-xs font-bold transition-colors ${
+                className={`hidden h-8 rounded-xl px-2 text-xs font-bold transition-colors min-[390px]:block ${
                   showQualityMenu || selectedQuality !== -1 || !hasSwitchableQuality
                     ? "bg-white/10 text-white"
                     : "text-white/60 hover:bg-white/10 hover:text-white"
@@ -1338,7 +1354,7 @@ export function VideoPlayer({
             <button
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               onClick={fullscreen}
-              className="grid h-8 w-8 place-items-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white"
             >
               {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
             </button>

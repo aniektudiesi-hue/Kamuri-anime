@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock3, Download, Heart, LogOut, Menu, Moon, Repeat2, Search, ShieldCheck, Sun, UserRound, Wifi } from "lucide-react";
+import { Clock3, Download, Heart, LogOut, Menu, Repeat2, Search, ShieldCheck, UserRound, Wifi } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -195,17 +195,6 @@ export function Header() {
                     checked={settings.autoResume}
                     onClick={() => settings.setAutoResume(!settings.autoResume)}
                   />
-                  <button
-                    type="button"
-                    onClick={() => settings.setTheme(settings.theme === "dark" ? "light" : "dark")}
-                    className="flex h-11 w-full items-center justify-between rounded-xl px-3 text-sm font-bold text-white/62 transition hover:bg-white/[0.055] hover:text-white"
-                  >
-                    <span className="flex items-center gap-3">
-                      {settings.theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
-                      {settings.theme === "dark" ? "Dark mode" : "Light mode"}
-                    </span>
-                    <span className="text-xs font-black text-[#f43f5e]">Switch</span>
-                  </button>
                 </div>
 
                 {!isLoggedIn ? (

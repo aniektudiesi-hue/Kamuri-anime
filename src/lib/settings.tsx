@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-type ThemeMode = "dark" | "light";
+type ThemeMode = "dark";
 
 type AppSettings = {
   autoFetchWhileWatching: boolean;
@@ -32,15 +32,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(SETTINGS_KEY);
-      if (saved) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) });
+      if (saved) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved), theme: "dark" });
     } catch {
       setSettings(DEFAULT_SETTINGS);
     }
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme;
-    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    document.documentElement.dataset.theme = "dark";
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, theme: "dark" }));
   }, [settings]);
 
   const value = useMemo<SettingsContextValue>(
@@ -50,7 +50,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setSettings((current) => ({ ...current, autoFetchWhileWatching })),
       setAutoResume: (autoResume) =>
         setSettings((current) => ({ ...current, autoResume })),
-      setTheme: (theme) => setSettings((current) => ({ ...current, theme })),
+      setTheme: () => setSettings((current) => ({ ...current, theme: "dark" })),
     }),
     [settings],
   );
