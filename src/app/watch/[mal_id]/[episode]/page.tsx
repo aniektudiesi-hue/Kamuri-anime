@@ -3,43 +3,32 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ChevronLeft, ChevronRight, RefreshCcw, Radio, Play } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, RefreshCcw, Radio, Play } from "lucide-react";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { EpisodeDownloadButton } from "@/components/episode-download-button";
 import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
+import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
 import { useAuth } from "@/lib/auth";
 import { historySocketUrl } from "@/lib/history-realtime";
-import { clearCachedStream, warmMoonPipeline, warmStreamManifest } from "@/lib/stream-cache";
+import { clearCachedStream } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
-import type { Anime, StreamResponse } from "@/lib/types";
-import { posterOf, progressOf, rememberedAnime, titleOf } from "@/lib/utils";
-
-const SERVERS = [
-  { id: "mega", label: "MegaPlay", desc: "Primary · Adaptive HLS" },
-  { id: "moon", label: "Moon", desc: "Backup · Fast CDN" },
-  { id: "hd1", label: "HD1", desc: "Alternate · Direct" },
-] as const;
-
-type ServerId = (typeof SERVERS)[number]["id"];
-
-function hasPlayableStream(data: StreamResponse | undefined) {
-  return Boolean(data?.m3u8_url || data?.url || data?.stream_url);
-}
-
-function fetchServer(id: ServerId, malId: string, ep: string, type: "sub" | "dub") {
-  if (id === "mega") return api.stream(malId, ep, type);
-  if (id === "moon") return api.moon(malId, ep);
-  return api.hd1(malId, ep);
-}
-
-function streamCacheKey(id: ServerId, malId: string, ep: string, type: "sub" | "dub") {
-  if (id === "mega") return `mega:${malId}:${ep}:${type}`;
-  if (id === "moon") return `moon-fast:${malId}:${ep}`;
-  return `hd1:${malId}:${ep}`;
-}
+import {
+  DEFAULT_STREAM_PROVIDER_ID,
+  STREAM_PROVIDERS,
+  fetchStreamProvider,
+  hasPlayableStream,
+  streamProviderCacheKey,
+  streamProviderIndex,
+  streamProviderQueryKey,
+  streamUrlOf,
+  warmStreamProvider,
+  type StreamProviderId,
+} from "@/lib/stream-providers";
+import type { Anime } from "@/lib/types";
+import { posterOf, progressOf, rememberAnime, rememberedAnime, titleOf } from "@/lib/utils";
 
 function getPlayed(malId: string): number[] {
   try { return JSON.parse(sessionStorage.getItem(`played_${malId}`) || "[]"); }
@@ -64,7 +53,8 @@ export default function WatchPage({
 }) {
   const { mal_id: malId, episode } = use(params);
   const { t } = use(searchParams);
-  const [server, setServer] = useState<ServerId>("mega");
+  const [server, setServer] = useState<StreamProviderId>(DEFAULT_STREAM_PROVIDER_ID);
+  const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [type, setType] = useState<"sub" | "dub">("sub");
   const [known, setKnown] = useState<Anime | undefined>();
   const [playedEps, setPlayedEps] = useState<number[]>([]);
@@ -89,32 +79,34 @@ export default function WatchPage({
   }, [episodeNum, malId]);
 
   const streamQueries = useQueries({
-    queries: SERVERS.map((s) => ({
-      queryKey: ["stream", malId, episode, s.id, s.id === "mega" ? type : "any"],
-      queryFn: () => fetchServer(s.id, malId, episode, type),
+    queries: STREAM_PROVIDERS.map((provider) => ({
+      queryKey: streamProviderQueryKey(provider, malId, episode, type),
+      queryFn: () => fetchStreamProvider(provider, { malId, episode, type }),
       enabled: Boolean(malId) && Number.isFinite(episodeNum),
-      retry: s.id === "moon" ? 1 : false,
+      retry: provider.retry,
       staleTime: 1000 * 60 * 25,
       gcTime: 1000 * 60 * 120,
     })),
   });
 
-  const playableServers = SERVERS.filter(
-    (s, i) => hasPlayableStream(streamQueries[i]?.data),
+  const playableServers = STREAM_PROVIDERS.filter(
+    (provider, i) => hasPlayableStream(streamQueries[i]?.data),
   );
   const availableServers = playableServers;
   const selectedServer = availableServers.find((s) => s.id === server) ?? availableServers[0];
   const selectedStream = selectedServer
-    ? streamQueries[SERVERS.findIndex((s) => s.id === selectedServer.id)]?.data
+    ? streamQueries[streamProviderIndex(selectedServer.id)]?.data
     : undefined;
+  const selectedStreamForPlayer = selectedStream;
   const activeServerId = selectedServer?.id;
-  const megaQuery = streamQueries[SERVERS.findIndex((s) => s.id === "mega")];
-  const moonQuery = streamQueries[SERVERS.findIndex((s) => s.id === "moon")];
-  const hd1Query = streamQueries[SERVERS.findIndex((s) => s.id === "hd1")];
-  const selectedQueryIndex = selectedServer ? SERVERS.findIndex((s) => s.id === selectedServer.id) : 0;
+  const megaQuery = streamQueries[streamProviderIndex(DEFAULT_STREAM_PROVIDER_ID)];
+  const selectedQueryIndex = selectedServer ? streamProviderIndex(selectedServer.id) : 0;
   const selectedQuery = streamQueries[selectedQueryIndex];
   const availableServerIds = availableServers.map((s) => s.id).join("|");
   const firstAvailableServerId = availableServers[0]?.id;
+  const warmSignature = STREAM_PROVIDERS
+    .map((provider, index) => `${provider.id}:${streamUrlOf(streamQueries[index]?.data)}`)
+    .join("|");
   const streamsLoading = Boolean((selectedQuery?.isLoading || selectedQuery?.isFetching) || (!selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching)));
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
@@ -125,6 +117,23 @@ export default function WatchPage({
     staleTime: 1000 * 60 * 20,
   });
 
+  const needsMetadataFallback = !known || titleOf(known) === "Untitled" || !posterOf(known);
+  const metadataFallback = useQuery({
+    queryKey: ["anime-metadata", malId],
+    queryFn: () => fetchAnimeMetadataByMalId(malId),
+    enabled: needsMetadataFallback && Number.isFinite(Number(malId)),
+    staleTime: 1000 * 60 * 60 * 12,
+    gcTime: 1000 * 60 * 60 * 24,
+  });
+  const displayAnime = useMemo(
+    () => ({
+      ...(known ?? {}),
+      ...(metadataFallback.data ?? {}),
+      mal_id: malId,
+    }) as Anime,
+    [known, malId, metadataFallback.data],
+  );
+
   const history = useQuery({
     queryKey: ["history", token],
     queryFn: () => api.history(token!),
@@ -132,8 +141,15 @@ export default function WatchPage({
     staleTime: 1000 * 20,
   });
 
-  const animeTitle = titleOf(known);
-  const animePoster = posterOf(known);
+  const animeTitle = titleOf(displayAnime);
+  const animePoster = posterOf(displayAnime);
+
+  useEffect(() => {
+    if (titleOf(displayAnime) !== "Untitled") {
+      // Keep future direct visits and history rows titled without waiting on home data.
+      rememberAnime(displayAnime);
+    }
+  }, [displayAnime, malId]);
   const explicitResumeTime = Number(t || 0);
   const serverResumeItem = useMemo(
     () => history.data?.find(
@@ -292,29 +308,32 @@ export default function WatchPage({
 
   useEffect(() => {
     if (!firstAvailableServerId) return;
-    if (server === "mega" && type === "dub" && !megaQuery?.isError && !hasPlayableStream(megaQuery?.data)) return;
+    if (server === DEFAULT_STREAM_PROVIDER_ID && type === "dub" && !megaQuery?.isError && !hasPlayableStream(megaQuery?.data)) return;
     if (!availableServerIds.split("|").includes(server)) {
       setServer(firstAvailableServerId);
     }
   }, [availableServerIds, firstAvailableServerId, megaQuery?.data, megaQuery?.isError, server, type]);
 
   useEffect(() => {
-    if (moonQuery?.data && !warmMoonPipeline(moonQuery.data, 2)) {
-      warmStreamManifest(moonQuery.data, { segments: 2, timeoutMs: 15_000 });
-    }
-    if (hd1Query?.data) warmStreamManifest(hd1Query.data, { segments: 1, timeoutMs: 10_000 });
-  }, [hd1Query?.data, moonQuery?.data]);
+    STREAM_PROVIDERS.forEach((provider, index) => {
+      warmStreamProvider(provider, streamQueries[index]?.data);
+    });
+  // warmSignature intentionally captures the stream URLs that matter for warmups.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warmSignature]);
 
   function handlePlayerFatalError() {
     if (!activeServerId) return;
-    clearCachedStream(streamCacheKey(activeServerId, malId, episode, type));
-    const index = SERVERS.findIndex((s) => s.id === activeServerId);
-    streamQueries[index]?.refetch();
+    const providerIndex = streamProviderIndex(activeServerId);
+    const provider = STREAM_PROVIDERS[providerIndex];
+    if (!provider) return;
+    clearCachedStream(streamProviderCacheKey(provider, malId, episode, type));
+    streamQueries[providerIndex]?.refetch();
   }
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      setServer("mega");
+      setServer(DEFAULT_STREAM_PROVIDER_ID);
     }, 0);
     return () => window.clearTimeout(id);
   }, [episode, malId, type]);
@@ -353,7 +372,7 @@ export default function WatchPage({
                 </div>
               </div>
             ) : streamsLoading && !selectedStream ? (
-              <div className="relative aspect-video w-full overflow-hidden rounded-[22px] border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)]">
+              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] sm:aspect-video sm:rounded-[22px]">
                 {animePoster ? (
                   <>
                     <Image src={animePoster} alt="" fill priority sizes="100vw" className="scale-105 object-cover opacity-80 blur-[1px]" />
@@ -371,9 +390,10 @@ export default function WatchPage({
               </div>
             ) : (
               <VideoPlayer
-                key={`${activeServerId}-${type}-${selectedStream?.m3u8_url || selectedStream?.url || selectedStream?.stream_url}`}
-                stream={selectedStream}
+                key={`${activeServerId}-${type}-${selectedStreamForPlayer?.m3u8_url || selectedStreamForPlayer?.url || selectedStreamForPlayer?.stream_url}`}
+                stream={selectedStreamForPlayer}
                 poster={animePoster}
+                serverId={activeServerId}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
                 autoPlay={settings.autoResume}
@@ -422,34 +442,69 @@ export default function WatchPage({
             </div>
 
             {/* Server + Audio bar */}
-            <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_auto_auto]">
+            <div className={`mt-3 grid gap-3 ${activeServerId === DEFAULT_STREAM_PROVIDER_ID ? "xl:grid-cols-[1fr_auto_auto]" : "xl:grid-cols-[1fr_auto]"}`}>
               {/* Servers */}
-              <div className="rounded-3xl border border-white/[0.055] bg-[#0d1020] p-4">
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">Stream Server</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3.5">
+                <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-white/25">Stream Server</p>
+                <div className="relative">
                   {streamsLoading && !availableServers.length ? (
-                    <>{[1,2,3].map(i => <div key={i} className="h-9 w-24 animate-pulse rounded-2xl bg-[#141828]" />)}</>
+                    <div className="h-11 w-full animate-pulse rounded-xl bg-[#141828]" />
                   ) : null}
-                  {availableServers.map((s) => {
-                    const isActive = activeServerId === s.id;
-                    return (
+                  {!streamsLoading && selectedServer ? (
+                    <button
+                      type="button"
+                      aria-expanded={serverMenuOpen}
+                      onClick={() => setServerMenuOpen((value) => !value)}
+                      className="flex h-12 w-full items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#141828] px-3.5 text-left transition hover:border-white/[0.13] hover:bg-[#1b2036]"
+                    >
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#c8ced8]" />
+                          <span className="text-sm font-black text-white">{selectedServer.label}</span>
+                        </span>
+                        <span className="mt-0.5 block truncate text-[10px] font-semibold text-white/30">
+                          {selectedServer.desc}
+                        </span>
+                      </span>
+                      <ChevronDown size={16} className={`shrink-0 text-white/45 transition ${serverMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
+                  ) : null}
+                  {serverMenuOpen && availableServers.length ? (
+                    <>
                       <button
-                        key={s.id}
-                        onClick={() => setServer(s.id)}
-                        className={`group flex flex-col rounded-2xl px-4 py-2 text-left transition ${
-                          isActive
-                            ? "bg-[#cf2442]/16 ring-1 ring-[#cf2442]/30"
-                            : "border border-white/[0.07] bg-[#141828] hover:border-white/[0.13] hover:bg-[#1b2036]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-[#c8ced8] animate-pulse" : "bg-white/45"}`} />
-                          <span className={`text-sm font-bold ${isActive ? "text-white" : "text-white/60"}`}>{s.label}</span>
-                        </div>
-                        <span className="mt-0.5 text-[10px] text-white/25">{s.desc}</span>
-                      </button>
-                    );
-                  })}
+                        type="button"
+                        aria-label="Close server list"
+                        className="fixed inset-0 z-40"
+                        onClick={() => setServerMenuOpen(false)}
+                      />
+                      <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-white/[0.09] bg-[#090b14]/98 p-1.5 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+                        {availableServers.map((s) => {
+                          const isActive = activeServerId === s.id;
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setServer(s.id);
+                                setServerMenuOpen(false);
+                              }}
+                              className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                                isActive
+                                  ? "bg-[#cf2442]/16 text-white"
+                                  : "text-white/58 hover:bg-white/[0.06] hover:text-white"
+                              }`}
+                            >
+                              <span className="min-w-0">
+                                <span className="block text-sm font-black">{s.label}</span>
+                                <span className="mt-0.5 block truncate text-[10px] font-semibold text-white/28">{s.desc}</span>
+                              </span>
+                              {isActive ? <span className="h-2 w-2 shrink-0 rounded-full bg-[#cf2442]" /> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : null}
                   {!streamsLoading && !availableServers.length ? (
                     <span className="text-sm text-white/30">No servers responded</span>
                   ) : null}
@@ -457,14 +512,14 @@ export default function WatchPage({
               </div>
 
               {/* Audio */}
-              <div className="rounded-3xl border border-white/[0.055] bg-[#0d1020] p-4">
+              <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3.5">
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">Audio Track</p>
                 <div className="flex gap-2">
                   {(["sub", "dub"] as const).map((a) => (
                     <button
                       key={a}
-                      onClick={() => { setType(a); setServer("mega"); }}
-                      className={`rounded-2xl px-4 py-2 text-sm font-bold uppercase transition ${
+                      onClick={() => { setType(a); setServer(DEFAULT_STREAM_PROVIDER_ID); }}
+                      className={`rounded-xl px-4 py-2 text-sm font-bold uppercase transition ${
                         type === a
                           ? "bg-[#cf2442] text-white shadow-lg shadow-[#cf2442]/20"
                           : "border border-white/[0.07] bg-[#141828] text-white/40 hover:border-white/[0.14] hover:text-white"
@@ -476,14 +531,16 @@ export default function WatchPage({
                 </div>
               </div>
 
-              <EpisodeDownloadButton
-                stream={selectedStream}
-                malId={malId}
-                episode={episodeNum}
-                title={displayTitle}
-                poster={animePoster}
-                server={activeServerId}
-              />
+              {activeServerId === DEFAULT_STREAM_PROVIDER_ID ? (
+                <EpisodeDownloadButton
+                  stream={selectedStreamForPlayer}
+                  malId={malId}
+                  episode={episodeNum}
+                  title={displayTitle}
+                  poster={animePoster}
+                  server={activeServerId}
+                />
+              ) : null}
             </div>
 
             {/* Mobile episode list */}

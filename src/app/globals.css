@@ -20,9 +20,10 @@
   --border-hover: rgba(255,255,255,0.11);
 
   /* Brand accents */
-  --accent: #cf2442;          /* cinematic ruby */
-  --accent-dim: rgba(207,36,66,0.14);
-  --accent-glow: rgba(207,36,66,0.34);
+  --accent: #e11d48;          /* cinematic ruby */
+  --accent-hover: #f43f5e;
+  --accent-dim: rgba(225,29,72,0.14);
+  --accent-glow: rgba(225,29,72,0.35);
   --accent-2: #c8ced8;        /* soft silver */
   --accent-2-dim: rgba(200,206,216,0.12);
   --accent-2-glow: rgba(200,206,216,0.18);
@@ -36,7 +37,7 @@
   --card-foreground: #f2f4f8;
   --popover: #0b0d18;
   --popover-foreground: #f2f4f8;
-  --primary: #cf2442;
+  --primary: #e11d48;
   --primary-foreground: #ffffff;
   --secondary: #151a2b;
   --secondary-foreground: #e8ecf4;
@@ -44,8 +45,8 @@
   --accent-foreground: #ffffff;
   --destructive: #ef4444;
   --input: rgba(255,255,255,0.105);
-  --ring: rgba(207,36,66,0.58);
-  --chart-1: #cf2442;
+  --ring: rgba(225,29,72,0.58);
+  --chart-1: #e11d48;
   --chart-2: #c8ced8;
   --chart-3: #d8b56a;
   --chart-4: #8f2638;
@@ -53,12 +54,12 @@
   --radius: 0.625rem;
   --sidebar: #0d1020;
   --sidebar-foreground: #f2f4f8;
-  --sidebar-primary: #cf2442;
+  --sidebar-primary: #e11d48;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #151a2b;
   --sidebar-accent-foreground: #e8ecf4;
   --sidebar-border: rgba(255,255,255,0.075);
-  --sidebar-ring: rgba(207,36,66,0.58);
+  --sidebar-ring: rgba(225,29,72,0.58);
 }
 
 @theme inline {
@@ -119,10 +120,11 @@ html {
 
 body {
   background:
-    radial-gradient(circle at 18% -10%, rgba(207,36,66,0.12), transparent 34%),
-    radial-gradient(circle at 82% 0%, rgba(200,206,216,0.08), transparent 28%),
-    linear-gradient(180deg, #05060b 0%, #070912 48%, #05060b 100%);
-  background-color: #05060b;
+    radial-gradient(circle at top right, rgba(225,29,72,0.12), transparent 30%),
+    radial-gradient(circle at 18% -10%, rgba(225,29,72,0.09), transparent 34%),
+    radial-gradient(circle at 82% 0%, rgba(200,206,216,0.07), transparent 28%),
+    linear-gradient(180deg, #08090f 0%, #05060a 100%);
+  background-color: #05060a;
   color: var(--foreground);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -247,8 +249,8 @@ button, a, input { outline-color: var(--accent); }
               filter 0.25s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 .card-lift:hover {
-  transform: translateY(-3px) scale(1.01);
-  filter: drop-shadow(0 16px 32px rgba(0,0,0,0.55));
+  transform: translateY(-6px) scale(1.02);
+  filter: drop-shadow(0 24px 52px rgba(0,0,0,0.55));
 }
 
 .content-visibility-auto {

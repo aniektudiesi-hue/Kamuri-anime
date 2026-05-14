@@ -262,31 +262,53 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
       {active ? (
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {active.items.map((item) => (
-            <Link
+            <ScheduleCard
               key={`${item.id}-${item.episode}-${item.airingAt}`}
-              href={`/anime/${item.id}`}
-              onClick={() => rememberAnime(item.anime)}
-              className="scroll-card group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#0d1020]/70 p-2 transition hover:border-[#cf2442]/30 hover:bg-[#141828]"
-            >
-              <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
-                {posterOf(item.anime) ? (
-                  <Image src={posterOf(item.anime)} alt="" fill sizes="72px" className="object-cover" unoptimized />
-                ) : null}
-              </div>
-              <div className="min-w-0 py-1">
-                <p className="text-[10px] font-black uppercase tracking-wide text-[#cf2442]">
-                  {formatAiringTime(item.airingAt)}
-                </p>
-                <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-white/82 group-hover:text-white">
-                  {titleOf(item.anime)}
-                </h3>
-                <p className="mt-1 text-xs font-semibold text-white/36">Episode {item.episode}</p>
-              </div>
-            </Link>
+              item={item}
+            />
           ))}
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ScheduleCard({ item }: { item: AiringScheduleItem }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const poster = posterOf(item.anime);
+  const title = titleOf(item.anime);
+
+  return (
+    <Link
+      href={`/anime/${item.id}`}
+      onClick={() => rememberAnime(item.anime)}
+      className="scroll-card group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#111421]/72 p-2 transition hover:-translate-y-0.5 hover:border-[#f43f5e]/30 hover:bg-[#171b2a]"
+    >
+      <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]" data-loaded={Boolean(poster && !imageFailed) || imageFailed}>
+        {poster && !imageFailed ? (
+          <Image
+            src={poster}
+            alt={title}
+            fill
+            sizes="72px"
+            className="object-cover"
+            onError={() => setImageFailed(true)}
+            unoptimized
+          />
+        ) : (
+          <PosterFallback title={title} />
+        )}
+      </div>
+      <div className="min-w-0 py-1">
+        <p className="text-[10px] font-black uppercase tracking-wide text-[#f43f5e]">
+          {formatAiringTime(item.airingAt)}
+        </p>
+        <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-white/82 group-hover:text-white">
+          {title}
+        </h3>
+        <p className="mt-1 text-xs font-semibold text-white/36">Episode {item.episode}</p>
+      </div>
+    </Link>
   );
 }
 

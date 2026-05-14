@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { getHomeAnimeCatalog } from "@/lib/server-anime";
 import { SEO_CATEGORIES } from "@/lib/seo-categories";
 import { absoluteUrl } from "@/lib/site";
-import { animeId, posterOf } from "@/lib/utils";
+import { animeId, episodeCount } from "@/lib/utils";
 
 export const revalidate = 3600;
 
@@ -64,16 +64,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .map((anime) => {
       const id = animeId(anime);
       if (!id) return null;
-      const poster = posterOf(anime);
       return {
         url: absoluteUrl(`/anime/${id}`),
         lastModified: now,
         changeFrequency: "daily" as const,
         priority: 0.86,
-        images: poster ? [poster] : undefined,
       };
     })
     .filter(Boolean) as MetadataRoute.Sitemap;
 
-  return [...staticRoutes, ...animeRoutes];
+  const watchRoutes = catalog
+    .map((anime) => {
+      const id = animeId(anime);
+      if (!id || episodeCount(anime) < 1) return null;
+      return {
+        url: absoluteUrl(`/watch/${id}/1`),
+        lastModified: now,
+        changeFrequency: "daily" as const,
+        priority: 0.74,
+      };
+    })
+    .filter(Boolean) as MetadataRoute.Sitemap;
+
+  return [...staticRoutes, ...animeRoutes, ...watchRoutes];
 }

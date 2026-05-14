@@ -28,6 +28,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryFn: () => api.me(token!),
     enabled: Boolean(token),
     retry: false,
+    staleTime: 1000 * 60 * 60 * 24,
+    gcTime: 1000 * 60 * 60 * 24 * 7,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const value = useMemo<AuthContextValue>(

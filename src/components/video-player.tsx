@@ -41,6 +41,7 @@ export function VideoPlayer({
   stream,
   title,
   poster,
+  serverId,
   initialTime = 0,
   nextHref,
   onProgress,
@@ -51,6 +52,7 @@ export function VideoPlayer({
   stream?: StreamResponse;
   title: string;
   poster?: string;
+  serverId?: string;
   initialTime?: number;
   nextHref?: string;
   onProgress?: (progress: { currentTime: number; duration: number }) => void;
@@ -83,6 +85,7 @@ export function VideoPlayer({
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(true);
+  const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(0);
   const [controlsOpen, setControlsOpen] = useState(true);
   const [playbackError, setPlaybackError] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -103,6 +106,11 @@ export function VideoPlayer({
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
+  const isMegaPlayServer =
+    serverId === "mega" ||
+    stream?.server === "megaplay" ||
+    stream?.server === "mega" ||
+    Boolean(src?.includes("/api/stream/") || src?.includes("/proxy/megaplay/"));
   const isMoonStream = stream?.server === "moon" || Boolean(src?.includes("/proxy/moon/"));
   const isHlsStream = Boolean(
     src &&
@@ -110,13 +118,22 @@ export function VideoPlayer({
         /\/m3u8(?:$|[?#])/i.test(src) ||
         /\/proxy\/(?:m3u8|moon)\b/i.test(src)),
   );
-  const subtitles = useMemo(() => preferredSubtitles(stream?.subtitles), [stream?.subtitles]);
-  const activeSubtitleUrl = subtitles[0]?.file ?? "";
+  const subtitles = useMemo(
+    () => preferredSubtitles(stream?.subtitles, stream?.subtitle_url, stream?.vtt_url),
+    [stream?.subtitles, stream?.subtitle_url, stream?.vtt_url],
+  );
+  const activeSubtitle = subtitles[selectedSubtitleIndex] ?? subtitles[0];
+  const activeSubtitleUrl = activeSubtitle?.file ?? "";
   const subtitleCount = subtitles.length;
   const showNextPrompt = Boolean(nextHref && duration > 0 && duration - currentTime <= 60);
-  const introStart = stream?.intro?.start ?? 0;
-  const introEnd = stream?.intro?.end ?? 90;
-  const showSkipIntro = currentTime >= introStart && currentTime < introEnd && currentTime > 0;
+  const hasMegaPlayIntro =
+    isMegaPlayServer &&
+    Number.isFinite(stream?.intro?.start) &&
+    Number.isFinite(stream?.intro?.end) &&
+    Number(stream?.intro?.end) > Number(stream?.intro?.start);
+  const introStart = hasMegaPlayIntro ? Number(stream?.intro?.start) : 0;
+  const introEnd = hasMegaPlayIntro ? Number(stream?.intro?.end) : 0;
+  const showSkipIntro = hasMegaPlayIntro && currentTime >= introStart && currentTime < introEnd && currentTime > 0;
   const progress = useMemo(() => (duration ? (currentTime / duration) * 100 : 0), [currentTime, duration]);
   const bufferAheadLabel = useMemo(() => formatBufferAhead(bufferAhead), [bufferAhead]);
   const showControls = useCallback(
@@ -129,6 +146,14 @@ export function VideoPlayer({
     },
     [playing],
   );
+
+  useEffect(() => {
+    if (subtitleCount === 0) {
+      if (selectedSubtitleIndex !== 0) setSelectedSubtitleIndex(0);
+      return;
+    }
+    if (selectedSubtitleIndex >= subtitleCount) setSelectedSubtitleIndex(0);
+  }, [selectedSubtitleIndex, subtitleCount]);
 
   useEffect(() => {
     onProgressRef.current = onProgress;
@@ -734,21 +759,34 @@ export function VideoPlayer({
 
   function changeQuality(hlsIndex: number) {
     const hls = hlsRef.current;
-    if (!hls) return;
+    if (!hls || qualityLevels.length <= 1) {
+      setShowQualityMenu(false);
+      return;
+    }
     hls.currentLevel = hlsIndex;
     setSelectedQuality(hlsIndex);
     setShowQualityMenu(false);
   }
 
+  const hasSwitchableQuality = isHlsStream && qualityLevels.length > 1;
   const qualityLabel =
-    selectedQuality === -1
+    !isHlsStream
+      ? "Source"
+      : qualityLevels.length === 1
+        ? qualityLevels[0].label
+        : selectedQuality === -1
       ? "Auto"
       : qualityLevels.find((l) => l.hlsIndex === selectedQuality)?.label ?? "Auto";
+  const qualityNote = !isHlsStream
+    ? "This server is a direct source, so quality is fixed."
+    : qualityLevels.length <= 1
+      ? "This playlist exposes one adaptive profile."
+      : "Switch HLS variants without changing servers.";
   const displayedCaption = activeCaption || (captionSettingsOpen ? "Caption preview - drag me anywhere" : "");
 
   if (!src) {
     return (
-      <div className="grid aspect-video w-full place-items-center rounded-[28px] border border-white/[0.08] bg-black text-sm text-white/50">
+      <div className="grid aspect-[4/3] w-full place-items-center rounded-2xl border border-white/[0.08] bg-black text-sm text-white/50 sm:aspect-video">
         <div className="text-center">
           <p className="font-semibold text-white">No stream available</p>
           <p className="mt-1 text-white/40">Try switching to another server below.</p>
@@ -762,7 +800,7 @@ export function VideoPlayer({
       ref={containerRef}
       tabIndex={0}
       aria-label={`Video player: ${title}`}
-      className="video-player-shell group relative aspect-video w-full overflow-hidden rounded-[28px] border border-white/[0.095] bg-black shadow-[0_32px_110px_rgba(0,0,0,0.78)] outline-none ring-1 ring-white/[0.035]"
+      className="video-player-shell group relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/[0.095] bg-black shadow-[0_32px_110px_rgba(0,0,0,0.78)] outline-none ring-1 ring-white/[0.035] sm:aspect-video sm:rounded-[22px]"
       style={{ cursor: controlsOpen ? "default" : "none" }}
       onMouseMove={() => showControls()}
       onMouseLeave={() => {
@@ -793,7 +831,7 @@ export function VideoPlayer({
 
       {/* Top glass title rail */}
       <div
-        className={`pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-3 pt-3 transition-opacity duration-300 sm:px-5 sm:pt-5 ${
+        className={`pointer-events-none absolute inset-x-0 top-0 z-30 hidden items-start justify-between gap-3 px-3 pt-3 transition-opacity duration-300 sm:flex sm:px-5 sm:pt-5 ${
           controlsOpen ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -890,12 +928,12 @@ export function VideoPlayer({
       {showSkipIntro ? (
         <button
           onClick={(e) => { e.stopPropagation(); skipIntro(); }}
-          className="absolute bottom-[86px] right-4 z-50 inline-flex h-11 items-center gap-2 rounded-full border border-[#cf2442]/35 bg-[#cf2442]/88 px-4 text-sm font-black text-white shadow-[0_18px_48px_rgba(207,36,66,0.28)] backdrop-blur-xl transition hover:border-[#ff8a9d]/50 hover:bg-[#dc2d4b] active:scale-95"
+          className="absolute bottom-[84px] right-3 z-50 inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#cf2442]/35 bg-[#cf2442]/90 px-3 text-xs font-black text-white shadow-[0_14px_36px_rgba(207,36,66,0.24)] backdrop-blur-xl transition hover:border-[#ff8a9d]/50 hover:bg-[#dc2d4b] active:scale-95 sm:bottom-[86px] sm:right-4"
         >
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-white/10">
-            <SkipForward size={13} />
+          <span className="grid h-5 w-5 place-items-center rounded-lg bg-white/10">
+            <SkipForward size={12} />
           </span>
-          Skip intro
+          Skip
         </button>
       ) : null}
 
@@ -1034,18 +1072,17 @@ export function VideoPlayer({
             </div>
 
             {/* Captions */}
-            {subtitleCount > 0 ? (
-              <button
-                aria-label="Toggle captions"
-                onClick={() => setCaptionsOn((v) => !v)}
-                title={captionsOn ? "Hide captions" : "Show captions"}
-                className={`grid h-8 w-8 place-items-center rounded-xl transition-colors ${
-                  captionsOn ? "bg-white/10 text-white" : "text-white/45 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Captions size={18} />
-              </button>
-            ) : null}
+            <button
+              aria-label={subtitleCount > 0 ? "Toggle captions" : "Captions unavailable"}
+              disabled={subtitleCount === 0}
+              onClick={() => subtitleCount > 0 && setCaptionsOn((v) => !v)}
+              title={subtitleCount > 0 ? (captionsOn ? "Hide captions" : "Show captions") : "No captions for this server"}
+              className={`grid h-8 w-8 place-items-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
+                captionsOn && subtitleCount > 0 ? "bg-white/10 text-white" : "text-white/45 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <Captions size={18} />
+            </button>
 
             {subtitleCount > 0 ? (
               <div className="relative">
@@ -1086,6 +1123,29 @@ export function VideoPlayer({
                       >
                         Caption preview
                       </div>
+
+                      {subtitleCount > 1 ? (
+                        <div className="mb-3 max-h-28 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.025] p-1">
+                          {subtitles.map((subtitle, index) => (
+                            <button
+                              key={`${subtitle.file}-${index}`}
+                              type="button"
+                              onClick={() => {
+                                setSelectedSubtitleIndex(index);
+                                setCaptionsOn(true);
+                              }}
+                              className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-xs font-bold transition-colors ${
+                                selectedSubtitleIndex === index
+                                  ? "bg-[#cf2442]/18 text-white"
+                                  : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+                              }`}
+                            >
+                              <span className="line-clamp-1">{subtitleLabel(subtitle, index)}</span>
+                              {selectedSubtitleIndex === index ? <span className="h-1.5 w-1.5 rounded-full bg-[#cf2442]" /> : null}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
 
                       <div className="grid grid-cols-2 gap-2">
                         <CaptionSlider
@@ -1174,7 +1234,7 @@ export function VideoPlayer({
                 }`}
               >
                 <Gauge size={13} />
-                {playbackRate === 1 ? "Speed" : `${playbackRate}×`}
+                {playbackRate === 1 ? "Speed" : `${playbackRate}x`}
               </button>
               {showSpeedMenu ? (
                 <>
@@ -1189,7 +1249,7 @@ export function VideoPlayer({
                           playbackRate === rate ? "text-accent-2" : "text-white/80"
                         }`}
                       >
-                        {rate === 1 ? "Normal" : `${rate}×`}
+                        {rate === 1 ? "Normal" : `${rate}x`}
                         {playbackRate === rate ? <span className="h-1.5 w-1.5 rounded-full bg-accent-2" /> : null}
                       </button>
                     ))}
@@ -1199,65 +1259,68 @@ export function VideoPlayer({
             </div>
 
             {/* Quality selector */}
-            {qualityLevels.length > 1 ? (
-              <div className="relative">
-                <button
-                  aria-label="Quality"
-                  aria-expanded={showQualityMenu}
-                  onClick={() => { setShowQualityMenu((v) => !v); setCaptionSettingsOpen(false); }}
-                  className={`h-8 rounded-xl px-2 text-xs font-bold transition-colors ${
-                    showQualityMenu || selectedQuality !== -1
-                      ? "bg-white/10 text-white"
-                      : "text-white/60 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  {qualityLabel}
-                </button>
+            <div className="relative">
+              <button
+                aria-label="Quality"
+                aria-expanded={showQualityMenu}
+                onClick={() => { setShowQualityMenu((v) => !v); setCaptionSettingsOpen(false); }}
+                className={`h-8 rounded-xl px-2 text-xs font-bold transition-colors ${
+                  showQualityMenu || selectedQuality !== -1 || !hasSwitchableQuality
+                    ? "bg-white/10 text-white"
+                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {qualityLabel}
+              </button>
 
-                {showQualityMenu ? (
-                  <>
-                    {/* Backdrop to close */}
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowQualityMenu(false)}
-                    />
-                    {/* Menu */}
-                    <div className="absolute bottom-full right-0 z-50 mb-2 min-w-[90px] overflow-hidden rounded-xl border border-white/15 bg-black/95 py-1 shadow-2xl ">
-                      <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-white/30">
-                        Quality
-                      </p>
-                      {/* Auto option */}
-                      <button
-                        onClick={() => changeQuality(-1)}
-                        className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white/10 ${
-                          selectedQuality === -1 ? "text-accent-2" : "text-white/80"
-                        }`}
-                      >
-                        Auto
-                        {selectedQuality === -1 ? (
-                          <span className="h-1.5 w-1.5 rounded-full bg-accent-2" />
-                        ) : null}
-                      </button>
-                      {/* Per-level options */}
-                      {qualityLevels.map((level) => (
+              {showQualityMenu ? (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowQualityMenu(false)}
+                  />
+                  <div className="absolute bottom-full right-0 z-50 mb-2 min-w-[150px] overflow-hidden rounded-xl border border-white/15 bg-black/95 py-1 shadow-2xl">
+                    <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-white/30">
+                      Quality
+                    </p>
+                    {hasSwitchableQuality ? (
+                      <>
                         <button
-                          key={level.hlsIndex}
-                          onClick={() => changeQuality(level.hlsIndex)}
+                          onClick={() => changeQuality(-1)}
                           className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white/10 ${
-                            selectedQuality === level.hlsIndex ? "text-accent-2" : "text-white/80"
+                            selectedQuality === -1 ? "text-accent-2" : "text-white/80"
                           }`}
                         >
-                          {level.label}
-                          {selectedQuality === level.hlsIndex ? (
+                          Auto
+                          {selectedQuality === -1 ? (
                             <span className="h-1.5 w-1.5 rounded-full bg-accent-2" />
                           ) : null}
                         </button>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
+                        {qualityLevels.map((level) => (
+                          <button
+                            key={level.hlsIndex}
+                            onClick={() => changeQuality(level.hlsIndex)}
+                            className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white/10 ${
+                              selectedQuality === level.hlsIndex ? "text-accent-2" : "text-white/80"
+                            }`}
+                          >
+                            {level.label}
+                            {selectedQuality === level.hlsIndex ? (
+                              <span className="h-1.5 w-1.5 rounded-full bg-accent-2" />
+                            ) : null}
+                          </button>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="px-3 py-2 text-xs">
+                        <p className="font-bold text-white/82">{qualityLabel}</p>
+                        <p className="mt-1 max-w-[190px] leading-snug text-white/42">{qualityNote}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
 
             {pipSupported ? (
               <button
@@ -1324,10 +1387,40 @@ function CaptionSlider({
   );
 }
 
-function preferredSubtitles(subtitles: Subtitle[] | undefined) {
-  const valid = (subtitles ?? []).filter((subtitle) => subtitle.file);
+function preferredSubtitles(subtitles: Subtitle[] | undefined, subtitleUrl?: string, vttUrl?: string) {
+  const collected: Subtitle[] = [...(subtitles ?? [])];
+  if (subtitleUrl) {
+    collected.push({
+      file: subtitleUrl,
+      label: "English",
+      kind: "subtitles",
+      default: !collected.length,
+    });
+  }
+  if (vttUrl) {
+    collected.push({
+      file: vttUrl,
+      label: "English",
+      kind: "subtitles",
+      default: !collected.length,
+    });
+  }
+
+  const seen = new Set<string>();
+  const valid = collected.filter((subtitle) => {
+    if (!subtitle.file || seen.has(subtitle.file)) return false;
+    seen.add(subtitle.file);
+    return true;
+  });
   const english = valid.filter((subtitle) => subtitleRank(subtitle) === 0);
-  return (english.length ? english : valid).sort((a, b) => subtitleRank(a) - subtitleRank(b));
+  return (english.length ? english : valid).sort((a, b) => {
+    if (a.default !== b.default) return a.default ? -1 : 1;
+    return subtitleRank(a) - subtitleRank(b);
+  });
+}
+
+function subtitleLabel(subtitle: Subtitle, index: number) {
+  return subtitle.label || subtitle.kind || `Track ${index + 1}`;
 }
 
 function clamp(value: number, min: number, max: number) {

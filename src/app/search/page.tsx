@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, ChevronDown, Loader2, RefreshCw, Search, WifiOff } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AnimeCard } from "@/components/anime-card";
+import { SearchBox } from "@/components/search-box";
 import { SidebarLayout } from "@/components/sidebar";
 import { api } from "@/lib/api";
 import {
@@ -141,6 +142,10 @@ function SearchContent() {
     <AppShell>
       <SidebarLayout>
         <div className="py-6">
+          <div className="mb-5 sm:hidden">
+            <SearchBox />
+          </div>
+
           {q ? (
             <div className="mb-5">
               <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-white/25">{intent.sourceLabel}</p>

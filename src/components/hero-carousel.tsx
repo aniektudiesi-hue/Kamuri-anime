@@ -81,7 +81,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
             alt=""
             fill
             priority
-            quality={95}
+            quality={100}
             sizes="100vw"
             className="object-cover object-center opacity-72"
           />
@@ -261,11 +261,11 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
 
   if (loading) {
     return (
-      <section ref={sectionRef} className="relative -mt-1 min-h-[420px] overflow-hidden pb-6 sm:hidden">
+      <section ref={sectionRef} className="relative -mt-1 min-h-[360px] overflow-hidden pb-4 sm:hidden">
         <div className="absolute inset-0 animate-pulse bg-[#141828]" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/35 to-transparent" />
-        <div className="relative flex min-h-[420px] items-end px-4">
-          <div className="w-full rounded-[28px] border border-white/[0.1] bg-black/30 p-4 shadow-2xl shadow-black/35 backdrop-blur-2xl">
+        <div className="relative flex min-h-[360px] items-end px-4">
+          <div className="w-full rounded-2xl border border-white/[0.1] bg-black/30 p-3.5 shadow-2xl shadow-black/35 backdrop-blur-2xl">
             <div className="mb-3 h-3 w-24 rounded-full bg-white/[0.12]" />
             <div className="h-8 w-4/5 rounded-xl bg-white/[0.12]" />
             <div className="mt-4 flex gap-2">
@@ -287,7 +287,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const count = episodeCount(current);
 
   return (
-    <section ref={sectionRef} className="relative -mt-1 min-h-[430px] overflow-hidden pb-4 sm:hidden">
+    <section ref={sectionRef} className="relative -mt-1 min-h-[365px] overflow-hidden pb-3 sm:hidden">
       <div className="absolute inset-0 bg-[#080a12]">
         {banner || poster ? (
           <Image
@@ -297,7 +297,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             fill
             priority={index === 0}
             loading={index === 0 ? undefined : "lazy"}
-            quality={92}
+            quality={96}
             sizes="100vw"
             className="object-cover opacity-85"
           />
@@ -306,8 +306,8 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#06070d]/80 to-transparent" />
       </div>
 
-      <div className="relative flex min-h-[430px] items-end px-4">
-        <div className="w-[92%] max-w-[360px] rounded-3xl border border-white/[0.1] bg-[#090b13]/28 p-3.5 shadow-2xl shadow-black/35 backdrop-blur-xl">
+      <div className="relative flex min-h-[365px] items-end px-4">
+        <div className="w-[92%] max-w-[350px] rounded-2xl border border-white/[0.1] bg-[#090b13]/24 p-3 shadow-2xl shadow-black/30 backdrop-blur-md">
           <div className="mb-2 flex items-center gap-2">
             <span className="rounded-full bg-[#cf2442]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#cf2442]/30">
               Featured
@@ -319,21 +319,21 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             ) : null}
           </div>
 
-          <h1 className="line-clamp-2 text-xl font-black leading-tight text-white drop-shadow-xl">
+          <h1 className="line-clamp-2 text-lg font-black leading-tight text-white drop-shadow-xl">
             {title}
           </h1>
 
           <div className="mt-3 flex gap-2">
             <Link
               href={`/watch/${id}/1`}
-              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#cf2442] text-sm font-black text-white shadow-lg shadow-[#cf2442]/22"
+              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#cf2442] text-sm font-black text-white shadow-lg shadow-[#cf2442]/22"
             >
               <Play size={16} fill="currentColor" />
               Watch
             </Link>
             <Link
               href={`/anime/${id}`}
-              className="inline-flex h-10 items-center justify-center rounded-2xl border border-white/[0.14] bg-white/[0.1] px-3.5 text-sm font-bold text-white/85 backdrop-blur-xl"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.1] px-3.5 text-sm font-bold text-white/85 backdrop-blur-xl"
             >
               Details
             </Link>

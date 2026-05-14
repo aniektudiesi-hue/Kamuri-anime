@@ -56,6 +56,8 @@ export type StreamResponse = {
   embed_url?: string;
   server?: string;
   subtitles?: Subtitle[];
+  subtitle_url?: string;
+  vtt_url?: string;
   intro?: { start: number; end: number };
   outro?: { start: number; end: number };
   server_id?: number;

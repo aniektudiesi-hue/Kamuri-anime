@@ -3,13 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Clock, Play, Plus, Star, Tv, CheckCircle2, Loader2 } from "lucide-react";
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { SidebarLayout } from "@/components/sidebar";
 import { api } from "@/lib/api";
+import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
 import { useAuth } from "@/lib/auth";
-import { warmMoonPipeline, warmStreamManifest } from "@/lib/stream-cache";
+import {
+  STREAM_PROVIDERS,
+  fetchStreamProvider,
+  streamProviderQueryKey,
+  warmStreamProvider,
+} from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
 import {
@@ -60,11 +66,27 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     [...(thumbs.data ?? []), ...(recent.data ?? []), ...(top.data ?? [])].find(
       (item) => animeId(item) === malId,
     )) as Anime | undefined;
-  const hint = episodeCount(known);
+  const needsMetadataFallback = !known || titleOf(known) === "Untitled" || !posterOf(known);
+  const metadataFallback = useQuery({
+    queryKey: ["anime-metadata", malId],
+    queryFn: () => fetchAnimeMetadataByMalId(malId),
+    enabled: needsMetadataFallback && Number.isFinite(Number(malId)),
+    staleTime: 1000 * 60 * 60 * 12,
+    gcTime: 1000 * 60 * 60 * 24,
+  });
+  const displayAnime = useMemo(
+    () => ({
+      ...(known ?? {}),
+      ...(metadataFallback.data ?? {}),
+      mal_id: malId,
+    }) as Anime,
+    [known, malId, metadataFallback.data],
+  );
+  const hint = episodeCount(displayAnime);
 
   useEffect(() => {
-    if (known) rememberAnime(known);
-  }, [known]);
+    if (displayAnime && titleOf(displayAnime) !== "Untitled") rememberAnime(displayAnime);
+  }, [displayAnime]);
 
   const episodes = useQuery({
     queryKey: ["episodes", malId, hint],
@@ -93,7 +115,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     mutationFn: () =>
       api.addWatchlist(token!, {
         mal_id: malId, anime_id: malId,
-        title: titleOf(known), image_url: posterOf(known), episodes: hint,
+        title: titleOf(displayAnime), image_url: posterOf(displayAnime), episodes: hint,
       }),
     onMutate: () => setWatchlistSaved(true),
     onError: () => setWatchlistSaved(false),
@@ -106,36 +128,24 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
 
   const prefetchWatch = useCallback((ep: number) => {
     const episode = String(ep);
-    queryClient.prefetchQuery({
-      queryKey: ["stream", malId, episode, "mega", "sub"],
-      queryFn: () => api.stream(malId, episode, "sub"),
-      staleTime: 1000 * 60 * 25,
-    });
-    queryClient.prefetchQuery({
-      queryKey: ["stream", malId, episode, "moon", "any"],
-      queryFn: async () => {
-        const stream = await api.moon(malId, episode);
-        warmMoonPipeline(stream, 2);
-        return stream;
-      },
-      staleTime: 1000 * 60 * 25,
-    });
-    queryClient.prefetchQuery({
-      queryKey: ["stream", malId, episode, "hd1", "any"],
-      queryFn: async () => {
-        const stream = await api.hd1(malId, episode);
-        warmStreamManifest(stream, { segments: 1, timeoutMs: 10_000 });
-        return stream;
-      },
-      staleTime: 1000 * 60 * 25,
+    STREAM_PROVIDERS.forEach((provider) => {
+      queryClient.prefetchQuery({
+        queryKey: streamProviderQueryKey(provider, malId, episode, "sub"),
+        queryFn: async () => {
+          const stream = await fetchStreamProvider(provider, { malId, episode, type: "sub" });
+          warmStreamProvider(provider, stream);
+          return stream;
+        },
+        staleTime: 1000 * 60 * 25,
+      });
     });
   }, [malId, queryClient]);
 
-  const episodeTotal = episodes.data?.num_episodes || hint;
-  const poster = posterOf(known);
-  const backdrop = bannerOf(known) || poster;
-  const title = titleOf(known) || `Anime ${malId}`;
-  const statusKey = (known?.status || "").toLowerCase();
+  const episodeTotal = episodes.data?.num_episodes || episodeCount(displayAnime);
+  const poster = posterOf(displayAnime);
+  const backdrop = bannerOf(displayAnime) || poster;
+  const title = titleOf(displayAnime) === "Untitled" ? `Anime ${malId}` : titleOf(displayAnime);
+  const statusKey = (displayAnime?.status || "").toLowerCase();
   const statusCfg = STATUS_CONFIG[statusKey];
   const resumeHref = resume.href;
 
@@ -209,9 +219,9 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`} />
                     {statusCfg.label}
                   </span>
-                ) : known?.status ? (
+                ) : displayAnime?.status ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-bold text-white/50 ring-1 ring-white/10">
-                    {displayStatus(known.status)}
+                    {displayStatus(displayAnime.status)}
                   </span>
                 ) : null}
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-white/50 ring-1 ring-white/[0.08]">
@@ -224,10 +234,10 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     {episodeTotal} Episodes
                   </span>
                 ) : null}
-                {known?.score ? (
+                {displayAnime?.score ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-[#d8b56a]/10 px-3 py-1 text-[11px] font-bold text-[#d8b56a] ring-1 ring-[#d8b56a]/20">
                     <Star size={11} className="fill-[#d8b56a]" />
-                    {Number(known.score).toFixed(2)} / 10
+                    {Number(displayAnime.score).toFixed(2)} / 10
                   </span>
                 ) : null}
               </div>
@@ -235,8 +245,8 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               <h1 className="mb-1 text-xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
                 {title}
               </h1>
-              {known?.title_jp && known.title_jp !== title ? (
-                <p className="mb-5 text-sm text-white/30">{known.title_jp}</p>
+              {displayAnime?.title_jp && displayAnime.title_jp !== title ? (
+                <p className="mb-5 text-sm text-white/30">{displayAnime.title_jp}</p>
               ) : (
                 <div className="mb-5" />
               )}
@@ -337,7 +347,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               ))}
             </div>
           ) : rangeEpisodes.length ? (
-            <div className="no-scrollbar max-h-[620px] overflow-y-auto rounded-3xl border border-white/[0.065] bg-[#0d1020]/72 p-2.5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+            <div className="rounded-3xl border border-white/[0.065] bg-[#0d1020]/72 p-2.5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
               {visibleEpisodes.map((ep) => {
                 const isCurrent = ep.episode_number === lastEp && Boolean(last);
                 const href = isCurrent ? resumeHref : `/watch/${malId}/${ep.episode_number}`;
@@ -349,24 +359,33 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     onFocus={() => prefetchWatch(ep.episode_number)}
                     onTouchStart={() => prefetchWatch(ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
-                    className={`group relative mb-2 grid grid-cols-[96px_1fr_auto] items-center gap-2.5 rounded-2xl border p-2 text-left transition last:mb-0 sm:grid-cols-[118px_1fr_auto] ${
+                    className={`group relative mb-2 grid grid-cols-[140px_1fr] items-center gap-3 rounded-[18px] border p-3 text-left transition duration-200 last:mb-0 sm:grid-cols-[230px_1fr_auto] sm:gap-[18px] sm:rounded-[24px] sm:p-4 ${
                       isCurrent
                         ? "border-[#cf2442]/40 bg-[#cf2442]/12 shadow-md shadow-[#cf2442]/12"
-                        : "border-white/[0.055] bg-[#111527] hover:border-white/[0.12] hover:bg-[#171c31]"
+                        : "border-white/[0.08] bg-[#121628]/92 hover:-translate-y-0.5 hover:border-[#ff2d55]/45 hover:bg-[#191e34]/98"
                     }`}
                   >
-                    <div className="relative h-[58px] overflow-hidden rounded-xl bg-[#080a12] sm:h-[68px]">
+                    <div className="relative aspect-video w-[140px] shrink-0 overflow-hidden rounded-[18px] bg-[#111] sm:w-[230px]">
                       {poster ? (
-                        <Image
-                          src={poster}
-                          alt=""
-                          fill
-                          sizes="118px"
-                          className="object-contain p-1.5 transition-transform duration-300 group-hover:scale-[1.03]"
-                        />
+                        <>
+                          <Image
+                            src={poster}
+                            alt=""
+                            fill
+                            sizes="(max-width: 640px) 140px, 230px"
+                            className="scale-[1.18] object-cover opacity-65 blur-2xl"
+                          />
+                          <Image
+                            src={poster}
+                            alt={ep.title || `Episode ${ep.episode_number} poster`}
+                            fill
+                            sizes="(max-width: 640px) 140px, 230px"
+                            className="object-contain p-1.5 transition-transform duration-300 group-hover:scale-[1.025] sm:p-2"
+                          />
+                        </>
                       ) : null}
-                      <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/72 to-transparent" />
-                      <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/72 px-2 py-0.5 text-[10px] font-black text-white">
+                      <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/76 to-transparent" />
+                      <span className="absolute bottom-2 left-2 rounded-full bg-black/85 px-2.5 py-1 text-[11px] font-black text-white shadow-lg sm:bottom-2.5 sm:left-2.5 sm:px-3 sm:py-1.5 sm:text-sm">
                         EP {ep.episode_number}
                       </span>
                       {isCurrent ? (
@@ -390,7 +409,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                       ) : null}
                     </div>
 
-                    <span className={`hidden h-10 w-10 place-items-center rounded-full sm:grid ${
+                    <span className={`hidden h-11 w-11 place-items-center rounded-full sm:grid ${
                       isCurrent ? "bg-[#cf2442] text-white" : "bg-white/[0.06] text-white/45 group-hover:text-white"
                     }`}>
                       <Play size={15} fill="currentColor" />

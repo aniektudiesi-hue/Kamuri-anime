@@ -22,7 +22,7 @@ export function SearchBox() {
   const trimmed = value.trim();
 
   useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(trimmed), 150);
+    const t = window.setTimeout(() => setDebounced(trimmed), 200);
     return () => window.clearTimeout(t);
   }, [trimmed]);
 
@@ -92,11 +92,8 @@ export function SearchBox() {
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
-      if (active >= 0 && items[active]) {
-        openSuggestion(items[active]);
-      } else {
-        submit();
-      }
+      event.preventDefault();
+      submit();
     }
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -115,13 +112,13 @@ export function SearchBox() {
   return (
     <div className="relative w-full">
       <div
-        className={`flex h-11 items-center gap-2 rounded-2xl border px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[border-color,background-color,box-shadow] duration-150 ${
+        className={`flex h-11 items-center gap-2 rounded-full border px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[border-color,background-color,box-shadow] duration-150 sm:h-12 ${
           focused
-            ? "border-[#cf2442]/55 bg-[#111525] shadow-[0_0_0_4px_rgba(207,36,66,0.08),inset_0_1px_0_rgba(255,255,255,0.05)]"
+            ? "border-[#e11d48]/60 bg-[#111421]/92 shadow-[0_0_0_4px_rgba(225,29,72,0.12),inset_0_1px_0_rgba(255,255,255,0.05)]"
             : "border-white/[0.075] bg-[#0d1020]/86 hover:border-white/[0.14]"
         }`}
       >
-        <Search size={16} className={`shrink-0 transition-colors duration-150 ${focused ? "text-[#cf2442]" : "text-white/30"}`} />
+        <Search size={16} className={`shrink-0 transition-colors duration-150 ${focused ? "text-[#f43f5e]" : "text-white/30"}`} />
         <Input
           ref={inputRef}
           value={value}
@@ -229,7 +226,7 @@ export function SearchBox() {
                         <p className="line-clamp-1 text-sm font-medium text-white/85">{titleOf(anime)}</p>
                         <p className="mt-0.5 text-[11px] text-white/30">
                           {episodeLabel(anime)}
-                          {anime.score ? ` - * ${Number(anime.score).toFixed(1)}` : ""}
+                          {anime.score ? ` - Score ${Number(anime.score).toFixed(1)}` : ""}
                         </p>
                       </div>
                     </button>
@@ -241,7 +238,7 @@ export function SearchBox() {
                   onClick={submit}
                   className="flex w-full items-center justify-between rounded-2xl px-2.5 py-2 text-[13px] font-bold text-[#cf2442] transition-colors duration-100 hover:bg-white/[0.045] hover:text-white"
                 >
-                  <span>All results for &ldquo;{trimmed}&rdquo;</span>
+                  <span>Press Enter to search &ldquo;{trimmed}&rdquo;</span>
                   <Search size={13} />
                 </button>
               </div>
