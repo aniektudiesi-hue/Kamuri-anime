@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Play, Star, TvIcon, Info } from "lucide-reac
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { Anime } from "@/lib/types";
-import { animeId, bannerOf, episodeCount, posterOf, titleOf } from "@/lib/utils";
+import { animeId, animePath, bannerOf, episodeCount, posterOf, titleOf, watchPath } from "@/lib/utils";
 
 const STATUS_LABEL: Record<string, string> = {
   currently_airing: "Airing Now",
@@ -150,14 +150,14 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
           {/* CTA buttons */}
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
-              href={`/watch/${id}/1`}
+              href={watchPath(current, id, 1)}
               className="shine group inline-flex h-[52px] items-center gap-2.5 rounded-full bg-[#cf2442] px-7 text-sm font-black text-white shadow-xl shadow-[#cf2442]/28 transition hover:bg-[#dc2d4b] hover:shadow-[#cf2442]/36 hover:shadow-2xl"
             >
               <Play size={18} fill="currentColor" />
               Watch Now
             </Link>
             <Link
-              href={`/anime/${id}`}
+              href={animePath(current, id)}
               aria-label={`More details about ${title}`}
               className="inline-flex h-[52px] items-center gap-2.5 rounded-full border border-white/[0.12] bg-white/[0.06] px-7 text-sm font-black text-white backdrop-blur-xl transition hover:border-white/20 hover:bg-white/10"
             >
@@ -332,14 +332,14 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
 
           <div className="mt-3 flex gap-2">
             <Link
-              href={`/watch/${id}/1`}
+              href={watchPath(current, id, 1)}
               className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#cf2442] text-sm font-black text-white shadow-lg shadow-[#cf2442]/22"
             >
               <Play size={16} fill="currentColor" />
               Watch
             </Link>
             <Link
-              href={`/anime/${id}`}
+              href={animePath(current, id)}
               aria-label={`View details for ${title}`}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.1] px-3.5 text-sm font-bold text-white/85 backdrop-blur-xl"
             >

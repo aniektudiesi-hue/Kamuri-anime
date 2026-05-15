@@ -29,7 +29,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
 }
 
 function SidebarSkeleton() {
-  return <div className="h-[540px] rounded-2xl border border-white/[0.05] bg-[#0d1020]/35" />;
+  return <div className="h-[1860px] rounded-2xl border border-white/[0.05] bg-[#0d1020]/35" />;
 }
 
 function useDesktopSidebar() {
@@ -45,4 +45,3 @@ function useDesktopSidebar() {
 
   return show;
 }
-

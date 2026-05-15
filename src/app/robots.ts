@@ -20,12 +20,7 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: [
-      `${SITE_URL}/sitemap.xml`,
-      `${SITE_URL}/anime-sitemap.xml`,
-      `${SITE_URL}/watch-sitemap.xml`,
-      `${SITE_URL}/video-sitemap.xml`,
-    ],
+    sitemap: [`${SITE_URL}/sitemap.xml`],
     host: SITE_URL,
   };
 }

@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Play, Star } from "lucide-react";
 import type { Anime } from "@/lib/types";
-import { animeId, displayStatus, episodeLabel, posterOf, titleOf } from "@/lib/utils";
+import { animeId, animePath, displayStatus, episodeLabel, posterOf, titleOf } from "@/lib/utils";
 
 export function SeoAnimeCard({ anime, priority = false }: { anime: Anime; priority?: boolean }) {
   const id = animeId(anime);
@@ -12,7 +12,7 @@ export function SeoAnimeCard({ anime, priority = false }: { anime: Anime; priori
 
   return (
     <article className="group">
-      <Link href={`/anime/${id}`} className="block">
+      <Link href={animePath(anime, id)} className="block">
         <div className="relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828]">
           {poster ? (
             <Image

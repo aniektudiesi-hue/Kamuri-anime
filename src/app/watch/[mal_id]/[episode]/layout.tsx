@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getEpisodeMetadata, getKnownAnimeById } from "@/lib/server-anime";
 import { animeKeywords, breadcrumbJsonLd, buildPageMetadata, episodeJsonLd, safeJsonLd, watchDescription, watchPageTitle } from "@/lib/seo";
-import { episodeCount, posterOf, titleOf } from "@/lib/utils";
+import { animePath, episodeCount, episodeNumberFromSlug, idFromSlug, posterOf, titleOf, watchPath } from "@/lib/utils";
 
 type WatchLayoutProps = {
   children: React.ReactNode;
@@ -33,13 +33,15 @@ function videoUploadDate(anime: Awaited<ReturnType<typeof getKnownAnimeById>>) {
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ mal_id: string; episode: string }> }): Promise<Metadata> {
-  const { mal_id: malId, episode } = await params;
+  const { mal_id: rawMalId, episode: rawEpisode } = await params;
+  const malId = idFromSlug(rawMalId);
+  const episode = episodeNumberFromSlug(rawEpisode);
   const { anime, animeTitle, episodeTitle } = await getWatchInfo(malId, episode);
 
   const metadata = buildPageMetadata({
     title: watchPageTitle(anime, malId, episode),
     description: watchDescription(anime, malId, episode, episodeTitle),
-    path: `/watch/${malId}/${episode}`,
+    path: watchPath(anime, malId, episode),
     image: posterOf(anime),
   });
   return {
@@ -61,9 +63,11 @@ export async function generateMetadata({ params }: { params: Promise<{ mal_id: s
 }
 
 export default async function WatchLayout({ children, params }: WatchLayoutProps) {
-  const { mal_id: malId, episode } = await params;
+  const { mal_id: rawMalId, episode: rawEpisode } = await params;
+  const malId = idFromSlug(rawMalId);
+  const episode = episodeNumberFromSlug(rawEpisode);
   const { anime, animeTitle, episodeTitle } = await getWatchInfo(malId, episode);
-  const path = `/watch/${malId}/${episode}`;
+  const path = watchPath(anime, malId, episode);
 
   const jsonLd = [
     ...episodeJsonLd({
@@ -75,7 +79,7 @@ export default async function WatchLayout({ children, params }: WatchLayoutProps
     }),
     breadcrumbJsonLd([
       { name: "Home", path: "/" },
-      { name: animeTitle, path: `/anime/${malId}` },
+      { name: animeTitle, path: animePath(anime, malId) },
       { name: `Episode ${episode}`, path },
     ]),
   ];

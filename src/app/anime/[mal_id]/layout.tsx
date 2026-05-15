@@ -10,7 +10,7 @@ import {
   safeJsonLd,
 } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site";
-import { episodeCount, posterOf, titleOf } from "@/lib/utils";
+import { animePath, episodeCount, idFromSlug, posterOf, titleOf, watchPath } from "@/lib/utils";
 
 type AnimeLayoutProps = {
   children: React.ReactNode;
@@ -18,13 +18,14 @@ type AnimeLayoutProps = {
 };
 
 export async function generateMetadata({ params }: { params: Promise<{ mal_id: string }> }): Promise<Metadata> {
-  const { mal_id: malId } = await params;
+  const { mal_id: rawMalId } = await params;
+  const malId = idFromSlug(rawMalId);
   const anime = await getKnownAnimeById(malId);
 
   const metadata = buildPageMetadata({
     title: animePageTitle(anime, malId),
     description: animeDescription(anime, malId),
-    path: `/anime/${malId}`,
+    path: animePath(anime, malId),
     image: posterOf(anime),
   });
   return {
@@ -39,7 +40,8 @@ export async function generateMetadata({ params }: { params: Promise<{ mal_id: s
 }
 
 export default async function AnimeLayout({ children, params }: AnimeLayoutProps) {
-  const { mal_id: malId } = await params;
+  const { mal_id: rawMalId } = await params;
+  const malId = idFromSlug(rawMalId);
   const anime = await getKnownAnimeById(malId);
   const hint = episodeCount(anime);
   const episodes = await getEpisodeMetadata(malId, hint);
@@ -49,7 +51,7 @@ export default async function AnimeLayout({ children, params }: AnimeLayoutProps
     animeJsonLd(anime, malId),
     breadcrumbJsonLd([
       { name: "Home", path: "/" },
-      { name: title, path: `/anime/${malId}` },
+      { name: title, path: animePath(anime, malId) },
     ]),
     episodes?.episodes?.length
       ? {
@@ -60,7 +62,7 @@ export default async function AnimeLayout({ children, params }: AnimeLayoutProps
           itemListElement: episodes.episodes.slice(0, 100).map((episode, index) => ({
             "@type": "ListItem",
             position: index + 1,
-            url: absoluteUrl(`/watch/${malId}/${episode.episode_number}`),
+            url: absoluteUrl(watchPath(anime, malId, episode.episode_number)),
             name: episode.title || `${title} Episode ${episode.episode_number}`,
           })),
         }

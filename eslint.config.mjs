@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-verify/**",
+    "lh-*.json",
     "out/**",
     "build/**",
     "next-env.d.ts",

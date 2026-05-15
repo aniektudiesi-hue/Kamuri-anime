@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { getEpisodeMetadata, getHomeAnimeCatalog } from "@/lib/server-anime";
 import { SEO_CATEGORIES } from "@/lib/seo-categories";
 import { absoluteUrl } from "@/lib/site";
-import { animeId, episodeCount } from "@/lib/utils";
+import { animeId, animePath, episodeCount, watchPath } from "@/lib/utils";
 
 export const SITEMAP_GENRES = [
   "Action",
@@ -63,7 +63,7 @@ export async function animeSitemapRoutes(now = new Date()): Promise<MetadataRout
       const id = animeId(anime);
       if (!id) return null;
       return {
-        url: absoluteUrl(`/anime/${id}`),
+        url: absoluteUrl(animePath(anime, id)),
         lastModified: now,
         changeFrequency: "daily" as const,
         priority: 0.86,
@@ -86,7 +86,7 @@ export async function watchSitemapRoutes(now = new Date()): Promise<MetadataRout
           : Array.from({ length: Math.min(knownCount, 36) }, (_, index) => index + 1);
 
         return prioritizedEpisodes(episodeNumbers, 36).map((episodeNumber) => ({
-          url: absoluteUrl(`/watch/${id}/${episodeNumber}`),
+          url: absoluteUrl(watchPath(anime, id, episodeNumber)),
           lastModified: now,
           changeFrequency: "daily" as const,
           priority: episodeNumber === 1 ? 0.78 : 0.72,
@@ -104,4 +104,3 @@ function prioritizedEpisodes(episodes: number[], limit: number) {
   const latest = normalized.slice(-Math.ceil(limit * 0.3));
   return [...new Set([...first, ...latest])].slice(0, limit);
 }
-

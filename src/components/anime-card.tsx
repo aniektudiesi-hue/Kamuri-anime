@@ -8,7 +8,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
-import { animeId, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
+import { animeId, animePath, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf, watchPath } from "@/lib/utils";
 
 const STATUS_DOT: Record<string, string> = {
   currently_airing: "bg-[#c8ced8]",
@@ -26,7 +26,9 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
   const title = titleOf(anime);
   const statusKey = (anime.status || "").toLowerCase();
   const resume = useResumeHistory(id);
-  const href = resume.hasResume ? resume.href : `/anime/${id}`;
+  const href = resume.hasResume
+    ? `${watchPath(anime, id, resume.episode)}${resume.progress > 1 ? `?t=${Math.floor(resume.progress)}` : ""}`
+    : animePath(anime, id);
 
   function prefetch() {
     if (!id) return;

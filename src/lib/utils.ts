@@ -72,6 +72,46 @@ export function titleOf(anime: Anime | undefined) {
   return anime?.title_en || anime?.title || anime?.name || anime?.english || titleFromArray || titleFromObject || anime?.title_jp || anime?.japanese || "Untitled";
 }
 
+export function slugifyTitle(value: string, fallback = "anime") {
+  const slug = value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+  return slug || fallback;
+}
+
+export function idFromSlug(value: string | number | undefined) {
+  const raw = String(value ?? "");
+  const match = raw.match(/(\d+)(?!.*\d)/);
+  return match?.[1] || raw;
+}
+
+export function episodeNumberFromSlug(value: string | number | undefined) {
+  const raw = String(value ?? "");
+  const match = raw.match(/(\d+)(?!.*\d)/);
+  return match?.[1] || raw || "1";
+}
+
+export function animeSlug(anime: Anime | undefined, fallbackId?: string | number) {
+  const id = animeId(anime) || String(fallbackId ?? "");
+  const title = titleOf(anime) === "Untitled" ? `anime-${id || "title"}` : titleOf(anime);
+  return id ? `${slugifyTitle(title)}-${id}` : slugifyTitle(title);
+}
+
+export function animePath(anime: Anime | undefined, fallbackId?: string | number) {
+  return `/anime/${animeSlug(anime, fallbackId)}`;
+}
+
+export function episodeSlug(episode: string | number) {
+  return `episode-${episodeNumberFromSlug(episode)}`;
+}
+
+export function watchPath(anime: Anime | undefined, fallbackId: string | number, episode: string | number) {
+  return `/watch/${animeSlug(anime, fallbackId)}/${episodeSlug(episode)}`;
+}
+
 export function rankAnimeForSearch(items: Anime[], query: string) {
   const normalizedQuery = query.trim().toLowerCase();
   return [...items].sort((a, b) => scoreSearchItem(b, normalizedQuery) - scoreSearchItem(a, normalizedQuery));

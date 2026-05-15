@@ -28,7 +28,7 @@ import {
   type StreamProviderId,
 } from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
-import { posterOf, progressOf, rememberAnime, rememberedAnime, titleOf } from "@/lib/utils";
+import { animePath, episodeNumberFromSlug, idFromSlug, posterOf, progressOf, rememberAnime, rememberedAnime, titleOf, watchPath } from "@/lib/utils";
 
 function getPlayed(malId: string): number[] {
   try { return JSON.parse(sessionStorage.getItem(`played_${malId}`) || "[]"); }
@@ -51,7 +51,9 @@ export default function WatchPage({
   params: Promise<{ mal_id: string; episode: string }>;
   searchParams: Promise<{ t?: string }>;
 }) {
-  const { mal_id: malId, episode } = use(params);
+  const { mal_id: rawMalId, episode: rawEpisode } = use(params);
+  const malId = idFromSlug(rawMalId);
+  const episode = episodeNumberFromSlug(rawEpisode);
   const { t } = use(searchParams);
   const [server, setServer] = useState<StreamProviderId>(DEFAULT_STREAM_PROVIDER_ID);
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
@@ -302,8 +304,8 @@ export default function WatchPage({
   useEffect(() => {
     if (!malId || !Number.isFinite(episodeNum)) return;
     queryClient.prefetchQuery({ queryKey: ["episodes", malId, 0], queryFn: () => api.episodes(malId), staleTime: 1000 * 60 * 20 });
-    router.prefetch(`/watch/${malId}/${episodeNum + 1}`);
-  }, [episodeNum, malId, queryClient, router]);
+    router.prefetch(watchPath(displayAnime, malId, episodeNum + 1));
+  }, [displayAnime, episodeNum, malId, queryClient, router]);
 
   const maxEpisode = useMemo(
     () => episodes.data?.num_episodes || episodes.data?.episodes.at(-1)?.episode_number || 0,
@@ -311,7 +313,7 @@ export default function WatchPage({
   );
   const hasPrev = episodeNum > 1;
   const hasNext = maxEpisode ? episodeNum < maxEpisode : true;
-  const nextHref = hasNext ? `/watch/${malId}/${episodeNum + 1}` : undefined;
+  const nextHref = hasNext ? watchPath(displayAnime, malId, episodeNum + 1) : undefined;
   const displayTitle = animeTitle === "Untitled" ? `Anime ${malId}` : animeTitle;
 
   useEffect(() => {
@@ -360,7 +362,7 @@ export default function WatchPage({
         <div className="mb-4 flex items-center gap-2 text-sm text-white/30">
           <Link href="/" className="hover:text-white transition-colors">Home</Link>
           <ChevronRight size={13} />
-          <Link href={`/anime/${malId}`} className="hover:text-white transition-colors line-clamp-1 max-w-[200px]">
+          <Link href={animePath(displayAnime, malId)} className="hover:text-white transition-colors line-clamp-1 max-w-[200px]">
             {displayTitle}
           </Link>
           <ChevronRight size={13} />
@@ -387,7 +389,7 @@ export default function WatchPage({
                 </div>
               </div>
             ) : streamsLoading && !selectedStream ? (
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] sm:aspect-video sm:rounded-[22px]">
+              <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] sm:rounded-[22px]">
                 {animePoster ? (
                   <>
                     <Image src={animePoster} alt="" fill priority sizes="100vw" className="scale-105 object-cover opacity-80 blur-[1px]" />
@@ -423,7 +425,7 @@ export default function WatchPage({
             <div className="mt-3 flex items-center justify-between gap-3">
               <Link
                 aria-disabled={!hasPrev}
-                href={hasPrev ? `/watch/${malId}/${episodeNum - 1}` : "#"}
+                href={hasPrev ? watchPath(displayAnime, malId, episodeNum - 1) : "#"}
                 className={`inline-flex h-10 items-center gap-2 rounded-2xl px-4 text-sm font-semibold transition ${
                   !hasPrev
                     ? "pointer-events-none bg-white/[0.03] text-white/20"
@@ -578,7 +580,7 @@ export default function WatchPage({
           </div>
 
           {/* ── Right: Episode list with thumbnails ── */}
-          <div className="hidden w-[340px] shrink-0 xl:block">
+          <div className="hidden min-h-[720px] w-[340px] shrink-0 xl:block">
             <div className="sticky top-[84px]">
               <EpisodeSidebar
                 episodesData={episodes.data?.episodes}
@@ -689,7 +691,7 @@ function EpisodeSidebar({
                 const isActive = ep.episode_number === currentEp;
                 const isPlayed = playedEps.includes(ep.episode_number);
                 return (
-                  <Link key={ep.episode_number} href={`/watch/${malId}/${ep.episode_number}`}
+                  <Link key={ep.episode_number} href={watchPath(undefined, malId, ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
                     className={`grid h-10 place-items-center rounded-xl text-xs font-bold transition ${
                       isActive
@@ -709,7 +711,7 @@ function EpisodeSidebar({
   }
 
   return (
-    <div className="flex max-h-[calc(100vh-96px)] flex-col overflow-hidden rounded-2xl border border-white/[0.055] bg-[#0d1020]">
+    <div className="flex h-[calc(100vh-96px)] min-h-[720px] flex-col overflow-hidden rounded-2xl border border-white/[0.055] bg-[#0d1020]">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/[0.055] px-4 py-3">
         <div>
@@ -752,7 +754,7 @@ function EpisodeSidebar({
               return (
                 <Link
                   key={ep.episode_number}
-                  href={`/watch/${malId}/${ep.episode_number}`}
+                  href={watchPath(undefined, malId, ep.episode_number)}
                   ref={isActive ? currentRef : null}
                   className={`group flex gap-3 border-b border-white/[0.04] p-3 transition-colors ${
                     isActive

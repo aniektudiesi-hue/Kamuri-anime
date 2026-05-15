@@ -828,6 +828,8 @@ export function VideoPlayer({
     >
       <video
         ref={videoRef}
+        width={1920}
+        height={1080}
         playsInline
         autoPlay={autoPlay}
         preload="auto"

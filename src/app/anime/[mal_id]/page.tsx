@@ -20,7 +20,7 @@ import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
 import {
   animeId, bannerOf, displayStatus, episodeCount, posterOf,
-  rememberAnime, rememberedAnime, titleOf,
+  idFromSlug, rememberAnime, rememberedAnime, titleOf, watchPath,
 } from "@/lib/utils";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
@@ -42,7 +42,8 @@ function getRanges(total: number): { label: string; start: number; end: number }
 }
 
 export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: string }> }) {
-  const { mal_id: malId } = use(params);
+  const { mal_id: rawMalId } = use(params);
+  const malId = idFromSlug(rawMalId);
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [clickedAnime, setClickedAnime] = useState<Anime | undefined>();
@@ -147,7 +148,9 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const title = titleOf(displayAnime) === "Untitled" ? `Anime ${malId}` : titleOf(displayAnime);
   const statusKey = (displayAnime?.status || "").toLowerCase();
   const statusCfg = STATUS_CONFIG[statusKey];
-  const resumeHref = resume.href;
+  const resumeHref = resume.item
+    ? `${watchPath(displayAnime, malId, resume.episode)}${resume.progress > 1 ? `?t=${Math.floor(resume.progress)}` : ""}`
+    : watchPath(displayAnime, malId, 1);
 
   const allEpisodes = episodes.data?.episodes ?? [];
   const ranges = getRanges(episodeTotal);
@@ -350,7 +353,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
             <div className="rounded-3xl border border-white/[0.065] bg-[#0d1020]/72 p-2.5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
               {visibleEpisodes.map((ep) => {
                 const isCurrent = ep.episode_number === lastEp && Boolean(last);
-                const href = isCurrent ? resumeHref : `/watch/${malId}/${ep.episode_number}`;
+                const href = isCurrent ? resumeHref : watchPath(displayAnime, malId, ep.episode_number);
                 return (
                   <Link
                     key={ep.episode_number}

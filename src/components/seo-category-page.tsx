@@ -4,7 +4,7 @@ import { SeoAnimeCard } from "@/components/seo-anime-card";
 import { SidebarLayout } from "@/components/sidebar";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 import { getSeoCategory, getSeoCategoryAnime, type SeoCategorySlug } from "@/lib/seo-categories";
-import { animeId, titleOf } from "@/lib/utils";
+import { animeId, animePath, titleOf } from "@/lib/utils";
 import { safeJsonLd } from "@/lib/seo";
 
 export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
@@ -22,7 +22,7 @@ export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
       "@type": "ListItem",
       position: index + 1,
       name: titleOf(item),
-      url: absoluteUrl(`/anime/${animeId(item)}`),
+      url: absoluteUrl(animePath(item, animeId(item))),
     })),
   };
 

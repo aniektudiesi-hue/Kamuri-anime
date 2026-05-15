@@ -1,6 +1,6 @@
 import { getEpisodeMetadata, getHomeAnimeCatalog } from "@/lib/server-anime";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
-import { animeId, episodeCount, posterOf, titleOf } from "@/lib/utils";
+import { animeId, episodeCount, posterOf, titleOf, watchPath } from "@/lib/utils";
 
 export const revalidate = 3600;
 
@@ -32,7 +32,7 @@ export async function GET() {
 
     for (const episode of prioritizedVideoEpisodes(episodes, MAX_VIDEOS_PER_ANIME)) {
       if (urls.length >= MAX_TOTAL_VIDEOS) break;
-      const watchUrl = absoluteUrl(`/watch/${id}/${episode.number}`);
+      const watchUrl = absoluteUrl(watchPath(anime, id, episode.number));
       const playerUrl = absoluteUrl(`/embed/${id}/${episode.number}`);
       const videoTitle = `${title} Episode ${episode.number}`;
       urls.push(`  <url>

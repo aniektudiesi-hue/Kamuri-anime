@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { Anime } from "@/lib/types";
 import { absoluteUrl, cleanText, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME } from "@/lib/site";
-import { animeId, displayStatus, episodeCount, posterOf, titleOf } from "@/lib/utils";
+import { animeId, animePath, displayStatus, episodeCount, posterOf, titleOf, watchPath } from "@/lib/utils";
 
 export function buildPageMetadata({
   title,
@@ -136,17 +136,17 @@ export function animeJsonLd(anime: Anime | undefined, malId: string) {
   return {
     "@context": "https://schema.org",
     "@type": "TVSeries",
-    "@id": absoluteUrl(`/anime/${id}`),
+    "@id": absoluteUrl(animePath(anime, id)),
     name: title,
     alternateName: anime?.title_jp || anime?.japanese || undefined,
-    url: absoluteUrl(`/anime/${id}`),
+    url: absoluteUrl(animePath(anime, id)),
     image: poster || undefined,
     numberOfEpisodes: count || undefined,
     genre: "Anime",
     inLanguage: ["ja", "en"],
     potentialAction: {
       "@type": "WatchAction",
-      target: absoluteUrl(count > 0 ? `/watch/${id}/1` : `/anime/${id}`),
+      target: absoluteUrl(count > 0 ? watchPath(anime, id, 1) : animePath(anime, id)),
       name: `Watch ${title} online`,
     },
     aggregateRating: anime?.score
@@ -175,7 +175,7 @@ export function episodeJsonLd({
 }) {
   const title = titleOf(anime) === "Untitled" ? `Anime ${malId}` : titleOf(anime);
   const poster = posterOf(anime);
-  const path = `/watch/${malId}/${episode}`;
+  const path = watchPath(anime, malId, episode);
 
   return [
     {
@@ -204,7 +204,7 @@ export function episodeJsonLd({
       isPartOf: {
         "@type": "TVSeries",
         name: title,
-        url: absoluteUrl(`/anime/${malId}`),
+        url: absoluteUrl(animePath(anime, malId)),
       },
     },
     {
@@ -217,7 +217,7 @@ export function episodeJsonLd({
       partOfSeries: {
         "@type": "TVSeries",
         name: title,
-        url: absoluteUrl(`/anime/${malId}`),
+        url: absoluteUrl(animePath(anime, malId)),
       },
       potentialAction: {
         "@type": "WatchAction",

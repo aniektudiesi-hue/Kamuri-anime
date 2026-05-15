@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { HeroCarousel, MobileHeroBanner } from "@/components/hero-carousel";
 import { SidebarLayout } from "@/components/sidebar";
 import type { AiringScheduleItem, Anime, HomeInitialData } from "@/lib/types";
-import { animeId, episodeCount, episodeLabel, posterOf, titleOf } from "@/lib/utils";
+import { animeId, animePath, episodeCount, episodeLabel, posterOf, titleOf } from "@/lib/utils";
 
 export function HomePageClient({ initialData }: { initialData: HomeInitialData }) {
   return (
@@ -137,7 +137,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
 
   return (
     <article className="card-lift scroll-card group w-[132px] shrink-0 sm:w-[154px]">
-      <Link href={`/anime/${id}`} aria-label={`View ${title}`} className="block">
+      <Link href={animePath(anime, id)} aria-label={`View ${title}`} className="block">
         <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.055] transition group-hover:ring-[#cf2442]/28">
           {poster ? (
             <Image
@@ -218,7 +218,7 @@ function ScheduleCard({ item }: { item: AiringScheduleItem }) {
 
   return (
     <Link
-      href={`/anime/${item.id}`}
+      href={animePath(item.anime, item.id)}
       aria-label={`View ${title} episode ${item.episode}`}
       className="scroll-card group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#111421]/72 p-2 transition hover:-translate-y-0.5 hover:border-[#f43f5e]/30 hover:bg-[#171b2a]"
     >

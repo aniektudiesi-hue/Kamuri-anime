@@ -7,7 +7,7 @@ import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { animeId, episodeLabel, posterOf, rankAnimeForSearch, rememberAnime, titleOf } from "@/lib/utils";
+import { animeId, animePath, episodeLabel, posterOf, rankAnimeForSearch, rememberAnime, titleOf } from "@/lib/utils";
 
 export function SearchBox() {
   const router = useRouter();
@@ -84,7 +84,7 @@ export function SearchBox() {
     setFocused(false);
     inputRef.current?.blur();
     if (id) {
-      router.push(`/anime/${id}`);
+      router.push(animePath(anime, id));
     } else {
       router.push(`/search?q=${encodeURIComponent(titleOf(anime))}`);
     }

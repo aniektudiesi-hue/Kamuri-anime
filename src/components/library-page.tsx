@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { deleteOfflineDownload, listOfflineDownloads, offlineId } from "@/lib/offline-downloads";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { posterOf, progressOf, rememberedAnime, titleOf } from "@/lib/utils";
+import { animePath, posterOf, progressOf, rememberedAnime, titleOf, watchPath } from "@/lib/utils";
 
 type LibraryKind = "history" | "watchlist" | "downloads";
 
@@ -184,13 +184,6 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
   const baseItem = { ...savedAnime, ...item };
   const downloadHref = `/offline/${encodeURIComponent(item.offline_id || offlineId(id, episode))}`;
   const progress = kind === "downloads" ? 0 : progressOf(item);
-  const href =
-    kind === "watchlist"
-      ? `/anime/${id}`
-      : kind === "downloads"
-        ? downloadHref
-        : `/watch/${id}/${episode}${progress > 1 ? `?t=${Math.floor(progress)}` : ""}`;
-  const titleHref = kind === "downloads" ? href : `/anime/${id}`;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -221,6 +214,13 @@ function LibraryRow({ item, kind, canRemove, onRemove }: { item: LibraryItem; ki
     ? (enrich.data as { title?: string })?.title || `Anime ${id}`
     : titleOf(displayItem);
   const displayPoster = posterOf(displayItem) || (enrich.data as { image_url?: string })?.image_url || "";
+  const href =
+    kind === "watchlist"
+      ? animePath(displayItem, id)
+      : kind === "downloads"
+        ? downloadHref
+        : `${watchPath(displayItem, id, episode)}${progress > 1 ? `?t=${Math.floor(progress)}` : ""}`;
+  const titleHref = kind === "downloads" ? href : animePath(displayItem, id);
 
   return (
     <div className="scroll-card grid grid-cols-[78px_1fr_auto] items-center gap-4 rounded-3xl border border-white/[0.075] bg-panel/86 p-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] transition hover:border-[#cf2442]/28 hover:bg-panel">

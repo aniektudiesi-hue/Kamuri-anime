@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
-import { animeId, episodeCount, posterOf, titleOf } from "@/lib/utils";
+import { animeId, animePath, episodeCount, posterOf, titleOf, watchPath } from "@/lib/utils";
 
 const GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy",
@@ -121,7 +121,7 @@ export function SidebarContent() {
                 return (
                   <Link
                     key={`${id}-${i}`}
-                    href={`/anime/${id}`}
+                    href={animePath(anime, id)}
                     className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.03]"
                   >
                     <span className={`w-5 shrink-0 text-center text-sm font-black tabular-nums ${i === 0 ? "text-[#d8b56a]" : i === 1 ? "text-white/70" : i === 2 ? "text-[#b58653]" : "text-white/55"}`}>
@@ -168,7 +168,7 @@ export function SidebarContent() {
                 return (
                   <Link
                     key={`${id}-${i}`}
-                    href={count > 0 ? `/watch/${id}/${count}` : `/anime/${id}`}
+                    href={count > 0 ? watchPath(anime, id, count) : animePath(anime, id)}
                     className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
                   >
                     <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-[#141828]">
@@ -229,4 +229,3 @@ function SettingSwitch({
     </button>
   );
 }
-

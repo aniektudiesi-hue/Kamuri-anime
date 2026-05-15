@@ -6,7 +6,7 @@ import { SidebarLayout } from "@/components/sidebar";
 import { getHomeInitialData } from "@/lib/home-server";
 import { buildPageMetadata, safeJsonLd } from "@/lib/seo";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
-import { animeId, posterOf, titleOf } from "@/lib/utils";
+import { animeId, animePath, posterOf, titleOf } from "@/lib/utils";
 
 export const revalidate = 900;
 export const metadata = buildPageMetadata({
@@ -62,7 +62,7 @@ export default async function SchedulePage() {
                     return (
                       <Link
                         key={`${id}-${item.episode}-${item.airingAt}`}
-                        href={`/anime/${id}`}
+                        href={animePath(item.anime, id)}
                         className="grid grid-cols-[56px_1fr_auto] items-center gap-3 rounded-2xl border border-white/[0.06] bg-[#0d1020] p-2 transition hover:border-white/[0.13] hover:bg-[#15192a]"
                       >
                         <div className="relative h-16 w-14 overflow-hidden rounded-xl bg-[#141828]">
