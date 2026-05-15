@@ -5,12 +5,21 @@ const IMAGE_CDN_ENABLED = process.env.NEXT_PUBLIC_IMAGE_CDN_ENABLED !== "0";
 export type ImageVariant = "poster-sm" | "poster-md" | "poster-lg" | "banner-sm" | "banner-lg" | "thumb";
 
 const VARIANT_WIDTH: Record<ImageVariant, number> = {
-  "poster-sm": 160,
-  "poster-md": 240,
-  "poster-lg": 360,
-  "banner-sm": 640,
-  "banner-lg": 1280,
-  thumb: 480,
+  "poster-sm": 144,
+  "poster-md": 200,
+  "poster-lg": 320,
+  "banner-sm": 520,
+  "banner-lg": 1120,
+  thumb: 360,
+};
+
+const VARIANT_QUALITY: Record<ImageVariant, number> = {
+  "poster-sm": 68,
+  "poster-md": 72,
+  "poster-lg": 76,
+  "banner-sm": 70,
+  "banner-lg": 76,
+  thumb: 70,
 };
 
 const ALLOWED_SOURCE_HOSTS = [
@@ -41,7 +50,7 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
       return normalizedSrc;
     }
     const width = VARIANT_WIDTH[variant];
-    return `${IMAGE_CDN_BASE}/image?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=82`;
+    return `${IMAGE_CDN_BASE}/image?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=${VARIANT_QUALITY[variant]}`;
   } catch {
     return src;
   }

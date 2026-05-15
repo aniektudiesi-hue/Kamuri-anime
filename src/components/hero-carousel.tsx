@@ -85,7 +85,10 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
     <section className="relative h-[76vh] max-h-[700px] min-h-[460px] overflow-hidden bg-[#05060b]">
 
       {/* Background image */}
-      <div key={`bg-${index}`} className="absolute inset-0 animate-[heroBackdropTurn_0.82s_cubic-bezier(0.2,0.8,0.18,1)]">
+      <div
+        key={`bg-${index}`}
+        className={`absolute inset-0 ${flipKey > 0 ? "animate-[heroBackdropTurn_0.82s_cubic-bezier(0.2,0.8,0.18,1)]" : ""}`}
+      >
         {banner ? (
           <Image
             src={banner}
@@ -95,7 +98,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
             fetchPriority="high"
             quality={100}
             sizes="100vw"
-            className="object-cover object-center opacity-72 motion-safe:will-change-transform"
+            className="object-cover object-center opacity-80 motion-safe:will-change-transform"
           />
         ) : null}
       </div>
@@ -267,10 +270,10 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
 
   if (loading) {
     return (
-      <section ref={sectionRef} className="relative -mt-1 min-h-[360px] overflow-hidden pb-4 sm:hidden">
+      <section ref={sectionRef} className="relative -mt-1 min-h-[320px] overflow-hidden pb-3 sm:hidden">
         <div className="absolute inset-0 animate-pulse bg-[#141828]" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/35 to-transparent" />
-        <div className="relative flex min-h-[360px] items-end px-4">
+        <div className="relative flex min-h-[320px] items-end px-4">
           <div className="w-full rounded-2xl border border-white/[0.1] bg-black/30 p-3.5 shadow-2xl shadow-black/35 backdrop-blur-2xl">
             <div className="mb-3 h-3 w-24 rounded-full bg-white/[0.12]" />
             <div className="h-8 w-4/5 rounded-xl bg-white/[0.12]" />
@@ -293,7 +296,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const count = episodeCount(current);
 
   return (
-    <section ref={sectionRef} className="relative -mt-1 min-h-[365px] overflow-hidden pb-3 sm:hidden">
+    <section ref={sectionRef} className="relative -mt-1 min-h-[320px] overflow-hidden pb-3 sm:hidden">
       <div className="absolute inset-0 bg-[#080a12]">
         {banner || poster ? (
           <Image
@@ -306,14 +309,14 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             loading={index === 0 ? undefined : "lazy"}
             quality={96}
             sizes="100vw"
-            className="object-cover opacity-85"
+            className="object-cover opacity-100"
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/42 to-transparent" />
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#06070d]/80 to-transparent" />
       </div>
 
-      <div className="relative flex min-h-[365px] items-end px-4">
+      <div className="relative flex min-h-[320px] items-end px-4">
         <div className="w-[92%] max-w-[350px] rounded-2xl border border-white/[0.1] bg-[#090b13]/24 p-3 shadow-2xl shadow-black/30 backdrop-blur-md">
           <div className="mb-2 flex items-center gap-2">
             <span className="rounded-full bg-[#cf2442]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#cf2442]/30">
