@@ -115,6 +115,7 @@ function Footer() {
           </p>
           <div className="flex items-center gap-4">
             {[
+              { label: "Licensing", href: "/licensing" },
               { label: "Privacy Policy", href: "/privacy" },
               { label: "Terms of Use", href: "/terms" },
               { label: "DMCA", href: "/dmca" },
@@ -139,6 +140,7 @@ function Footer() {
               { label: "Top Rated Anime", href: "/top-rated" },
               { label: "Watch Free Anime", href: "/free-anime" },
               { label: "Anime Schedule", href: "/schedule" },
+              { label: "Licensed Anime Access", href: "/licensing" },
             ].map((link) => (
               <Link
                 key={link.href}

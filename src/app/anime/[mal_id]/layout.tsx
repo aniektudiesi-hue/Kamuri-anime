@@ -3,6 +3,8 @@ import { getEpisodeMetadata, getKnownAnimeById } from "@/lib/server-anime";
 import {
   animeDescription,
   animeJsonLd,
+  animeKeywords,
+  animePageTitle,
   breadcrumbJsonLd,
   buildPageMetadata,
   safeJsonLd,
@@ -18,14 +20,22 @@ type AnimeLayoutProps = {
 export async function generateMetadata({ params }: { params: Promise<{ mal_id: string }> }): Promise<Metadata> {
   const { mal_id: malId } = await params;
   const anime = await getKnownAnimeById(malId);
-  const title = titleOf(anime) === "Untitled" ? `Anime ${malId}` : titleOf(anime);
 
-  return buildPageMetadata({
-    title: `${title} Episodes, Details and Watch Online`,
+  const metadata = buildPageMetadata({
+    title: animePageTitle(anime, malId),
     description: animeDescription(anime, malId),
     path: `/anime/${malId}`,
     image: posterOf(anime),
   });
+  return {
+    ...metadata,
+    keywords: animeKeywords(anime, malId),
+    openGraph: {
+      ...metadata.openGraph,
+      type: "video.tv_show",
+      title: animePageTitle(anime, malId),
+    },
+  };
 }
 
 export default async function AnimeLayout({ children, params }: AnimeLayoutProps) {

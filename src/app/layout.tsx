@@ -91,6 +91,15 @@ const organizationJsonLd = {
   url: SITE_URL,
   logo: absoluteUrl("/logo.svg"),
   image: absoluteUrl("/logo.svg"),
+  publishingPrinciples: absoluteUrl("/licensing"),
+  knowsAbout: [
+    "licensed anime streaming",
+    "anime episode discovery",
+    "safe anime playback",
+    "subbed anime",
+    "dubbed anime",
+    "monthly anime release schedules",
+  ],
 };
 
 export default function RootLayout({

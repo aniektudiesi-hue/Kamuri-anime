@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { getEpisodeMetadata, getKnownAnimeById } from "@/lib/server-anime";
-import { absoluteUrl, SITE_NAME } from "@/lib/site";
-import { breadcrumbJsonLd, buildPageMetadata, safeJsonLd } from "@/lib/seo";
+import { animeKeywords, breadcrumbJsonLd, buildPageMetadata, episodeJsonLd, safeJsonLd, watchDescription, watchPageTitle } from "@/lib/seo";
 import { episodeCount, posterOf, titleOf } from "@/lib/utils";
 
 type WatchLayoutProps = {
@@ -37,38 +36,43 @@ export async function generateMetadata({ params }: { params: Promise<{ mal_id: s
   const { mal_id: malId, episode } = await params;
   const { anime, animeTitle, episodeTitle } = await getWatchInfo(malId, episode);
 
-  return buildPageMetadata({
-    title: `Watch ${animeTitle} Episode ${episode}`,
-    description: `Watch ${episodeTitle} on ${SITE_NAME}. Enjoy fast HD anime streaming with smooth HLS playback, server switching, subtitles, and watch history.`,
+  const metadata = buildPageMetadata({
+    title: watchPageTitle(anime, malId, episode),
+    description: watchDescription(anime, malId, episode, episodeTitle),
     path: `/watch/${malId}/${episode}`,
     image: posterOf(anime),
   });
+  return {
+    ...metadata,
+    keywords: [
+      ...animeKeywords(anime, malId),
+      `${animeTitle} episode ${episode}`,
+      `watch ${animeTitle} episode ${episode}`,
+      `${animeTitle} episode ${episode} online`,
+      `${episodeTitle} watch online`,
+    ],
+    openGraph: {
+      ...metadata.openGraph,
+      type: "video.episode",
+      title: watchPageTitle(anime, malId, episode),
+      description: watchDescription(anime, malId, episode, episodeTitle),
+    },
+  };
 }
 
 export default async function WatchLayout({ children, params }: WatchLayoutProps) {
   const { mal_id: malId, episode } = await params;
-  const { anime, animeTitle, episodeTitle, episodeNumber } = await getWatchInfo(malId, episode);
-  const poster = posterOf(anime);
+  const { anime, animeTitle, episodeTitle } = await getWatchInfo(malId, episode);
   const path = `/watch/${malId}/${episode}`;
 
   const jsonLd = [
-    {
-      "@context": "https://schema.org",
-      "@type": "VideoObject",
-      name: episodeTitle,
-      description: `Watch ${animeTitle} episode ${episode} on ${SITE_NAME}.`,
-      thumbnailUrl: poster ? [poster] : undefined,
+    ...episodeJsonLd({
+      anime,
+      malId,
+      episode,
+      episodeTitle,
       uploadDate: videoUploadDate(anime),
-      url: absoluteUrl(path),
-      embedUrl: absoluteUrl(path),
-      episodeNumber: Number.isFinite(episodeNumber) ? episodeNumber : undefined,
-      inLanguage: ["ja", "en"],
-      isPartOf: {
-        "@type": "TVSeries",
-        name: animeTitle,
-        url: absoluteUrl(`/anime/${malId}`),
-      },
-    },
+    }),
     breadcrumbJsonLd([
       { name: "Home", path: "/" },
       { name: animeTitle, path: `/anime/${malId}` },
