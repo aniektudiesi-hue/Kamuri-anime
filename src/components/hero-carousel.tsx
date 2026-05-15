@@ -96,8 +96,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
             fill
             priority
             fetchPriority="high"
-            quality={100}
-            sizes="100vw"
+            sizes="(max-width: 639px) 1px, 100vw"
             className="object-cover object-center opacity-80 motion-safe:will-change-transform"
           />
         ) : null}
@@ -200,7 +199,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
               className="hero-book-card relative aspect-[2/3] w-full overflow-hidden rounded-[34px] shadow-[0_34px_110px_rgba(0,0,0,0.72)] ring-1 ring-white/12"
               style={{ "--book-start": dir === 1 ? "-34deg" : "34deg", "--book-shift": dir === 1 ? "-28px" : "28px" } as CSSProperties}
             >
-              <Image src={poster} alt={title} fill sizes="280px" priority quality={90} className="object-cover" />
+              <Image src={poster} alt={title} fill sizes="(max-width: 1023px) 1px, 280px" priority className="object-cover" />
               {/* Glow */}
               <div className="absolute inset-0 rounded-3xl ring-2 ring-inset ring-white/[0.08]" />
               <div className="hero-book-sheen" />
@@ -307,8 +306,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             priority={index === 0}
             fetchPriority={index === 0 ? "high" : "auto"}
             loading={index === 0 ? undefined : "lazy"}
-            quality={96}
-            sizes="100vw"
+            sizes="(max-width: 639px) 100vw, 1px"
             className="object-cover opacity-100"
           />
         ) : null}

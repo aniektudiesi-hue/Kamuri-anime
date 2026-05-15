@@ -22,7 +22,7 @@ export function animeId(anime: Anime | undefined) {
   return String(anime?.anime_id ?? anime?.mal_id ?? anime?.id ?? "");
 }
 
-export function posterOf(anime: Anime | undefined, variant: "poster-sm" | "poster-md" | "poster-lg" = "poster-md") {
+export function posterOf(anime: Anime | undefined, variant: "poster-xs" | "poster-sm" | "poster-md" | "poster-lg" = "poster-md") {
   const jpg = anime?.images?.jpg;
   const webp = anime?.images?.webp;
   return imageCdnUrl(

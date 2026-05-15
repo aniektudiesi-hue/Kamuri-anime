@@ -109,7 +109,7 @@ function BigSection({
 
       <div className="no-scrollbar scroll-strip -mx-1 flex gap-3 overflow-x-auto px-1 pb-3 sm:gap-4">
         {visibleItems.map((anime, i) => (
-          <AnimeGridCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 6} />
+          <AnimeGridCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 3} />
         ))}
       </div>
 
@@ -130,7 +130,7 @@ function BigSection({
 
 function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }) {
   const id = animeId(anime);
-  const poster = posterOf(anime, priority ? "poster-md" : "poster-sm");
+  const poster = posterOf(anime, "poster-sm");
   const title = titleOf(anime);
   const count = episodeCount(anime);
   const statusKey = (anime.status || "").toLowerCase();

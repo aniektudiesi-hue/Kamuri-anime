@@ -2,24 +2,26 @@ const DEFAULT_IMAGE_CDN_BASE = "https://anime-tv-stream-proxy.kamuri-anime.worke
 const IMAGE_CDN_BASE = (process.env.NEXT_PUBLIC_IMAGE_CDN_BASE || DEFAULT_IMAGE_CDN_BASE).replace(/\/$/, "");
 const IMAGE_CDN_ENABLED = process.env.NEXT_PUBLIC_IMAGE_CDN_ENABLED !== "0";
 
-export type ImageVariant = "poster-sm" | "poster-md" | "poster-lg" | "banner-sm" | "banner-lg" | "thumb";
+export type ImageVariant = "poster-xs" | "poster-sm" | "poster-md" | "poster-lg" | "banner-sm" | "banner-lg" | "thumb";
 
 const VARIANT_WIDTH: Record<ImageVariant, number> = {
+  "poster-xs": 64,
   "poster-sm": 144,
-  "poster-md": 200,
-  "poster-lg": 320,
-  "banner-sm": 520,
-  "banner-lg": 1120,
-  thumb: 360,
+  "poster-md": 184,
+  "poster-lg": 300,
+  "banner-sm": 500,
+  "banner-lg": 1040,
+  thumb: 320,
 };
 
 const VARIANT_QUALITY: Record<ImageVariant, number> = {
-  "poster-sm": 68,
-  "poster-md": 72,
-  "poster-lg": 76,
-  "banner-sm": 70,
-  "banner-lg": 76,
-  thumb: 70,
+  "poster-xs": 58,
+  "poster-sm": 66,
+  "poster-md": 69,
+  "poster-lg": 72,
+  "banner-sm": 66,
+  "banner-lg": 70,
+  thumb: 66,
 };
 
 const ALLOWED_SOURCE_HOSTS = [

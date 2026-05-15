@@ -117,7 +117,7 @@ export function SidebarContent() {
               ))
             : topItems.map((anime, i) => {
                 const id = animeId(anime);
-                const poster = posterOf(anime, "poster-sm");
+                const poster = posterOf(anime, "poster-xs");
                 return (
                   <Link
                     key={`${id}-${i}`}
@@ -164,7 +164,7 @@ export function SidebarContent() {
             : recentItems.map((anime, i) => {
                 const id = animeId(anime);
                 const count = episodeCount(anime);
-                const poster = posterOf(anime, "poster-sm");
+                const poster = posterOf(anime, "poster-xs");
                 return (
                   <Link
                     key={`${id}-${i}`}
