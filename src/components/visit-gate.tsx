@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
 const VISIT_COUNT_KEY = "animetvplus_visit_count";
-const REGISTER_AFTER_VISITS = 4;
+const REGISTER_AFTER_VISITS = 2;
 
 const OPEN_PATHS = [
   "/login",

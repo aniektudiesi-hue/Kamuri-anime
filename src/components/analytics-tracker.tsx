@@ -33,8 +33,6 @@ export function AnalyticsTracker() {
   }, [pathname, token]);
 
   useEffect(() => {
-    if (!token) return;
-
     const sendPresence = () => {
       if (document.visibilityState === "hidden") return;
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
@@ -52,7 +50,7 @@ export function AnalyticsTracker() {
       );
     };
 
-    const interval = window.setInterval(sendPresence, 45_000);
+    const interval = window.setInterval(sendPresence, token ? 45_000 : 30_000);
     const onVisible = () => {
       if (document.visibilityState === "visible") sendPresence();
     };

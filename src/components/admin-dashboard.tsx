@@ -47,7 +47,7 @@ function formatTime(value: unknown) {
 }
 
 function lastSeenSeconds(row: Row) {
-  const value = Number(row.last_seen_at);
+  const value = Number(row.last_seen_at ?? row.created_at);
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
@@ -116,6 +116,40 @@ function locationLabel(row: Row) {
   return label || text(row, "timezone") || text(row, "language") || "Unknown";
 }
 
+function visitorLabel(row: Row) {
+  const username = text(row, "username");
+  if (username) return username;
+  const key = text(row, "visitor_key");
+  return key ? `Visitor ${key.slice(0, 8)}` : "Visitor";
+}
+
+function onlineRows(users: Row[], visits: Row[], nowMs: number) {
+  const rows: Row[] = [];
+  const seen = new Set<string>();
+
+  users.forEach((row) => {
+    if (!isOnline(row, nowMs)) return;
+    const key = `user:${row.id ?? text(row, "username")}`;
+    seen.add(key);
+    rows.push({ ...row, presence_name: text(row, "username"), presence_type: "User", presence_seen_at: row.last_seen_at });
+  });
+
+  visits.forEach((row) => {
+    if (!isOnline(row, nowMs)) return;
+    const key = row.user_id ? `user:${row.user_id}` : `visitor:${text(row, "visitor_key", String(row.id ?? ""))}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    rows.push({
+      ...row,
+      presence_name: visitorLabel(row),
+      presence_type: row.user_id ? "User" : "Visitor",
+      presence_seen_at: row.created_at,
+    });
+  });
+
+  return rows.sort((a, b) => lastSeenSeconds(b) - lastSeenSeconds(a));
+}
+
 export function AdminDashboard() {
   const { token, user } = useAuth();
   const [adminKey, setAdminKey] = useState("");
@@ -173,7 +207,8 @@ export function AdminDashboard() {
   });
 
   const userRows = useMemo(() => asItems(users.data), [users.data]);
-  const onlineUsers = userRows.filter((row) => isOnline(row, nowMs)).length;
+  const visitRows = useMemo(() => asItems(visits.data), [visits.data]);
+  const activeRows = useMemo(() => onlineRows(userRows, visitRows, nowMs), [nowMs, userRows, visitRows]);
 
   const anyError = overview.error || users.error || logins.error || visits.error;
   const overviewData = overview.data ?? {};
@@ -243,7 +278,7 @@ export function AdminDashboard() {
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
               <StatCard icon={<UserRound size={18} />} label="Users" value={overviewData.total_users} loading={overview.isLoading} />
-              <StatCard icon={<Activity size={18} />} label="Online" value={onlineUsers} loading={users.isLoading} />
+              <StatCard icon={<Activity size={18} />} label="Online" value={activeRows.length} loading={users.isLoading || visits.isLoading} />
               <StatCard icon={<Activity size={18} />} label="Visits" value={overviewData.total_visits} loading={overview.isLoading} />
               <StatCard icon={<Globe2 size={18} />} label="Unique" value={overviewData.unique_visitors} loading={overview.isLoading} />
               <StatCard icon={<Clock3 size={18} />} label="24h Visits" value={overviewData.visits_24h} loading={overview.isLoading} />
@@ -251,6 +286,23 @@ export function AdminDashboard() {
               <StatCard icon={<MapPin size={18} />} label="Locations" value={overviewData.known_locations} loading={overview.isLoading} />
               <StatCard icon={<Lock size={18} />} label="Failed" value={overviewData.login_failed} loading={overview.isLoading} />
             </div>
+
+            <Panel title="Online now" icon={<Activity size={16} />} loading={users.isLoading || visits.isLoading} className="mt-6">
+              <Table
+                rows={activeRows}
+                initialRows={20}
+                columns={[
+                  ["Name", (row) => <span className="font-black text-white/82">{text(row, "presence_name", visitorLabel(row))}</span>],
+                  ["Type", (row) => <Badge className={text(row, "presence_type") === "Visitor" ? "bg-sky-500/12 text-sky-200" : "bg-emerald-500/12 text-emerald-200"}>{text(row, "presence_type", "Visitor")}</Badge>],
+                  ["Status", (row) => <PresenceBadge row={row} nowMs={nowMs} />],
+                  ["Last seen", (row) => lastSeenLabel(row.presence_seen_at ?? row.last_seen_at ?? row.created_at, nowMs)],
+                  ["Path", (row) => <span className="line-clamp-1">{text(row, "path", "-")}</span>],
+                  ["Location", (row) => locationLabel(row)],
+                  ["Device", (row) => text(row, "device", "-")],
+                  ["IP", (row) => text(row, "ip_address", text(row, "last_ip", "-"))],
+                ]}
+              />
+            </Panel>
 
             <div className="mt-6 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
               <Panel title="Users database" icon={<UserRound size={16} />} loading={users.isLoading}>
@@ -366,7 +418,7 @@ export function AdminDashboard() {
                   initialRows={14}
                   columns={[
                     ["Path", (row) => <span className="line-clamp-1">{text(row, "path", "/")}</span>],
-                    ["User", (row) => text(row, "username", "Guest")],
+                    ["User", (row) => visitorLabel(row)],
                     ["Location", (row) => locationLabel(row)],
                     ["Device", (row) => text(row, "device", "-")],
                     ["Time", (row) => formatTime(row.created_at)],
