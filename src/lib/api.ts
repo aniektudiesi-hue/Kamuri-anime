@@ -99,6 +99,7 @@ export const api = {
     cachedStreamRequest(`hd1:${malId}:${episode}`, `/api/hd1/${malId}/${episode}`),
   login: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   register: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
+  recover: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/recover", { method: "POST", body: JSON.stringify(body) }),
   me: (token: string) => request<User>("/auth/me", { token }),
   addHistory: (token: string, body: Record<string, unknown>) =>
     request("/user/history", { method: "POST", token, body: JSON.stringify(normalizeHistoryBody(body)) }),

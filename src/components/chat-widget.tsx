@@ -213,6 +213,17 @@ export function ChatWidget() {
     event.preventDefault();
     const body = { message: message.trim(), kind: "text", meta: {} };
     if (!body.message || !token) return;
+    const optimistic: ChatMessage = {
+      id: -Date.now(),
+      room,
+      user_id: Number(user?.id || 0),
+      username: user?.username || "you",
+      message: body.message,
+      kind: "text",
+      meta: {},
+      created_at: Math.floor(Date.now() / 1000),
+    };
+    setLiveMessages((current) => [...current, optimistic].slice(-80));
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(body));
