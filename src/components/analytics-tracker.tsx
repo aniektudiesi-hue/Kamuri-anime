@@ -54,6 +54,7 @@ export function AnalyticsTracker() {
     const onVisible = () => {
       if (document.visibilityState === "visible") sendPresence();
     };
+    window.setTimeout(sendPresence, 1200);
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {

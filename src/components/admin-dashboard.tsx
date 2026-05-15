@@ -53,7 +53,7 @@ function lastSeenSeconds(row: Row) {
 
 function isOnline(row: Row, nowMs: number) {
   const lastSeen = lastSeenSeconds(row);
-  return lastSeen > 0 && nowMs / 1000 - lastSeen <= 90;
+  return lastSeen > 0 && nowMs / 1000 - lastSeen <= 180;
 }
 
 function lastSeenLabel(value: unknown, nowMs: number) {
@@ -119,6 +119,8 @@ function locationLabel(row: Row) {
 function visitorLabel(row: Row) {
   const username = text(row, "username");
   if (username) return username;
+  const userId = number(row, "user_id");
+  if (userId) return `User #${userId}`;
   const key = text(row, "visitor_key");
   return key ? `Visitor ${key.slice(0, 8)}` : "Visitor";
 }
@@ -126,13 +128,6 @@ function visitorLabel(row: Row) {
 function onlineRows(users: Row[], visits: Row[], nowMs: number) {
   const rows: Row[] = [];
   const seen = new Set<string>();
-
-  users.forEach((row) => {
-    if (!isOnline(row, nowMs)) return;
-    const key = `user:${row.id ?? text(row, "username")}`;
-    seen.add(key);
-    rows.push({ ...row, presence_name: text(row, "username"), presence_type: "User", presence_seen_at: row.last_seen_at });
-  });
 
   visits.forEach((row) => {
     if (!isOnline(row, nowMs)) return;
@@ -145,6 +140,14 @@ function onlineRows(users: Row[], visits: Row[], nowMs: number) {
       presence_type: row.user_id ? "User" : "Visitor",
       presence_seen_at: row.created_at,
     });
+  });
+
+  users.forEach((row) => {
+    if (!isOnline(row, nowMs)) return;
+    const key = `user:${row.id ?? text(row, "username")}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    rows.push({ ...row, presence_name: text(row, "username"), presence_type: "User", presence_seen_at: row.last_seen_at });
   });
 
   return rows.sort((a, b) => lastSeenSeconds(b) - lastSeenSeconds(a));
@@ -173,8 +176,9 @@ export function AdminDashboard() {
     queryKey: ["admin", "users", token, adminKey],
     queryFn: () => api.adminUsers(token!, adminKey, 150),
     enabled: Boolean(token),
-    staleTime: 1000 * 20,
-    refetchInterval: 15_000,
+    staleTime: 1000 * 4,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
     retry: false,
   });
   const logins = useQuery({
@@ -186,10 +190,11 @@ export function AdminDashboard() {
   });
   const visits = useQuery({
     queryKey: ["admin", "visits", token, adminKey],
-    queryFn: () => api.adminVisits(token!, adminKey, 100),
+    queryFn: () => api.adminVisits(token!, adminKey, 500),
     enabled: Boolean(token),
-    staleTime: 1000 * 20,
-    refetchInterval: 15_000,
+    staleTime: 1000 * 4,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
     retry: false,
   });
   const visibility = useQuery({
