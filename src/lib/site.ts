@@ -1,13 +1,17 @@
-export const SITE_NAME = "animeTv";
+export const SITE_NAME = "AnimeTV Plus";
 export const SITE_DOMAIN = "animetvplus.xyz";
 export const SITE_URL = `https://${SITE_DOMAIN}`;
 export const SITE_DESCRIPTION =
-  "Watch free anime online on animeTv with fast HD streaming, subbed and dubbed anime discovery, episode lists, monthly schedules, watch history, and smooth HLS playback.";
+  "AnimeTV Plus, also known as animetvplus, is a fast anime streaming and discovery site at animetvplus.xyz with HD playback, episode lists, schedules, watch history, and smooth HLS playback.";
 
 export const SITE_KEYWORDS = [
+  "AnimeTV Plus",
+  "AnimeTVPlus",
+  "animetvplus.xyz",
+  "animetvplus site",
+  "animetvplus anime",
   "animeTv",
   "animetvplus",
-  "animetvplus.xyz",
   "animeTv Plus",
   "watch anime online",
   "watch anime online free",
