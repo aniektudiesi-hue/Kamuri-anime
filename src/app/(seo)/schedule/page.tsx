@@ -16,7 +16,7 @@ export const metadata = buildPageMetadata({
 });
 
 export default async function SchedulePage() {
-  const { schedule } = await getHomeInitialData();
+  const { schedule } = await getHomeInitialData({ fullSchedule: true });
   const grouped = groupByDay(schedule);
   const monthLabel = new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" }).format(new Date());
   const jsonLd = {

@@ -6,6 +6,7 @@ const ANILIST_URL = "https://graphql.anilist.co";
 const HOME_REVALIDATE_SECONDS = 30 * 60;
 const SCHEDULE_REVALIDATE_SECONDS = 6 * 60 * 60;
 const MONTHLY_SCHEDULE_MAX_PAGES = 10;
+const HOMEPAGE_SCHEDULE_LIMIT = 60;
 
 type AniListMedia = {
   idMal: number | null;
@@ -33,7 +34,11 @@ const ANILIST_STATUS: Record<string, string> = {
   HIATUS: "finished_airing",
 };
 
-export async function getHomeInitialData(): Promise<HomeInitialData> {
+type HomeInitialDataOptions = {
+  fullSchedule?: boolean;
+};
+
+export async function getHomeInitialData(options: HomeInitialDataOptions = {}): Promise<HomeInitialData> {
   const [banners, thumbnails, recent, topRated, schedule] = await Promise.all([
     fetchHomeList("/api/v1/banners"),
     fetchHomeList("/home/thumbnails"),
@@ -42,12 +47,14 @@ export async function getHomeInitialData(): Promise<HomeInitialData> {
     fetchMonthlyAiringSchedule(),
   ]);
 
+  const scheduleItems = options.fullSchedule ? schedule : schedule.slice(0, HOMEPAGE_SCHEDULE_LIMIT);
+
   return {
     banners: banners.slice(0, 10),
     thumbnails: thumbnails.slice(0, 24),
     recent: recent.slice(0, 24),
     topRated: topRated.slice(0, 24),
-    schedule,
+    schedule: scheduleItems,
     generatedAt: new Date().toISOString(),
   };
 }

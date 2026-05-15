@@ -15,6 +15,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const HERO_AUTO_ADVANCE_MS = 3000;
+const HERO_INITIAL_AUTO_DELAY_MS = 7000;
 
 export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading?: boolean }) {
   const [index, setIndex] = useState(0);
@@ -34,9 +35,19 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
 
   useEffect(() => {
     if (!items.length) return;
-    timerRef.current = window.setInterval(() => goTo(index + 1, 1), HERO_AUTO_ADVANCE_MS);
-    return () => window.clearInterval(timerRef.current);
-  }, [items.length, index]); // eslint-disable-line react-hooks/exhaustive-deps
+    const firstTimer = window.setTimeout(() => {
+      goTo(index + 1, 1);
+      timerRef.current = window.setInterval(() => {
+        setIndex((value) => (value + 1) % items.length);
+        setDir(1);
+        setFlipKey((value) => value + 1);
+      }, HERO_AUTO_ADVANCE_MS);
+    }, HERO_INITIAL_AUTO_DELAY_MS);
+    return () => {
+      window.clearTimeout(firstTimer);
+      window.clearInterval(timerRef.current);
+    };
+  }, [items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -226,6 +237,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const [index, setIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
   const sectionRef = useRef<HTMLElement | null>(null);
+  const timerRef = useRef<number | undefined>(undefined);
   const len = Math.max(items.length, 1);
   const current = items[index % len];
 
@@ -242,8 +254,15 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
 
   useEffect(() => {
     if (!items.length || !isVisible || document.hidden) return;
-    const timer = window.setInterval(() => setIndex((value) => (value + 1) % items.length), HERO_AUTO_ADVANCE_MS);
-    return () => window.clearInterval(timer);
+    const firstTimer = window.setTimeout(() => {
+      setIndex((value) => (value + 1) % items.length);
+      const timer = window.setInterval(() => setIndex((value) => (value + 1) % items.length), HERO_AUTO_ADVANCE_MS);
+      timerRef.current = timer;
+    }, HERO_INITIAL_AUTO_DELAY_MS);
+    return () => {
+      window.clearTimeout(firstTimer);
+      window.clearInterval(timerRef.current);
+    };
   }, [items.length, isVisible]);
 
   if (loading) {

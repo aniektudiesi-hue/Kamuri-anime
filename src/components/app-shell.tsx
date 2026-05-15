@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Header } from "./header";
-import { MobileBottomNav } from "./mobile-bottom-nav";
+import { MobileBottomNavGate } from "./mobile-bottom-nav-gate";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -9,7 +9,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Header />
       <main className="pb-20 sm:pb-0">{children}</main>
       <Footer />
-      <MobileBottomNav />
+      <MobileBottomNavGate />
     </>
   );
 }
