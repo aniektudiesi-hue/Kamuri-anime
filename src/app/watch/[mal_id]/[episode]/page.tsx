@@ -2,13 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, RefreshCcw, Radio, Play } from "lucide-react";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
-import { EpisodeDownloadButton } from "@/components/episode-download-button";
-import { VideoPlayer } from "@/components/video-player";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
 import { useAuth } from "@/lib/auth";
@@ -29,6 +28,19 @@ import {
 } from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
 import { animePath, episodeNumberFromSlug, idFromSlug, posterOf, progressOf, rememberAnime, rememberedAnime, titleOf, watchPath } from "@/lib/utils";
+
+const VideoPlayer = dynamic(
+  () => import("@/components/video-player").then((module) => module.VideoPlayer),
+  {
+    ssr: false,
+    loading: () => <div className="aspect-video w-full rounded-2xl border border-white/[0.08] bg-black" />,
+  },
+);
+
+const EpisodeDownloadButton = dynamic(
+  () => import("@/components/episode-download-button").then((module) => module.EpisodeDownloadButton),
+  { ssr: false },
+);
 
 function getPlayed(malId: string): number[] {
   try { return JSON.parse(sessionStorage.getItem(`played_${malId}`) || "[]"); }

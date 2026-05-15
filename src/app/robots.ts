@@ -15,7 +15,6 @@ export default function robots(): MetadataRoute.Robots {
           "/login",
           "/offline",
           "/register",
-          "/search",
           "/watchlist",
         ],
       },

@@ -101,7 +101,7 @@ function BigSection({
   viewAllHref?: string;
 }) {
   const allItems = items ?? [];
-  const visibleItems = allItems.slice(0, 6);
+  const visibleItems = allItems.slice(0, 10);
 
   return (
     <section className="content-visibility-auto border-t border-white/[0.055] py-8 first:border-t-0">
@@ -191,7 +191,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
 }
 
 function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
-  const upcoming = items.slice(0, 6);
+  const upcoming = items.slice(0, 12);
   if (!upcoming.length) return null;
 
   return (

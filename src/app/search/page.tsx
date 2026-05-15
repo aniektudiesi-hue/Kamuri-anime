@@ -65,13 +65,13 @@ function SearchContent() {
   const [discoveryPage, setDiscoveryPage] = useState(1);
   const [allAnilist, setAllAnilist] = useState<Anime[]>([]);
   const [allJikan, setAllJikan] = useState<Anime[]>([]);
-  const [visibleCount, setVisibleCount] = useState(30);
+  const [visibleCount, setVisibleCount] = useState(18);
 
   useEffect(() => {
     setDiscoveryPage(1);
     setAllAnilist([]);
     setAllJikan([]);
-    setVisibleCount(30);
+    setVisibleCount(18);
   }, [intent.key]);
 
   const results = useQuery({
@@ -208,15 +208,15 @@ function SearchContent() {
                   <p className="text-xs text-amber-400/60">Your API, AniList, and MyAnimeList are being checked in parallel.</p>
                 </div>
               </div>
-              <GridSkeleton count={30} />
+              <GridSkeleton count={18} />
             </>
           ) : isLoading ? (
-            <GridSkeleton count={30} />
+            <GridSkeleton count={18} />
           ) : merged.length > 0 ? (
             <>
               <div className="content-visibility-auto grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
                 {visibleMerged.map((anime, i) => (
-                  <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 8} />
+                  <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 3} />
                 ))}
               </div>
 
@@ -227,7 +227,7 @@ function SearchContent() {
               ) : visibleMerged.length < merged.length ? (
                 <div className="mt-8 flex justify-center">
                   <button
-                    onClick={() => setVisibleCount((count) => count + 30)}
+                    onClick={() => setVisibleCount((count) => count + 24)}
                     className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1020] px-8 py-3 text-sm font-bold text-white/60 transition-colors hover:border-white/[0.15] hover:text-white"
                   >
                     <ChevronDown size={16} />

@@ -97,9 +97,9 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
 
         {/* Title + meta */}
         <div className="mt-3 px-0.5">
-          <h3 className="line-clamp-2 text-[13px] font-semibold leading-5 text-white/85 transition-colors group-hover:text-white">
+          <h2 className="line-clamp-2 text-[13px] font-semibold leading-5 text-white/85 transition-colors group-hover:text-white">
             {title}
-          </h3>
+          </h2>
           <p className="mt-1 text-[11px] text-white/68">
             {resume.hasResume ? `Continue Ep ${resume.episode}` : episodeLabel(anime)}
             {statusKey === "currently_airing" ? " · Airing" : statusKey === "finished_airing" ? " · Completed" : ""}
