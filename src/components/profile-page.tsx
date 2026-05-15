@@ -83,7 +83,7 @@ export function ProfilePage() {
               <AvatarFallback className="bg-[#e11d48] text-2xl font-black text-white">{initial}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#f43f5e]">animeTv profile</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#f43f5e]">animeTVplus profile</p>
               <h1 className="mt-1 text-3xl font-black tracking-tight text-white">{shownName}</h1>
               <p className="mt-1 text-sm font-semibold text-white/36">Login account: {accountName}</p>
             </div>

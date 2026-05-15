@@ -5,7 +5,7 @@ import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Create Account",
-  description: "Create an animeTv account to sync watch history and watchlist.",
+  description: "Create an animeTVplus account to sync watch history and watchlist.",
   path: "/register",
   index: false,
 });

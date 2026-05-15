@@ -42,7 +42,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
   return (
     <form onSubmit={submit} className="mx-auto mt-14 w-full max-w-md rounded-[30px] border border-white/[0.085] bg-panel/92 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-      <p className="mb-2 text-[11px] font-black uppercase tracking-[0.24em] text-[#cf2442]">animeTv account</p>
+      <p className="mb-2 text-[11px] font-black uppercase tracking-[0.24em] text-[#cf2442]">animeTVplus account</p>
       <h1 className="text-3xl font-black tracking-tight text-white">{isLoggedIn ? "Switch username" : mode === "login" ? "Login" : "Create account"}</h1>
       <p className="mt-2 text-sm leading-6 text-white/42">
         {isLoggedIn

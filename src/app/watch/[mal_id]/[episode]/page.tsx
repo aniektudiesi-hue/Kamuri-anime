@@ -178,7 +178,7 @@ export default function WatchPage({
   const blockedAdultShow = isAdultRestrictedAnime(displayAnime);
   const noStreamTitle = blockedAdultShow ? "This title is not available here." : "Episode not available yet.";
   const noStreamMessage = blockedAdultShow
-    ? "We do not stream 18+ restricted anime on animeTv."
+    ? "We do not stream 18+ restricted anime on animeTVplus."
     : "This episode is not available on our servers yet. Please try again later.";
 
   useEffect(() => {

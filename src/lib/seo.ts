@@ -84,7 +84,7 @@ export function animeKeywords(anime: Anime | undefined, malId: string) {
     `${cleanTitle} streaming`,
     `${cleanTitle} subbed`,
     `${cleanTitle} dubbed`,
-    `${cleanTitle} animeTv`,
+    `${cleanTitle} animeTVplus`,
     `${cleanTitle} animetvplus`,
   ];
 }

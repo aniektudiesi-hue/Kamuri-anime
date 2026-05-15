@@ -5,7 +5,7 @@ import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Profile",
-  description: "Manage your animeTv profile, avatar, and device display name.",
+  description: "Manage your animeTVplus profile, avatar, and device display name.",
   path: "/profile",
   index: false,
 });

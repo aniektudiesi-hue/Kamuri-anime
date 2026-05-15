@@ -48,7 +48,7 @@ export default async function GenreLayout({ children, params }: GenreLayoutProps
       about: `${genre} anime`,
       isPartOf: {
         "@type": "WebSite",
-        name: "animeTv",
+        name: "animeTVplus",
         url: absoluteUrl("/"),
       },
     },

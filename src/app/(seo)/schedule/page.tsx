@@ -11,7 +11,7 @@ import { animeId, animePath, posterOf, titleOf } from "@/lib/utils";
 export const revalidate = 900;
 export const metadata = buildPageMetadata({
   title: "Monthly Anime Release Schedule",
-  description: "See this month's anime release schedule and upcoming airing episodes on animeTv.",
+  description: "See this month's anime release schedule and upcoming airing episodes on animeTVplus.",
   path: "/schedule",
 });
 

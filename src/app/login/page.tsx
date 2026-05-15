@@ -5,7 +5,7 @@ import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Sign In",
-  description: "Sign in to animeTv to sync watch history and watchlist.",
+  description: "Sign in to animeTVplus to sync watch history and watchlist.",
   path: "/login",
   index: false,
 });

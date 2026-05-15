@@ -4,7 +4,7 @@ import { buildPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Watchlist",
-  description: "Your private anime watchlist on animeTv.",
+  description: "Your private anime watchlist on animeTVplus.",
   path: "/watchlist",
   index: false,
 });

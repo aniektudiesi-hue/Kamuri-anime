@@ -233,7 +233,7 @@ export function AdminDashboard() {
                   <ShieldCheck size={14} />
                   Private owner route
                 </div>
-                <h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl">AnimeTV Admin Control</h1>
+                <h1 className="text-3xl font-black tracking-tight text-white sm:text-5xl">animeTVplus Admin Control</h1>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-white/48">
                   Users, logins, page visits, approximate location, device fingerprints, library activity, and SEO shortcuts in one private dashboard.
                 </p>

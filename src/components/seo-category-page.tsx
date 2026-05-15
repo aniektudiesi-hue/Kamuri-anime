@@ -84,10 +84,10 @@ export async function SeoCategoryPage({ slug }: { slug: SeoCategorySlug }) {
           </section>
 
           <section className="mt-10 rounded-2xl border border-white/[0.06] bg-[#0d1020]/72 p-5">
-            <h2 className="text-lg font-black text-white">Fast anime discovery on animeTv</h2>
+            <h2 className="text-lg font-black text-white">Fast anime discovery on animeTVplus</h2>
             <p className="mt-2 text-sm leading-6 text-white/42">
               Browse anime with clear category pages, title pages, posters, ratings, episode lists, and weekly release links.
-              animeTv is built for quick discovery across free anime, subbed anime, dubbed anime, new releases, and top rated shows.
+              animeTVplus is built for quick discovery across free anime, subbed anime, dubbed anime, new releases, and top rated shows.
             </p>
           </section>
         </div>
