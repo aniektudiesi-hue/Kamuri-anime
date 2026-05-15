@@ -371,7 +371,7 @@ export default function WatchPage({
     <AppShell>
       <div className="mx-auto max-w-screen-2xl px-4 py-5 lg:px-6">
         {/* Breadcrumb */}
-        <div className="mb-4 flex items-center gap-2 text-sm text-white/30">
+        <div className="mb-4 flex items-center gap-2 text-sm text-white/70">
           <Link href="/" className="hover:text-white transition-colors">Home</Link>
           <ChevronRight size={13} />
           <Link href={animePath(displayAnime, malId)} className="hover:text-white transition-colors line-clamp-1 max-w-[200px]">
@@ -451,7 +451,7 @@ export default function WatchPage({
               {/* Now playing badge */}
               <div className="hidden items-center gap-2 rounded-2xl border border-white/[0.06] bg-[#0d1020] px-4 py-2 sm:flex">
                 <Radio size={13} className="text-[#c8ced8] animate-pulse" />
-                <span className="text-xs font-semibold text-white/40">
+                <span className="text-xs font-semibold text-white/70">
                   {displayTitle} · Ep {episodeNum}
                 </span>
               </div>
@@ -474,7 +474,7 @@ export default function WatchPage({
             <div className={`mt-3 grid gap-3 ${showAudioControls && activeServerId === DEFAULT_STREAM_PROVIDER_ID ? "xl:grid-cols-[1fr_auto_auto]" : "xl:grid-cols-[1fr_auto]"}`}>
               {/* Servers */}
               <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3.5">
-                <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-white/25">Stream Server</p>
+                <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-white/70">Stream Server</p>
                 <div className="relative">
                   {streamsLoading && !availableServers.length ? (
                     <div className="h-11 w-full animate-pulse rounded-xl bg-[#141828]" />
@@ -491,7 +491,7 @@ export default function WatchPage({
                           <span className="h-1.5 w-1.5 rounded-full bg-[#c8ced8]" />
                           <span className="text-sm font-black text-white">{selectedServer.label}</span>
                         </span>
-                        <span className="mt-0.5 block truncate text-[10px] font-semibold text-white/30">
+                        <span className="mt-0.5 block truncate text-[10px] font-semibold text-white/70">
                           {selectedServer.desc}
                         </span>
                       </span>
@@ -520,12 +520,12 @@ export default function WatchPage({
                               className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                                 isActive
                                   ? "bg-[#cf2442]/16 text-white"
-                                  : "text-white/58 hover:bg-white/[0.06] hover:text-white"
+                                  : "text-white/70 hover:bg-white/[0.06] hover:text-white"
                               }`}
                             >
                               <span className="min-w-0">
                                 <span className="block text-sm font-black">{s.label}</span>
-                                <span className="mt-0.5 block truncate text-[10px] font-semibold text-white/28">{s.desc}</span>
+                                <span className="mt-0.5 block truncate text-[10px] font-semibold text-white/70">{s.desc}</span>
                               </span>
                               {isActive ? <span className="h-2 w-2 shrink-0 rounded-full bg-[#cf2442]" /> : null}
                             </button>
@@ -535,14 +535,14 @@ export default function WatchPage({
                     </>
                   ) : null}
                   {!streamsLoading && !availableServers.length ? (
-                    <span className="text-sm text-white/30">No servers responded</span>
+                    <span className="text-sm text-white/70">No servers responded</span>
                   ) : null}
                 </div>
               </div>
 
               {showAudioControls ? (
                 <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3.5">
-                  <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/25">Audio Track</p>
+                  <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/70">Audio Track</p>
                   <div className="flex gap-2">
                     {(["sub", "dub"] as const).map((a) => (
                       <button
@@ -554,7 +554,7 @@ export default function WatchPage({
                         className={`rounded-xl px-4 py-2 text-sm font-bold uppercase transition ${
                           type === a
                             ? "bg-[#cf2442] text-white shadow-lg shadow-[#cf2442]/20"
-                            : "border border-white/[0.07] bg-[#141828] text-white/40 hover:border-white/[0.14] hover:text-white"
+                            : "border border-white/[0.07] bg-[#141828] text-white/70 hover:border-white/[0.14] hover:text-white"
                         }`}
                       >
                         {a}
@@ -681,7 +681,7 @@ function EpisodeSidebar({
       <div className="overflow-hidden rounded-2xl border border-white/[0.055] bg-[#0d1020]">
         <div className="flex items-center justify-between border-b border-white/[0.055] px-4 py-3">
           <h2 className="text-sm font-black text-white">Episodes</h2>
-          <span className="rounded-lg bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold text-white/25">
+          <span className="rounded-lg bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold text-white/70">
             {maxEpisode ? `${maxEpisode} total` : "…"}
           </span>
         </div>
@@ -690,7 +690,7 @@ function EpisodeSidebar({
             {ranges.map((r, i) => (
               <button key={r.label} onClick={() => setActiveRange(i)}
                 className={`shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold transition ${
-                  activeRange === i ? "bg-[#cf2442] text-white" : "bg-white/[0.05] text-white/35 hover:text-white"
+                  activeRange === i ? "bg-[#cf2442] text-white" : "bg-white/[0.05] text-white/70 hover:text-white"
                 }`}
               >{r.label}</button>
             ))}
@@ -710,7 +710,7 @@ function EpisodeSidebar({
                         ? "bg-[#cf2442] text-white shadow-md shadow-[#cf2442]/20"
                         : isPlayed
                           ? "bg-white/[0.08] text-[#c8ced8] ring-1 ring-white/10 hover:bg-white/[0.12]"
-                          : "bg-[#141828] text-white/35 hover:bg-[#1b2036] hover:text-white"
+                          : "bg-[#141828] text-white/70 hover:bg-[#1b2036] hover:text-white"
                     }`}
                   >
                     {ep.episode_number}
@@ -728,7 +728,7 @@ function EpisodeSidebar({
       <div className="flex items-center justify-between border-b border-white/[0.055] px-4 py-3">
         <div>
           <h2 className="text-sm font-black text-white">Episodes</h2>
-          <p className="text-[11px] text-white/25">{maxEpisode ? `${maxEpisode} total` : "Loading…"}</p>
+          <p className="text-[11px] text-white/70">{maxEpisode ? `${maxEpisode} total` : "Loading…"}</p>
         </div>
         <span className="rounded-lg bg-[#cf2442]/14 px-2.5 py-1 text-[10px] font-bold text-white/60 ring-1 ring-[#cf2442]/20">
           Ep {currentEp}
@@ -741,7 +741,7 @@ function EpisodeSidebar({
           {ranges.map((r, i) => (
             <button key={r.label} onClick={() => setActiveRange(i)}
               className={`shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold transition ${
-                activeRange === i ? "bg-[#cf2442] text-white" : "bg-white/[0.05] text-white/35 hover:text-white"
+                activeRange === i ? "bg-[#cf2442] text-white" : "bg-white/[0.05] text-white/70 hover:text-white"
               }`}
             >{r.label}</button>
           ))}
