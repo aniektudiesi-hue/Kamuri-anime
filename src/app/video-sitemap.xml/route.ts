@@ -33,6 +33,7 @@ export async function GET() {
     for (const episode of prioritizedVideoEpisodes(episodes, MAX_VIDEOS_PER_ANIME)) {
       if (urls.length >= MAX_TOTAL_VIDEOS) break;
       const watchUrl = absoluteUrl(`/watch/${id}/${episode.number}`);
+      const playerUrl = absoluteUrl(`/embed/${id}/${episode.number}`);
       const videoTitle = `${title} Episode ${episode.number}`;
       urls.push(`  <url>
     <loc>${xmlEscape(watchUrl)}</loc>
@@ -40,7 +41,7 @@ export async function GET() {
       <video:thumbnail_loc>${xmlEscape(poster)}</video:thumbnail_loc>
       <video:title>${xmlEscape(videoTitle)}</video:title>
       <video:description>${xmlEscape(`Watch ${episode.title || videoTitle} on ${SITE_NAME}. Fast anime streaming with subtitles, episode navigation, and server switching.`)}</video:description>
-      <video:player_loc allow_embed="yes">${xmlEscape(watchUrl)}</video:player_loc>
+      <video:player_loc allow_embed="yes">${xmlEscape(playerUrl)}</video:player_loc>
       <video:family_friendly>yes</video:family_friendly>
       <video:requires_subscription>no</video:requires_subscription>
       <video:publication_date>${new Date().toISOString()}</video:publication_date>
