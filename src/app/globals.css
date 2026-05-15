@@ -545,7 +545,12 @@ input[type="range"] { accent-color: var(--accent-2); }
   }
 
   .netflix-image-shell {
-    animation-duration: 1.8s;
+    animation: none;
+    background: #101322;
+  }
+
+  .netflix-image-shell::after {
+    display: none;
   }
 }
 

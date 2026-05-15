@@ -22,7 +22,7 @@ export function animeId(anime: Anime | undefined) {
   return String(anime?.anime_id ?? anime?.mal_id ?? anime?.id ?? "");
 }
 
-export function posterOf(anime: Anime | undefined) {
+export function posterOf(anime: Anime | undefined, variant: "poster-sm" | "poster-md" | "poster-lg" = "poster-md") {
   const jpg = anime?.images?.jpg;
   const webp = anime?.images?.webp;
   return imageCdnUrl(
@@ -37,12 +37,12 @@ export function posterOf(anime: Anime | undefined) {
     webp?.image_url ||
     jpg?.image_url ||
     "",
-    "poster-md",
+    variant,
   );
 }
 
-export function bannerOf(anime: Anime | undefined) {
-  return imageCdnUrl(anime?.banner || anime?.img_url || anime?.image || posterOf(anime), "banner-lg");
+export function bannerOf(anime: Anime | undefined, variant: "banner-sm" | "banner-lg" = "banner-lg") {
+  return imageCdnUrl(anime?.banner || anime?.img_url || anime?.image || posterOf(anime, "poster-lg"), variant);
 }
 
 export function episodeCount(anime: Anime | undefined) {

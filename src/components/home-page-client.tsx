@@ -121,7 +121,7 @@ function BigSection({
   viewAllHref?: string;
 }) {
   const allItems = items ?? [];
-  const visibleItems = allItems.slice(0, 18);
+  const visibleItems = allItems.slice(0, 10);
 
   return (
     <section className="content-visibility-auto border-t border-white/[0.055] py-8 first:border-t-0">
@@ -163,7 +163,7 @@ function BigSection({
 
 function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }) {
   const id = animeId(anime);
-  const poster = posterOf(anime);
+  const poster = posterOf(anime, priority ? "poster-md" : "poster-sm");
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const title = titleOf(anime);
@@ -280,7 +280,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
 
 function ScheduleCard({ item }: { item: AiringScheduleItem }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const poster = posterOf(item.anime);
+  const poster = posterOf(item.anime, "poster-sm");
   const title = titleOf(item.anime);
 
   return (
