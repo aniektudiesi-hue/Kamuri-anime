@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { HeaderControls } from "./header-controls";
+import { SearchBox } from "./search-box";
 
 const nav = [
   { href: "/popular", label: "Browse" },
@@ -37,14 +38,7 @@ export function Header() {
           </nav>
 
           <div className="mx-auto hidden max-w-2xl flex-1 sm:block">
-            <Link
-              href="/search"
-              aria-label="Search anime"
-              className="flex h-11 items-center gap-2 rounded-full border border-white/[0.075] bg-[#0d1020]/86 px-4 text-[15px] font-semibold text-white/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-[#e11d48]/35 hover:bg-[#111421]/92 hover:text-white/55 sm:h-12"
-            >
-              <Search size={16} className="shrink-0 text-white/32" />
-              <span>Search anime...</span>
-            </Link>
+            <SearchBox />
           </div>
 
           <HeaderControls />
