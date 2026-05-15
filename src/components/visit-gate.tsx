@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
-const VISIT_COUNT_KEY = "animetvplus_visit_count";
-const REGISTER_AFTER_VISITS = 2;
+const GUEST_STARTED_AT_KEY = "animetvplus_guest_started_at";
+const REGISTER_AFTER_MS = 2 * 60 * 1000;
 
 const OPEN_PATHS = [
   "/login",
@@ -28,14 +28,24 @@ export function VisitGate() {
       return;
     }
 
-    const current = Number.parseInt(localStorage.getItem(VISIT_COUNT_KEY) || "0", 10);
-    const next = Number.isFinite(current) ? current + 1 : 1;
-    localStorage.setItem(VISIT_COUNT_KEY, String(next));
+    const now = Date.now();
+    const stored = Number.parseInt(localStorage.getItem(GUEST_STARTED_AT_KEY) || "0", 10);
+    const startedAt = Number.isFinite(stored) && stored > 0 ? stored : now;
+    if (!stored) localStorage.setItem(GUEST_STARTED_AT_KEY, String(startedAt));
 
-    if (next > REGISTER_AFTER_VISITS) {
+    const redirectToRegister = () => {
       const returnTo = `${pathname}${window.location.search}`;
       router.replace(`/register?returnTo=${encodeURIComponent(returnTo)}`);
+    };
+
+    const remaining = REGISTER_AFTER_MS - (now - startedAt);
+    if (remaining <= 0) {
+      redirectToRegister();
+      return;
     }
+
+    const timer = window.setTimeout(redirectToRegister, remaining);
+    return () => window.clearTimeout(timer);
   }, [isLoggedIn, pathname, router]);
 
   return null;

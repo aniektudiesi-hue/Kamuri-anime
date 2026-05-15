@@ -62,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoggedIn: Boolean(token),
       setSession(nextToken) {
         localStorage.setItem(TOKEN_KEY, nextToken);
+        localStorage.removeItem("animetvplus_guest_started_at");
         setToken(nextToken);
       },
       logout() {
