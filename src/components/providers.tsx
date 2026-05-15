@@ -6,6 +6,7 @@ import { AuthProvider } from "@/lib/auth";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { makeQueryClient } from "@/lib/query";
 import { SettingsProvider } from "@/lib/settings";
+import { VisitGate } from "@/components/visit-gate";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => makeQueryClient());
@@ -15,6 +16,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <SettingsProvider>
         <AuthProvider>
           <AnalyticsTracker />
+          <VisitGate />
           {children}
         </AuthProvider>
       </SettingsProvider>

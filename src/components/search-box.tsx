@@ -93,7 +93,9 @@ export function SearchBox() {
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
+      event.stopPropagation();
       submit();
+      return;
     }
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -111,7 +113,12 @@ export function SearchBox() {
 
   return (
     <div className="relative w-full">
-      <div
+      <form
+        action="/search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
         className={`flex h-11 items-center gap-2 rounded-full border px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[border-color,background-color,box-shadow] duration-150 sm:h-12 ${
           focused
             ? "border-[#e11d48]/60 bg-[#111421]/92 shadow-[0_0_0_4px_rgba(225,29,72,0.12),inset_0_1px_0_rgba(255,255,255,0.05)]"
@@ -147,13 +154,14 @@ export function SearchBox() {
           <Loader2 size={13} className="shrink-0 animate-spin text-white/25" />
         ) : value ? (
           <button
+            type="button"
             onClick={clear}
             className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-white/[0.08] text-white/40 hover:bg-white/[0.14] hover:text-white"
           >
             <X size={9} />
           </button>
         ) : null}
-      </div>
+      </form>
 
       {showDropdown ? (
         <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-3xl border border-white/[0.085] bg-[#0b0e19]/98 shadow-[0_28px_90px_rgba(0,0,0,0.72)] backdrop-blur-2xl">
@@ -235,6 +243,7 @@ export function SearchBox() {
               </div>
               <div className="border-t border-white/[0.055] px-3 py-2">
                 <button
+                  type="button"
                   onClick={submit}
                   className="flex w-full items-center justify-between rounded-2xl px-2.5 py-2 text-[13px] font-bold text-[#cf2442] transition-colors duration-100 hover:bg-white/[0.045] hover:text-white"
                 >
