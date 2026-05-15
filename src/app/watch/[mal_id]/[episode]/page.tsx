@@ -4,13 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, RefreshCcw, Radio, Play } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, MessageCircle, RefreshCcw, Radio, Play } from "lucide-react";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
 import { useAuth } from "@/lib/auth";
+import { shareWatching } from "@/lib/chat";
 import { historySocketUrl } from "@/lib/history-realtime";
 import { clearCachedStream } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
@@ -94,6 +95,7 @@ export default function WatchPage({
   const lastProgressSave = useRef(0);
   const lastHttpProgressSave = useRef(0);
   const pendingHistoryBodyRef = useRef<Record<string, unknown> | null>(null);
+  const latestPlaybackTimeRef = useRef(0);
   const historySocketRef = useRef<WebSocket | null>(null);
   const historySocketReadyRef = useRef(false);
 
@@ -289,6 +291,7 @@ export default function WatchPage({
   const saveWatchProgress = useCallback(
     ({ currentTime, duration }: { currentTime: number; duration: number }) => {
       if (!Number.isFinite(currentTime) || currentTime < 1) return;
+      latestPlaybackTimeRef.current = currentTime;
       const now = Date.now();
       if (now - lastProgressSave.current < 12000 && currentTime + 2 < duration) return;
       lastProgressSave.current = now;
@@ -374,6 +377,17 @@ export default function WatchPage({
   const hasNext = maxEpisode ? episodeNum < maxEpisode : true;
   const nextHref = hasNext ? watchPath(displayAnime, malId, episodeNum + 1) : undefined;
   const displayTitle = animeTitle === "Untitled" ? `Anime ${malId}` : animeTitle;
+
+  function shareCurrentWatch() {
+    const timestamp = Math.floor(latestPlaybackTimeRef.current || initialTime || 0);
+    shareWatching({
+      title: displayTitle,
+      malId,
+      episode: episodeNum,
+      timestamp,
+      href: `${watchPath(displayAnime, malId, episodeNum)}${timestamp > 1 ? `?t=${timestamp}` : ""}`,
+    });
+  }
 
   useEffect(() => {
     if (type === "dub" && megaHasPlayableStream && server !== DEFAULT_STREAM_PROVIDER_ID) {
@@ -502,6 +516,15 @@ export default function WatchPage({
                   {displayTitle} · Ep {episodeNum}
                 </span>
               </div>
+
+              <button
+                type="button"
+                onClick={shareCurrentWatch}
+                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1020] px-3 text-xs font-black text-white/70 transition hover:border-[#e11d48]/35 hover:text-white"
+              >
+                <MessageCircle size={15} />
+                <span className="hidden sm:inline">What am I watching</span>
+              </button>
 
               <Link
                 aria-disabled={!hasNext}

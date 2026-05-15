@@ -146,4 +146,20 @@ export const api = {
   adminVisits: (token: string, adminKey?: string | null, limit = 300) =>
     request<{ items: Record<string, unknown>[] }>(`/admin/visits?limit=${limit}`, { token, adminKey }),
   adminSearchVisibility: (token: string, adminKey?: string | null) => request<Record<string, unknown>>("/admin/search-visibility", { token, adminKey }),
+  chatRooms: (token: string) => request<{ items: Record<string, unknown>[] }>("/chat/rooms", { token }),
+  chatMessages: (token: string, room: string, limit = 80) =>
+    request<{ items: Record<string, unknown>[] }>(`/chat/messages/${encodeURIComponent(room)}?limit=${limit}`, { token }),
+  sendChatMessage: (token: string, room: string, body: Record<string, unknown>) =>
+    request<{ ok: boolean; message: Record<string, unknown> }>(`/chat/messages/${encodeURIComponent(room)}`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }),
+  searchChatUsers: (token: string, q: string) =>
+    request<{ items: Record<string, unknown>[] }>(`/chat/users/search?q=${encodeURIComponent(q)}`, { token }),
+  followUser: (token: string, userId: string | number) =>
+    request(`/chat/users/${userId}/follow`, { method: "POST", token }),
+  unfollowUser: (token: string, userId: string | number) =>
+    request(`/chat/users/${userId}/follow`, { method: "DELETE", token }),
+  followingUsers: (token: string) => request<{ items: Record<string, unknown>[] }>("/chat/following", { token }),
 };
