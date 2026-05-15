@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
 import { absoluteUrl, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
-import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
-
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -110,7 +107,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("h-full antialiased", "font-sans", geist.variable)}
+      className={cn("h-full antialiased", "font-sans")}
     >
       <head>
         <link rel="preconnect" href="https://anime-search-api-burw.onrender.com" crossOrigin="anonymous" />

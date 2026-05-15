@@ -102,6 +102,31 @@ export function watchDescription(anime: Anime | undefined, malId: string, episod
   return `Watch ${label} online on ${SITE_NAME}. Stream the episode with fast loading, subtitles, server switching, watch history, and smooth HD HLS playback.`;
 }
 
+export function genreTitle(name: string) {
+  const genre = cleanText(decodeURIComponent(name), "Anime");
+  return `${genre} Anime - Watch Popular ${genre} Shows on ${SITE_NAME}`;
+}
+
+export function genreDescription(name: string) {
+  const genre = cleanText(decodeURIComponent(name), "anime");
+  return `Explore popular ${genre} anime on ${SITE_NAME}. Find currently airing titles, new episodes, top rated shows, episode lists, and fast anime streaming pages in one clean catalog.`;
+}
+
+export function genreKeywords(name: string) {
+  const genre = cleanText(decodeURIComponent(name), "anime");
+  return [
+    ...SITE_KEYWORDS,
+    `${genre} anime`,
+    `best ${genre} anime`,
+    `watch ${genre} anime online`,
+    `popular ${genre} anime`,
+    `${genre} anime episodes`,
+    `${genre} anime streaming`,
+    `new ${genre} anime`,
+    `top rated ${genre} anime`,
+  ];
+}
+
 export function animeJsonLd(anime: Anime | undefined, malId: string) {
   const title = titleOf(anime) === "Untitled" ? `Anime ${malId}` : titleOf(anime);
   const poster = posterOf(anime);

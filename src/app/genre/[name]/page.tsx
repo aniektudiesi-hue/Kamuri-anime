@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { AnimeCard } from "@/components/anime-card";
 import { SidebarLayout } from "@/components/sidebar";
 import { fetchJikanDiscovery, mergeAnimeSources, resolveDiscoveryIntent } from "@/lib/anime-discovery";
+import { genreDescription } from "@/lib/seo";
 import type { Anime } from "@/lib/types";
 import { animeId } from "@/lib/utils";
 
@@ -140,6 +141,9 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
                 <span className="text-lg font-semibold text-white/25">{animeList.length} titles</span>
               )}
             </h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/42">
+              {genreDescription(genre)}
+            </p>
           </div>
 
           {/* Error */}
