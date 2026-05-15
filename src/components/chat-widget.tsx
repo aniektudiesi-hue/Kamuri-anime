@@ -94,7 +94,14 @@ export function ChatWidget() {
 
   const sendFallback = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.sendChatMessage(token!, room, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chat", "messages", token, room] }),
+    onSuccess: (data, body) => {
+      const saved = data.message as ChatMessage;
+      setLiveMessages((current) => [
+        ...current.filter((item) => !(Number(item.id) < 0 && item.message === body.message)),
+        saved,
+      ].slice(-80));
+      queryClient.invalidateQueries({ queryKey: ["chat", "messages", token, room] });
+    },
   });
 
   const follow = useMutation({
@@ -184,8 +191,14 @@ export function ChatWidget() {
       socketRef.current = socket;
       socket.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data) as { type?: string; users?: Record<string, unknown>[]; message?: ChatMessage };
+          const data = JSON.parse(event.data) as {
+            type?: string;
+            users?: Record<string, unknown>[];
+            message?: ChatMessage;
+            messages?: ChatMessage[];
+          };
           if (data.type === "online") setOnlineUsers(data.users ?? []);
+          if (data.type === "history") setLiveMessages(data.messages ?? []);
           if (data.type === "message" && data.message) setLiveMessages((current) => [...current, data.message!].slice(-80));
         } catch {
           // Ignore malformed chat frames.
@@ -224,12 +237,7 @@ export function ChatWidget() {
       created_at: Math.floor(Date.now() / 1000),
     };
     setLiveMessages((current) => [...current, optimistic].slice(-80));
-    const socket = socketRef.current;
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(body));
-    } else {
-      sendFallback.mutate(body);
-    }
+    sendFallback.mutate(body);
     setMessage("");
   }
 

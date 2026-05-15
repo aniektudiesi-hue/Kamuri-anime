@@ -94,7 +94,14 @@ export function ChatPage() {
 
   const sendFallback = useMutation({
     mutationFn: (body: Row) => api.sendChatMessage(token!, room, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chat", "messages", token, room] }),
+    onSuccess: (data, body) => {
+      const saved = data.message as ChatMessage;
+      setLiveMessages((current) => [
+        ...current.filter((item) => !(Number(item.id) < 0 && item.message === body.message)),
+        saved,
+      ].slice(-120));
+      queryClient.invalidateQueries({ queryKey: ["chat", "messages", token, room] });
+    },
   });
 
   const follow = useMutation({
@@ -147,8 +154,9 @@ export function ChatPage() {
       socketRef.current = socket;
       socket.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data) as { type?: string; users?: Row[]; message?: ChatMessage };
+          const data = JSON.parse(event.data) as { type?: string; users?: Row[]; message?: ChatMessage; messages?: ChatMessage[] };
           if (data.type === "online") setRoomOnline(data.users ?? []);
+          if (data.type === "history") setLiveMessages(data.messages ?? []);
           if (data.type === "message" && data.message) setLiveMessages((current) => [...current, data.message!].slice(-120));
         } catch {
           // Ignore malformed frames.
@@ -186,9 +194,7 @@ export function ChatPage() {
       created_at: Math.floor(Date.now() / 1000),
     };
     setLiveMessages((current) => [...current, optimistic].slice(-120));
-    const socket = socketRef.current;
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(body));
-    else sendFallback.mutate(body);
+    sendFallback.mutate(body);
     setMessage("");
   }
 
