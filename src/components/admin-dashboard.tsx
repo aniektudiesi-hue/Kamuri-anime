@@ -46,6 +46,45 @@ function formatTime(value: unknown) {
   return new Date(ts * 1000).toLocaleString();
 }
 
+function lastSeenSeconds(row: Row) {
+  const value = Number(row.last_seen_at);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function isOnline(row: Row, nowMs: number) {
+  const lastSeen = lastSeenSeconds(row);
+  return lastSeen > 0 && nowMs / 1000 - lastSeen <= 90;
+}
+
+function lastSeenLabel(value: unknown, nowMs: number) {
+  const ts = Number(value);
+  if (!Number.isFinite(ts) || ts <= 0) return "Never";
+  const diff = Math.max(0, Math.floor(nowMs / 1000 - ts));
+  if (diff < 15) return "Just now";
+  if (diff < 60) return `${diff}s ago`;
+  const minutes = Math.floor(diff / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return formatTime(ts);
+}
+
+function PresenceBadge({ row, nowMs }: { row: Row; nowMs: number }) {
+  const online = isOnline(row, nowMs);
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black ${
+        online
+          ? "bg-emerald-500/12 text-emerald-300 ring-1 ring-emerald-400/20"
+          : "bg-white/[0.045] text-white/42 ring-1 ring-white/[0.06]"
+      }`}
+    >
+      <span className={`h-2 w-2 rounded-full ${online ? "bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.75)]" : "bg-white/24"}`} />
+      {online ? "Online" : "Offline"}
+    </span>
+  );
+}
+
 function formatBytes(value: unknown) {
   const bytes = Number(value);
   if (!Number.isFinite(bytes) || bytes <= 0) return "-";
@@ -81,9 +120,13 @@ export function AdminDashboard() {
   const { token, user } = useAuth();
   const [adminKey, setAdminKey] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(0);
 
   useEffect(() => {
     setAdminKey(localStorage.getItem("animetv_admin_key") || "");
+    setNowMs(Date.now());
+    const interval = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const overview = useQuery({
@@ -97,6 +140,7 @@ export function AdminDashboard() {
     queryFn: () => api.adminUsers(token!, adminKey, 150),
     enabled: Boolean(token),
     staleTime: 1000 * 20,
+    refetchInterval: 15_000,
     retry: false,
   });
   const logins = useQuery({
@@ -111,6 +155,7 @@ export function AdminDashboard() {
     queryFn: () => api.adminVisits(token!, adminKey, 100),
     enabled: Boolean(token),
     staleTime: 1000 * 20,
+    refetchInterval: 15_000,
     retry: false,
   });
   const visibility = useQuery({
@@ -128,6 +173,7 @@ export function AdminDashboard() {
   });
 
   const userRows = useMemo(() => asItems(users.data), [users.data]);
+  const onlineUsers = userRows.filter((row) => isOnline(row, nowMs)).length;
 
   const anyError = overview.error || users.error || logins.error || visits.error;
   const overviewData = overview.data ?? {};
@@ -195,8 +241,9 @@ export function AdminDashboard() {
           />
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
               <StatCard icon={<UserRound size={18} />} label="Users" value={overviewData.total_users} loading={overview.isLoading} />
+              <StatCard icon={<Activity size={18} />} label="Online" value={onlineUsers} loading={users.isLoading} />
               <StatCard icon={<Activity size={18} />} label="Visits" value={overviewData.total_visits} loading={overview.isLoading} />
               <StatCard icon={<Globe2 size={18} />} label="Unique" value={overviewData.unique_visitors} loading={overview.isLoading} />
               <StatCard icon={<Clock3 size={18} />} label="24h Visits" value={overviewData.visits_24h} loading={overview.isLoading} />
@@ -229,8 +276,9 @@ export function AdminDashboard() {
                         );
                       },
                     ],
+                    ["Status", (row) => <PresenceBadge row={row} nowMs={nowMs} />],
                     ["Joined", (row) => formatTime(row.created_at)],
-                    ["Last seen", (row) => formatTime(row.last_seen_at)],
+                    ["Last seen", (row) => lastSeenLabel(row.last_seen_at, nowMs)],
                     ["Last login", (row) => formatTime(row.last_login_at)],
                     ["Last watched", (row) => formatTime(row.last_watched_at)],
                     ["Location", (row) => locationLabel(row)],
@@ -275,6 +323,7 @@ export function AdminDashboard() {
               loading={activity.isLoading}
               selectedUserId={selectedUserId}
               error={activity.error}
+              nowMs={nowMs}
             />
 
             <div className="mt-6 grid gap-5 xl:grid-cols-3">
@@ -356,11 +405,13 @@ function UserActivityPanel({
   loading,
   selectedUserId,
   error,
+  nowMs,
 }: {
   data?: Record<string, unknown>;
   loading: boolean;
   selectedUserId: number | null;
   error: Error | null;
+  nowMs: number;
 }) {
   const selectedUser = objectFrom(data, "user");
   const history = arrayFrom(data, "history");
@@ -389,8 +440,9 @@ function UserActivityPanel({
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <MiniStat label="Username" value={text(selectedUser, "username", "-")} />
+            <MiniStat label="Status" value={isOnline(selectedUser, nowMs) ? "Online now" : "Offline"} />
             <MiniStat label="Joined" value={formatTime(selectedUser.created_at)} />
-            <MiniStat label="Last seen" value={formatTime(selectedUser.last_seen_at)} />
+            <MiniStat label="Last seen" value={lastSeenLabel(selectedUser.last_seen_at, nowMs)} />
             <MiniStat label="History" value={String(number(totals, "history") || number(selectedUser, "history_count"))} />
             <MiniStat label="Visits" value={String(number(totals, "visits") || visits.length)} />
             <MiniStat label="Logins" value={String(number(totals, "logins") || logins.length)} />

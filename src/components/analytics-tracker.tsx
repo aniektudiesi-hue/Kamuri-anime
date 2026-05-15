@@ -11,6 +11,14 @@ export function AnalyticsTracker() {
   const lastTrackedKey = useRef("");
 
   useEffect(() => {
+    const makePayload = () => {
+      const path = `${window.location.pathname}${window.location.search}`;
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      const language = navigator.language || "";
+      const screen = `${window.screen.width}x${window.screen.height}`;
+      return { path, referrer: document.referrer, timezone, language, screen };
+    };
+
     const path = `${window.location.pathname}${window.location.search}`;
     const identity = token ? `user:${token.slice(-10)}` : "guest";
     const key = `${identity}:${path}`;
@@ -18,14 +26,43 @@ export function AnalyticsTracker() {
 
     const timer = window.setTimeout(() => {
       lastTrackedKey.current = key;
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-      const language = navigator.language || "";
-      const screen = `${window.screen.width}x${window.screen.height}`;
-      api.trackVisit({ path, referrer: document.referrer, timezone, language, screen }, token);
+      api.trackVisit(makePayload(), token);
     }, token ? 250 : 900);
 
     return () => window.clearTimeout(timer);
   }, [pathname, token]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const sendPresence = () => {
+      if (document.visibilityState === "hidden") return;
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      const language = navigator.language || "";
+      const screen = `${window.screen.width}x${window.screen.height}`;
+      api.trackVisit(
+        {
+          path: `${window.location.pathname}${window.location.search}`,
+          referrer: document.referrer,
+          timezone,
+          language,
+          screen,
+        },
+        token,
+      );
+    };
+
+    const interval = window.setInterval(sendPresence, 45_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sendPresence();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [token]);
 
   return null;
 }
