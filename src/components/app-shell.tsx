@@ -40,13 +40,13 @@ function Footer() {
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2.5">
-              <Image src="/logo.svg" alt="animeTv logo" width={28} height={28} />
+              <Image src="/logo.svg" alt="AnimeTV Plus logo" width={28} height={28} />
               <span className="text-sm font-black tracking-tight text-white">
-                anime<span className="text-[#ff4f70]">Tv</span>
+                AnimeTV<span className="text-[#ff4f70]">+</span>
               </span>
             </Link>
             <p className="mt-3 max-w-[230px] text-[12px] leading-relaxed text-white/72">
-              Safe, secure anime streaming over HTTPS with fast HD playback, sub &amp; dub discovery, and personal watch history.
+              AnimeTV Plus at animetvplus.xyz offers safe, secure anime streaming over HTTPS with fast HD playback, sub &amp; dub discovery, and personal watch history.
             </p>
             <p className="mt-4 text-[11px] text-white/68">
               Smooth browsing, secure accounts, and clean anime discovery for every screen.
@@ -111,7 +111,7 @@ function Footer() {
 
         <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-white/[0.04] pt-6 sm:flex-row">
           <p className="text-[11px] text-white/68">
-            &copy; {new Date().getFullYear()} animeTv. Safe and secure streaming experience.
+            &copy; {new Date().getFullYear()} AnimeTV Plus. Safe and secure streaming experience on animetvplus.xyz.
           </p>
           <div className="flex items-center gap-4">
             {[
@@ -129,7 +129,7 @@ function Footer() {
 
         <div className="mt-5 border-t border-white/[0.04] pt-5">
           <p className="max-w-4xl text-[12px] leading-6 text-white/68">
-            Popular anime pages on animeTv include currently airing anime, new release anime, top rated anime, anime genres,
+            Popular anime pages on AnimeTV Plus include currently airing anime, new release anime, top rated anime, anime genres,
             free anime streaming, dubbed anime discovery, subbed anime, and a monthly anime release schedule. These internal links help viewers and search engines discover the site naturally.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">

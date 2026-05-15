@@ -16,13 +16,14 @@ export function Header() {
     <header className="sticky top-0 z-50">
       <div className="border-b border-white/[0.075] bg-[#05060a]/90 shadow-[0_18px_55px_rgba(0,0,0,0.32)] backdrop-blur-2xl supports-[backdrop-filter]:bg-[#05060a]/76">
         <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-3 px-4 sm:h-[72px] lg:px-6">
-          <Link href="/" aria-label="animeTv home" className="group flex shrink-0 items-center gap-3">
+          <Link href="/" aria-label="AnimeTV Plus home" className="group flex shrink-0 items-center gap-3">
             <span className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.045] shadow-[0_18px_40px_rgba(0,0,0,0.38)] transition group-hover:border-[#e11d48]/40">
               <Image src="/logo.svg" alt="" width={34} height={34} priority className="drop-shadow-[0_0_22px_rgba(225,29,72,0.32)]" />
             </span>
             <span className="hidden text-[18px] font-black tracking-tight text-white sm:block">
-              anime<span className="text-[#e11d48]">Tv</span>
+              AnimeTV<span className="text-[#e11d48]">+</span>
             </span>
+            <span className="sr-only">animetvplus.xyz</span>
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex">

@@ -275,7 +275,7 @@ function HomeSeoSection() {
           Watch anime online with fast browsing, HD playback, and fresh episode discovery.
         </h2>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-white/72">
-          animeTv helps viewers find licensed anime access, free anime discovery, subbed anime, dubbed anime,
+          AnimeTV Plus on animetvplus.xyz helps viewers find licensed anime access, free anime discovery, subbed anime, dubbed anime,
           top rated shows, newly released episodes, and monthly airing schedules from one clean streaming interface.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
