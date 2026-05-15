@@ -147,10 +147,11 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
             </Link>
             <Link
               href={`/anime/${id}`}
+              aria-label={`More details about ${title}`}
               className="inline-flex h-[52px] items-center gap-2.5 rounded-full border border-white/[0.12] bg-white/[0.06] px-7 text-sm font-black text-white backdrop-blur-xl transition hover:border-white/20 hover:bg-white/10"
             >
               <Info size={16} />
-              More Info
+              More About {title.length > 22 ? `${title.slice(0, 22)}...` : title}
             </Link>
           </div>
 
@@ -335,6 +336,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             </Link>
             <Link
               href={`/anime/${id}`}
+              aria-label={`View details for ${title}`}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.1] px-3.5 text-sm font-bold text-white/85 backdrop-blur-xl"
             >
               Details

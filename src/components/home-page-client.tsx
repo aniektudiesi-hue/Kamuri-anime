@@ -84,12 +84,12 @@ function SectionHeader({
         <span className="grid h-8 w-8 place-items-center rounded-2xl border border-white/[0.075] bg-white/[0.045]">{icon}</span>
         <div>
           <h2 className="text-lg font-black tracking-tight text-white">{title}</h2>
-          <p className="mt-0.5 hidden text-[11px] font-semibold uppercase tracking-[0.22em] text-white/24 sm:block">
+          <p className="mt-0.5 hidden text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55 sm:block">
             Curated for fast watching
           </p>
         </div>
         {count ? (
-          <span className="rounded-full border border-white/[0.07] bg-white/[0.045] px-2.5 py-1 text-[11px] font-black text-white/36">
+          <span className="rounded-full border border-white/[0.1] bg-white/[0.08] px-2.5 py-1 text-[11px] font-black text-white/78">
             {count}
           </span>
         ) : null}
@@ -97,9 +97,10 @@ function SectionHeader({
       {viewAllHref ? (
         <Link
           href={viewAllHref}
-          className="hidden items-center gap-1 rounded-full border border-white/[0.075] bg-white/[0.035] px-3 py-1.5 text-xs font-black text-white/42 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/10 hover:text-white sm:flex"
+          aria-label={`View all ${title}`}
+          className="hidden items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.055] px-3 py-1.5 text-xs font-black text-white/68 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/10 hover:text-white sm:flex"
         >
-          View All <ChevronRight size={13} />
+          View All {title} <ChevronRight size={13} />
         </Link>
       ) : null}
     </div>
@@ -147,8 +148,12 @@ function BigSection({
 
       {!loading && allItems.length > visibleItems.length && viewAllHref ? (
         <div className="mt-2 flex justify-center sm:hidden">
-          <Link href={viewAllHref} className="rounded-full border border-white/[0.075] bg-white/[0.035] px-4 py-2 text-xs font-black text-white/50">
-            See more
+          <Link
+            href={viewAllHref}
+            aria-label={`See more ${title}`}
+            className="rounded-full border border-white/[0.09] bg-white/[0.055] px-4 py-2 text-xs font-black text-white/72"
+          >
+            See more {title}
           </Link>
         </div>
       ) : null}
@@ -218,7 +223,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
 
         <div className="mt-2 px-0.5">
           <h3 className="line-clamp-2 text-[12px] font-bold leading-4 text-white/84 transition group-hover:text-white">{title}</h3>
-          <p className="mt-1 text-[10px] font-semibold text-white/30">{episodeLabel(anime)}</p>
+          <p className="mt-1 text-[10px] font-semibold text-white/64">{episodeLabel(anime)}</p>
         </div>
       </Link>
     </article>
@@ -250,11 +255,11 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
             className={`shrink-0 rounded-xl border px-3.5 py-2 text-left transition ${
               activeDay === day.key
                 ? "border-[#cf2442]/40 bg-[#cf2442]/16 text-white shadow-lg shadow-[#cf2442]/10"
-                : "border-white/[0.07] bg-[#0d1020] text-white/45 hover:border-white/[0.14] hover:text-white"
+                : "border-white/[0.08] bg-[#0d1020] text-white/64 hover:border-white/[0.14] hover:text-white"
             }`}
           >
             <span className="block text-[11px] font-black uppercase tracking-wide">{day.short}</span>
-            <span className="mt-0.5 block text-[10px] font-semibold text-white/35">{day.items.length} episodes</span>
+            <span className="mt-0.5 block text-[10px] font-semibold text-white/62">{day.items.length} episodes</span>
           </button>
         ))}
       </div>
@@ -305,7 +310,7 @@ function ScheduleCard({ item }: { item: AiringScheduleItem }) {
         <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-white/82 group-hover:text-white">
           {title}
         </h3>
-        <p className="mt-1 text-xs font-semibold text-white/36">Episode {item.episode}</p>
+        <p className="mt-1 text-xs font-semibold text-white/64">Episode {item.episode}</p>
       </div>
     </Link>
   );
@@ -344,7 +349,7 @@ function HomeSeoSection() {
         <h2 className="mt-2 max-w-3xl text-2xl font-black tracking-tight text-white sm:text-3xl">
           Watch anime online with fast browsing, HD playback, and fresh episode discovery.
         </h2>
-        <p className="mt-3 max-w-4xl text-sm leading-7 text-white/44">
+        <p className="mt-3 max-w-4xl text-sm leading-7 text-white/68">
           animeTv helps viewers find licensed anime access, free anime discovery, subbed anime, dubbed anime,
           top rated shows, newly released episodes, and monthly airing schedules from one clean streaming interface.
           Browse titles, open anime detail pages, continue from watch history, and switch between available servers quickly.
@@ -354,7 +359,7 @@ function HomeSeoSection() {
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 py-1.5 text-xs font-bold text-white/44 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/10 hover:text-white"
+              className="rounded-xl border border-white/[0.09] bg-white/[0.055] px-3 py-1.5 text-xs font-bold text-white/72 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/10 hover:text-white"
             >
               {link.label}
             </Link>
