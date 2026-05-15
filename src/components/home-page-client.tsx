@@ -219,7 +219,6 @@ function ScheduleCard({ item }: { item: AiringScheduleItem }) {
   return (
     <Link
       href={animePath(item.anime, item.id)}
-      aria-label={`View ${title} episode ${item.episode}`}
       className="scroll-card group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#111421]/72 p-2 transition hover:-translate-y-0.5 hover:border-[#f43f5e]/30 hover:bg-[#171b2a]"
     >
       <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">

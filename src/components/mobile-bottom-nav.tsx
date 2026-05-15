@@ -31,7 +31,7 @@ export function MobileBottomNav() {
                 "flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-black transition-colors",
                 active
                   ? "bg-[#e11d48]/14 text-white ring-1 ring-[#e11d48]/20"
-                  : "text-white/38 hover:bg-white/[0.06] hover:text-white/80",
+                  : "text-white/70 hover:bg-white/[0.06] hover:text-white",
               )}
             >
               <Icon size={18} strokeWidth={active ? 2.6 : 2.2} />
