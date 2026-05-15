@@ -20,7 +20,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     setLoading(true);
     const form = new FormData(event.currentTarget);
     const username = String(form.get("username") || "");
-    const password = String(form.get("password") || "");
+    const password = mode === "login" ? "" : String(form.get("password") || "");
     const body = {
       username,
       password,
@@ -58,10 +58,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           Password
           <Input
             name="password"
-            required
+            required={mode === "register"}
             minLength={4}
             type="password"
             autoComplete={mode === "login" ? "current-password" : "new-password"}
+            placeholder={mode === "login" ? "Optional for existing username" : ""}
             className="h-12 rounded-2xl border-white/[0.09] bg-panel-strong px-4 text-white placeholder:text-white/24 focus-visible:ring-[#cf2442]/30"
           />
         </label>
