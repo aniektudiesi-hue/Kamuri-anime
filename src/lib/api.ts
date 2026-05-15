@@ -102,6 +102,16 @@ export const api = {
   me: (token: string) => request<User>("/auth/me", { token }),
   addHistory: (token: string, body: Record<string, unknown>) =>
     request("/user/history", { method: "POST", token, body: JSON.stringify(normalizeHistoryBody(body)) }),
+  addHistoryKeepalive: (token: string, body: Record<string, unknown>) => {
+    const headers = new Headers({ "Content-Type": "application/json", Accept: "application/json" });
+    headers.set("Authorization", `Bearer ${token}`);
+    return fetch(`${API_BASE}/user/history`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(normalizeHistoryBody(body)),
+      keepalive: true,
+    }).catch(() => undefined);
+  },
   history: async (token: string) => listFromPayload<LibraryItem>(await request("/user/history", { token })),
   clearHistory: (token: string) => request("/user/history", { method: "DELETE", token }),
   addWatchlist: (token: string, body: Record<string, unknown>) =>

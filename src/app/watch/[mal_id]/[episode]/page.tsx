@@ -80,6 +80,7 @@ export default function WatchPage({
   const savedHistoryKey = useRef("");
   const lastProgressSave = useRef(0);
   const lastHttpProgressSave = useRef(0);
+  const pendingHistoryBodyRef = useRef<Record<string, unknown> | null>(null);
   const historySocketRef = useRef<WebSocket | null>(null);
   const historySocketReadyRef = useRef(false);
 
@@ -190,6 +191,9 @@ export default function WatchPage({
 
   const saveHistory = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.addHistory(token!, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["history", token] });
+    },
   });
   // Stable ref so saveWatchProgress never changes identity (avoids HLS restart)
   const saveHistoryRef = useRef(saveHistory.mutate);
@@ -281,12 +285,12 @@ export default function WatchPage({
         timestamp: Math.floor(currentTime), duration: Math.floor(duration || 0),
         watched_at: new Date().toISOString(),
       };
+      pendingHistoryBodyRef.current = body;
       if (!tokenRef.current) return;
 
-      const sentRealtime = sendRealtimeHistory(body);
+      sendRealtimeHistory(body);
       const shouldHttpFallback =
-        !sentRealtime ||
-        now - lastHttpProgressSave.current > 60000 ||
+        now - lastHttpProgressSave.current > 15000 ||
         currentTime + 2 >= duration;
 
       if (shouldHttpFallback) {
@@ -310,8 +314,34 @@ export default function WatchPage({
       playback_pos: Math.floor(initialTime || 0), progress: Math.floor(initialTime || 0),
       timestamp: Math.floor(initialTime || 0), watched_at: new Date().toISOString(),
     };
-    if (token && !sendRealtimeHistory(body)) saveHistoryRef.current(body);
+    pendingHistoryBodyRef.current = body;
+    if (token) {
+      sendRealtimeHistory(body);
+      lastHttpProgressSave.current = Date.now();
+      saveHistoryRef.current(body);
+    }
   }, [animePoster, animeTitle, episodeNum, initialTime, malId, token, selectedStream, sendRealtimeHistory]);
+
+  useEffect(() => {
+    if (!token) return;
+    const flush = () => {
+      const body = pendingHistoryBodyRef.current;
+      if (!body) return;
+      api.addHistoryKeepalive(token, body);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      flush();
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [episodeNum, malId, token]);
 
   useEffect(() => {
     if (!malId || !Number.isFinite(episodeNum)) return;
