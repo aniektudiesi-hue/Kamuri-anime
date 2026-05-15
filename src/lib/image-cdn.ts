@@ -1,6 +1,6 @@
 const DEFAULT_IMAGE_CDN_BASE = "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
 const IMAGE_CDN_BASE = (process.env.NEXT_PUBLIC_IMAGE_CDN_BASE || DEFAULT_IMAGE_CDN_BASE).replace(/\/$/, "");
-const IMAGE_CDN_ENABLED = process.env.NEXT_PUBLIC_IMAGE_CDN_ENABLED === "1";
+const IMAGE_CDN_ENABLED = process.env.NEXT_PUBLIC_IMAGE_CDN_ENABLED !== "0";
 
 export type ImageVariant = "poster-sm" | "poster-md" | "poster-lg" | "banner-sm" | "banner-lg" | "thumb";
 

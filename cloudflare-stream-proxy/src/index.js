@@ -79,11 +79,11 @@ async function proxyImage(request) {
 
   const width = clampInt(url.searchParams.get("w"), 80, 1920, 480);
   const quality = clampInt(url.searchParams.get("q"), 45, 95, 82);
-  const cacheKey = new Request(`${url.origin}/image-cache/${width}/${quality}/${encodeURIComponent(source.toString())}`);
+  const format = imageFormatFor(request, url);
+  const cacheKey = new Request(`${url.origin}/image-cache/${format}/${width}/${quality}/${encodeURIComponent(source.toString())}`);
   const cached = await caches.default.match(cacheKey);
   if (cached) return withImageHeaders(cached);
 
-  const accept = request.headers.get("accept") || "";
   const response = await fetch(source.toString(), {
     headers: {
       "accept": "image/avif,image/webp,image/*,*/*;q=0.8",
@@ -98,7 +98,7 @@ async function proxyImage(request) {
         width,
         quality,
         fit: "scale-down",
-        format: accept.includes("image/avif") ? "avif" : "webp",
+        format,
       },
     },
   });
@@ -841,12 +841,20 @@ function imageRefererFor(hostname) {
   return "https://animetvplus.xyz/";
 }
 
+function imageFormatFor(request, url) {
+  const requested = (url.searchParams.get("f") || url.searchParams.get("format") || "auto").toLowerCase();
+  if (requested === "webp" || requested === "avif") return requested;
+  const accept = request.headers.get("accept") || "";
+  return accept.includes("image/avif") ? "avif" : "webp";
+}
+
 function withImageHeaders(response) {
   const headers = new Headers(response.headers);
   headers.delete("set-cookie");
   if (headers.get("vary") === "*") headers.delete("vary");
   headers.set("access-control-allow-origin", "*");
   headers.set("cache-control", `public, max-age=${IMAGE_CACHE_TTL}, stale-while-revalidate=${IMAGE_CACHE_TTL}`);
+  headers.set("vary", "Accept");
   return new Response(response.body, { status: response.status, headers });
 }
 
