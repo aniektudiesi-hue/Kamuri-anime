@@ -137,7 +137,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
 
   return (
     <article className="card-lift scroll-card group w-[132px] shrink-0 sm:w-[154px]">
-      <Link href={animePath(anime, id)} aria-label={`View ${title}`} className="block">
+      <Link href={animePath(anime, id)} className="block">
         <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.055] transition group-hover:ring-[#cf2442]/28">
           {poster ? (
             <Image
@@ -271,7 +271,7 @@ function HomeSeoSection() {
   return (
     <section className="mx-auto max-w-screen-2xl px-4 pb-4 pt-2 lg:px-6">
       <div className="rounded-3xl border border-white/[0.055] bg-[#0d1020]/68 p-5 sm:p-7">
-        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#cf2442]">AnimeTV Plus</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#ff5b78]">AnimeTV Plus</p>
         <h2 className="mt-2 max-w-3xl text-2xl font-black tracking-tight text-white sm:text-3xl">
           Watch anime online with fast browsing, HD playback, and fresh episode discovery.
         </h2>

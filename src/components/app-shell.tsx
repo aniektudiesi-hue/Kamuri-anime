@@ -22,12 +22,12 @@ function Footer() {
       <div className="border-b border-white/[0.04] py-4">
         <div className="mx-auto max-w-screen-2xl px-4 lg:px-6">
           <div className="flex flex-wrap items-center gap-1">
-            <span className="mr-2 text-[10px] font-bold uppercase tracking-widest text-white/25">A-Z</span>
+            <span className="mr-2 text-[10px] font-bold uppercase tracking-widest text-white/70">A-Z</span>
             {AZ.map((c) => (
               <Link
                 key={c}
                 href={`/search?q=${c === "#" ? "0" : c}`}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-[11px] font-bold text-white/68 transition-colors hover:bg-white/[0.06] hover:text-white"
               >
                 {c}
               </Link>
@@ -42,19 +42,19 @@ function Footer() {
             <Link href="/" className="inline-flex items-center gap-2.5">
               <Image src="/logo.svg" alt="animeTv logo" width={28} height={28} />
               <span className="text-sm font-black tracking-tight text-white">
-                anime<span className="text-[#cf2442]">Tv</span>
+                anime<span className="text-[#ff4f70]">Tv</span>
               </span>
             </Link>
-            <p className="mt-3 max-w-[230px] text-[12px] leading-relaxed text-white/34">
+            <p className="mt-3 max-w-[230px] text-[12px] leading-relaxed text-white/72">
               Safe, secure anime streaming over HTTPS with fast HD playback, sub &amp; dub discovery, and personal watch history.
             </p>
-            <p className="mt-4 text-[11px] text-white/20">
+            <p className="mt-4 text-[11px] text-white/68">
               Smooth browsing, secure accounts, and clean anime discovery for every screen.
             </p>
           </div>
 
           <div>
-            <h3 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-white/25">Browse</h3>
+            <h3 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-white/70">Browse</h3>
             <ul className="space-y-2">
               {[
                 { label: "New Releases", href: "/new-releases" },
@@ -66,7 +66,7 @@ function Footer() {
                 { label: "Movies", href: "/search?q=movie" },
               ].map((link) => (
                 <li key={link.label}>
-                  <Link href={link.href} className="text-[12px] text-white/40 transition-colors hover:text-white">
+                  <Link href={link.href} className="text-[12px] text-white/72 transition-colors hover:text-white">
                     {link.label}
                   </Link>
                 </li>
@@ -75,13 +75,13 @@ function Footer() {
           </div>
 
           <div>
-            <h3 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-white/25">Genres</h3>
+            <h3 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-white/70">Genres</h3>
             <ul className="space-y-2">
               {["Action", "Adventure", "Comedy", "Fantasy", "Romance", "Isekai", "Slice of Life", "Horror"].map((genre) => (
                 <li key={genre}>
                   <Link
                     href={`/genre/${encodeURIComponent(genre)}`}
-                    className="text-[12px] text-white/40 transition-colors hover:text-white"
+                    className="text-[12px] text-white/72 transition-colors hover:text-white"
                   >
                     {genre}
                   </Link>
@@ -91,7 +91,7 @@ function Footer() {
           </div>
 
           <div>
-            <h3 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-white/25">Account</h3>
+            <h3 className="mb-4 text-[10px] font-bold uppercase tracking-widest text-white/70">Account</h3>
             <ul className="space-y-2">
               {[
                 { label: "My Watchlist", href: "/watchlist" },
@@ -100,7 +100,7 @@ function Footer() {
                 { label: "Register", href: "/register" },
               ].map((link) => (
                 <li key={link.label}>
-                  <Link href={link.href} className="text-[12px] text-white/40 transition-colors hover:text-white">
+                  <Link href={link.href} className="text-[12px] text-white/72 transition-colors hover:text-white">
                     {link.label}
                   </Link>
                 </li>
@@ -110,7 +110,7 @@ function Footer() {
         </div>
 
         <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-white/[0.04] pt-6 sm:flex-row">
-          <p className="text-[11px] text-white/20">
+          <p className="text-[11px] text-white/68">
             &copy; {new Date().getFullYear()} animeTv. Safe and secure streaming experience.
           </p>
           <div className="flex items-center gap-4">
@@ -120,7 +120,7 @@ function Footer() {
               { label: "Terms of Use", href: "/terms" },
               { label: "DMCA", href: "/dmca" },
             ].map((link) => (
-              <Link key={link.label} href={link.href} className="text-[11px] text-white/20 transition-colors hover:text-white/50">
+              <Link key={link.label} href={link.href} className="text-[11px] text-white/68 transition-colors hover:text-white">
                 {link.label}
               </Link>
             ))}
@@ -128,7 +128,7 @@ function Footer() {
         </div>
 
         <div className="mt-5 border-t border-white/[0.04] pt-5">
-          <p className="max-w-4xl text-[12px] leading-6 text-white/24">
+          <p className="max-w-4xl text-[12px] leading-6 text-white/68">
             Popular anime pages on animeTv include currently airing anime, new release anime, top rated anime, anime genres,
             free anime streaming, dubbed anime discovery, subbed anime, and a monthly anime release schedule. These internal links help viewers and search engines discover the site naturally.
           </p>
@@ -145,7 +145,7 @@ function Footer() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-lg bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold text-white/30 hover:text-white/60"
+                className="rounded-lg bg-white/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/70 hover:text-white"
               >
                 {link.label}
               </Link>

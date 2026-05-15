@@ -295,7 +295,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const count = episodeCount(current);
 
   return (
-    <section ref={sectionRef} className="relative -mt-1 min-h-[320px] overflow-hidden pb-3 sm:hidden">
+    <section ref={sectionRef} className="relative -mt-1 min-h-[286px] overflow-hidden pb-3 sm:hidden">
       <div className="absolute inset-0 bg-[#080a12]">
         {banner || poster ? (
           <Image
@@ -314,8 +314,8 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#06070d]/80 to-transparent" />
       </div>
 
-      <div className="relative flex min-h-[320px] items-end px-4">
-        <div className="w-[92%] max-w-[350px] rounded-2xl border border-white/[0.1] bg-[#090b13]/24 p-3 shadow-2xl shadow-black/30 backdrop-blur-md">
+      <div className="relative flex min-h-[286px] items-end px-4">
+        <div className="w-[92%] max-w-[350px] rounded-2xl border border-white/[0.1] bg-[#090b13]/56 p-3 shadow-2xl shadow-black/30">
           <div className="mb-2 flex items-center gap-2">
             <span className="rounded-full bg-[#cf2442]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#cf2442]/30">
               Featured
@@ -349,16 +349,20 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
           </div>
 
           {items.length > 1 ? (
-            <div className="mt-3 flex gap-1.5">
+            <div className="mt-2 flex gap-1">
               {items.slice(0, 5).map((_, i) => (
                 <button
                   key={i}
                   aria-label={`Featured ${i + 1}`}
                   onClick={() => setIndex(i)}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === index ? "w-7 bg-[#cf2442]" : "w-1.5 bg-white/25"
-                  }`}
-                />
+                  className="grid h-6 w-7 place-items-center rounded-full"
+                >
+                  <span
+                    className={`h-1.5 rounded-full transition-all ${
+                      i === index ? "w-5 bg-[#f43f5e]" : "w-1.5 bg-white/55"
+                    }`}
+                  />
+                </button>
               ))}
             </div>
           ) : null}

@@ -41,7 +41,7 @@ export function SeoAnimeCard({ anime, priority = false }: { anime: Anime; priori
         <h2 className="mt-3 line-clamp-2 text-[13px] font-bold leading-5 text-white/88 group-hover:text-white">
           {title}
         </h2>
-        <p className="mt-1 text-[11px] text-white/34">
+        <p className="mt-1 text-[11px] text-white/68">
           {episodeLabel(anime)}
           {status ? ` · ${status}` : ""}
         </p>
