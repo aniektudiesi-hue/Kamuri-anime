@@ -27,7 +27,19 @@ import {
   type StreamProviderId,
 } from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
-import { animePath, episodeNumberFromSlug, idFromSlug, posterOf, progressOf, rememberAnime, rememberedAnime, titleOf, watchPath } from "@/lib/utils";
+import {
+  animePath,
+  episodeNumberFromSlug,
+  idFromSlug,
+  posterOf,
+  progressOf,
+  rememberAnime,
+  rememberProgress,
+  rememberedAnime,
+  rememberedProgress,
+  titleOf,
+  watchPath,
+} from "@/lib/utils";
 
 const VideoPlayer = dynamic(
   () => import("@/components/video-player").then((module) => module.VideoPlayer),
@@ -71,6 +83,7 @@ export default function WatchPage({
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [type, setType] = useState<"sub" | "dub">("sub");
   const [known, setKnown] = useState<Anime | undefined>();
+  const [localResumeItem, setLocalResumeItem] = useState<Record<string, unknown> | undefined>();
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const { token } = useAuth();
   const settings = useSettings();
@@ -87,6 +100,7 @@ export default function WatchPage({
   useEffect(() => {
     const id = window.setTimeout(() => {
       setKnown(rememberedAnime(malId));
+      setLocalResumeItem(rememberedProgress(malId, episodeNum) as Record<string, unknown> | undefined);
       markPlayed(malId, episodeNum);
       setPlayedEps(getPlayed(malId));
     }, 0);
@@ -183,10 +197,11 @@ export default function WatchPage({
     [episodeNum, history.data, malId],
   );
   const serverResumeTime = progressOf(serverResumeItem);
+  const localResumeTime = progressOf(localResumeItem);
   const initialTime = explicitResumeTime > 0
     ? explicitResumeTime
     : settings.autoResume
-      ? Number(serverResumeTime || 0)
+      ? Number(serverResumeTime || localResumeTime || 0)
       : 0;
 
   const saveHistory = useMutation({
@@ -286,6 +301,7 @@ export default function WatchPage({
         watched_at: new Date().toISOString(),
       };
       pendingHistoryBodyRef.current = body;
+      rememberProgress(body);
       if (!tokenRef.current) return;
 
       sendRealtimeHistory(body);
@@ -315,6 +331,7 @@ export default function WatchPage({
       timestamp: Math.floor(initialTime || 0), watched_at: new Date().toISOString(),
     };
     pendingHistoryBodyRef.current = body;
+    rememberProgress(body);
     if (token) {
       sendRealtimeHistory(body);
       lastHttpProgressSave.current = Date.now();

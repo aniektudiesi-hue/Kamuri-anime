@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
 import type { User } from "./types";
+import { rememberedHistory } from "./utils";
 
 const TOKEN_KEY = "kairostream_token";
 
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return null;
     return localStorage.getItem(TOKEN_KEY);
   });
+  const syncedTokenRef = useRef("");
 
   const me = useQuery({
     queryKey: ["me", token],
@@ -33,6 +35,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
+
+  useEffect(() => {
+    if (!token || !me.error) return;
+    const message = me.error instanceof Error ? me.error.message : String(me.error);
+    if (/401|not authenticated|invalid|expired/i.test(message)) {
+      localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
+    }
+  }, [me.error, token]);
+
+  useEffect(() => {
+    if (!token || syncedTokenRef.current === token) return;
+    syncedTokenRef.current = token;
+    const items = rememberedHistory(80);
+    if (!items.length) return;
+    items.forEach((item) => {
+      api.addHistory(token, item as Record<string, unknown>).catch(() => undefined);
+    });
+  }, [token]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

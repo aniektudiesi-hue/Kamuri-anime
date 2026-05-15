@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Button, ButtonLink } from "@/components/button";
@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { deleteOfflineDownload, listOfflineDownloads, offlineId } from "@/lib/offline-downloads";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { animePath, posterOf, progressOf, rememberedAnime, titleOf, watchPath } from "@/lib/utils";
+import { HISTORY_UPDATED_EVENT, animePath, posterOf, progressOf, rememberedAnime, rememberedHistory, titleOf, watchPath } from "@/lib/utils";
 
 type LibraryKind = "history" | "watchlist" | "downloads";
 
@@ -53,6 +53,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [localDownloads, setLocalDownloads] = useState<LibraryItem[]>([]);
+  const [localHistory, setLocalHistory] = useState<LibraryItem[]>([]);
   const title = kind === "history" ? "Watch History" : kind === "watchlist" ? "Watchlist" : "Downloads";
   const query = useQuery({
     queryKey: [kind, token],
@@ -63,6 +64,18 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
     },
     enabled: Boolean(token) && kind !== "downloads",
   });
+
+  useEffect(() => {
+    if (kind !== "history") return;
+    const refresh = () => setLocalHistory(rememberedHistory(200));
+    refresh();
+    window.addEventListener(HISTORY_UPDATED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(HISTORY_UPDATED_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [kind]);
 
   useEffect(() => {
     if (kind !== "downloads") return;
@@ -120,10 +133,17 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
     },
   });
 
-  const displayItems =
-    kind === "downloads"
-      ? localDownloads
-      : (query.data ?? []);
+  const displayItems = useMemo(() => {
+    if (kind === "downloads") return localDownloads;
+    if (kind !== "history") return query.data ?? [];
+    const byAnime = new Map<string, LibraryItem>();
+    [...localHistory, ...(query.data ?? [])].forEach((item) => {
+      const id = String(item.mal_id || item.anime_id || "");
+      if (!id) return;
+      byAnime.set(id, { ...byAnime.get(id), ...item });
+    });
+    return Array.from(byAnime.values());
+  }, [kind, localDownloads, localHistory, query.data]);
 
   return (
     <AppShell>
@@ -148,7 +168,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
           ) : null}
         </div>
 
-        {!token && kind !== "downloads" ? (
+        {!token && kind !== "downloads" && !displayItems.length ? (
           <div className="rounded-3xl border border-white/[0.08] bg-panel/88 p-10 text-center shadow-[0_22px_80px_rgba(0,0,0,0.26)]">
             <p className="text-muted">Login to view this library.</p>
             <ButtonLink href="/login" className="mt-4">Login</ButtonLink>
