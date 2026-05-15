@@ -158,6 +158,7 @@ export function AdminDashboard() {
   const [adminKey, setAdminKey] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(0);
+  const [userSearch, setUserSearch] = useState("");
 
   useEffect(() => {
     setAdminKey(localStorage.getItem("animetv_admin_key") || "");
@@ -174,7 +175,7 @@ export function AdminDashboard() {
   });
   const users = useQuery({
     queryKey: ["admin", "users", token, adminKey],
-    queryFn: () => api.adminUsers(token!, adminKey, 150),
+    queryFn: () => api.adminUsers(token!, adminKey, 1000),
     enabled: Boolean(token),
     staleTime: 1000 * 4,
     refetchInterval: 5_000,
@@ -212,6 +213,11 @@ export function AdminDashboard() {
   });
 
   const userRows = useMemo(() => asItems(users.data), [users.data]);
+  const filteredUserRows = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    if (!q) return userRows;
+    return userRows.filter((row) => text(row, "username").toLowerCase().includes(q) || String(row.id ?? "").includes(q));
+  }, [userRows, userSearch]);
   const visitRows = useMemo(() => asItems(visits.data), [visits.data]);
   const activeRows = useMemo(() => onlineRows(userRows, visitRows, nowMs), [nowMs, userRows, visitRows]);
 
@@ -311,8 +317,19 @@ export function AdminDashboard() {
 
             <div className="mt-6 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
               <Panel title="Users database" icon={<UserRound size={16} />} loading={users.isLoading}>
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Input
+                    value={userSearch}
+                    onChange={(event) => setUserSearch(event.target.value)}
+                    placeholder="Search username or user id"
+                    className="h-10 max-w-sm border-white/[0.08] bg-black/25 text-sm text-white"
+                  />
+                  <p className="text-xs font-bold text-white/42">
+                    Showing {filteredUserRows.length} of {userRows.length} users
+                  </p>
+                </div>
                 <Table
-                  rows={userRows}
+                  rows={filteredUserRows}
                   initialRows={24}
                   columns={[
                     [

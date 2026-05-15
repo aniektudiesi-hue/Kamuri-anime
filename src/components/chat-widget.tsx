@@ -76,6 +76,15 @@ export function ChatWidget() {
     staleTime: 1000 * 15,
   });
 
+  const online = useQuery({
+    queryKey: ["chat", "online", token],
+    queryFn: () => api.chatOnline(token!),
+    enabled: Boolean(token && open),
+    staleTime: 1000 * 5,
+    refetchInterval: 8_000,
+    refetchIntervalInBackground: true,
+  });
+
   const searchUsers = useQuery({
     queryKey: ["chat", "user-search", token, userSearch],
     queryFn: () => api.searchChatUsers(token!, userSearch),
@@ -118,6 +127,13 @@ export function ChatWidget() {
     });
     return Array.from(byId.values()).slice(-120);
   }, [history.data, liveMessages]);
+
+  const mergedOnlineUsers = useMemo(() => {
+    const byId = new Map<string, Record<string, unknown>>();
+    ((online.data?.items ?? []) as Record<string, unknown>[]).forEach((row) => byId.set(String(row.id), row));
+    onlineUsers.forEach((row) => byId.set(String(row.id), { ...byId.get(String(row.id)), ...row }));
+    return Array.from(byId.values());
+  }, [online.data, onlineUsers]);
 
   useEffect(() => {
     const openHandler = (event: Event) => {
@@ -295,7 +311,7 @@ export function ChatWidget() {
                 <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2">
                   <p className="line-clamp-1 text-sm font-black capitalize text-white">{roomLabel(room)}</p>
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-1 text-[10px] font-black text-emerald-200">
-                    <Radio size={11} /> {onlineUsers.length} online
+                    <Radio size={11} /> {mergedOnlineUsers.length} online
                   </span>
                 </div>
                 <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -338,7 +354,7 @@ export function ChatWidget() {
                 <div className="border-b border-white/[0.06] p-3">
                   <p className="mb-2 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-white/55"><Users size={12} /> Online</p>
                   <div className="max-h-24 overflow-y-auto">
-                    {onlineUsers.map((row) => (
+                    {mergedOnlineUsers.map((row) => (
                       <button key={String(row.id)} type="button" onClick={() => startDirectChat(row)} className="block w-full truncate rounded-xl px-2 py-1 text-left text-xs font-bold text-white/78 hover:bg-white/[0.06]">
                         {text(row, "username", `User ${row.id}`)}
                       </button>

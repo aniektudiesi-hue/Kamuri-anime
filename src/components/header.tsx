@@ -9,6 +9,7 @@ const nav = [
   { href: "/new-releases", label: "New Releases" },
   { href: "/top-rated", label: "Top Rated" },
   { href: "/schedule", label: "Schedule" },
+  { href: "/chat", label: "Chat" },
 ];
 
 export function Header() {
