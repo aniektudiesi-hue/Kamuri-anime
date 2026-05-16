@@ -306,46 +306,46 @@ export function ChatPage() {
     <>
       <Header />
       <main className="h-[calc(100dvh-72px)] overflow-hidden bg-[#03040a] px-2 py-2 text-white sm:px-4 sm:py-4">
-        <section className="mx-auto grid h-full max-w-screen-2xl overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#070913] shadow-[0_30px_110px_rgba(0,0,0,0.6)] lg:grid-cols-[360px_1fr]">
+        <section className="mx-auto grid h-full max-w-screen-2xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#070913] shadow-[0_30px_110px_rgba(0,0,0,0.6)] sm:rounded-[28px] lg:grid-cols-[360px_1fr] lg:grid-rows-1">
           <aside className="flex min-h-0 flex-col border-b border-white/[0.08] lg:border-b-0 lg:border-r">
-            <div className="shrink-0 border-b border-white/[0.08] p-4">
+            <div className="shrink-0 border-b border-white/[0.08] p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#ff5b78]">animeTVplus</p>
-                  <h1 className="mt-1 text-2xl font-black">Chats</h1>
+                  <h1 className="mt-1 text-xl font-black sm:text-2xl">Chats</h1>
                 </div>
                 <span className={cn("rounded-full px-3 py-1 text-[11px] font-black", socketState === "live" ? "bg-emerald-400/12 text-emerald-200" : "bg-yellow-400/12 text-yellow-100")}>
                   {socketState === "live" ? "Live" : "Connecting"}
                 </span>
               </div>
-              <div className="mt-4 flex h-11 items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.06] px-3">
+              <div className="mt-4 hidden h-11 items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.06] px-3 lg:flex">
                 <Search size={16} className="text-white/42" />
                 <input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Search users" className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none placeholder:text-white/35" />
               </div>
             </div>
 
-            <div className="no-scrollbar flex shrink-0 gap-2 overflow-x-auto border-b border-white/[0.08] p-3 lg:block lg:max-h-[260px] lg:space-y-2 lg:overflow-y-auto">
+            <div className="no-scrollbar flex shrink-0 gap-2 overflow-x-auto border-b border-white/[0.08] p-2.5 sm:p-3 lg:block lg:max-h-[260px] lg:space-y-2 lg:overflow-y-auto">
               {roomItems.map((item) => {
                 const name = text(item, "room", "global");
                 const active = room === name;
                 return (
-                  <button key={name} type="button" onClick={() => setRoom(name)} className={cn("flex min-w-[210px] items-center gap-3 rounded-2xl p-3 text-left transition lg:w-full lg:min-w-0", active ? "bg-[#e11d48] text-white" : "bg-white/[0.045] text-white/74 hover:bg-white/[0.075]")}>
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-black/20"><Hash size={16} /></span>
+                  <button key={name} type="button" onClick={() => setRoom(name)} className={cn("flex min-w-[142px] items-center gap-2 rounded-2xl px-2.5 py-2 text-left transition sm:min-w-[180px] lg:w-full lg:min-w-0 lg:gap-3 lg:p-3", active ? "bg-[#e11d48] text-white" : "bg-white/[0.045] text-white/74 hover:bg-white/[0.075]")}>
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/20 lg:h-11 lg:w-11"><Hash size={15} /></span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-black capitalize">{label(name)}</span>
-                      <span className="mt-0.5 block text-[11px] font-semibold opacity-65">{num(item, "messages")} saved messages</span>
+                      <span className="block truncate text-xs font-black capitalize sm:text-sm">{label(name)}</span>
+                      <span className="mt-0.5 hidden text-[11px] font-semibold opacity-65 sm:block">{num(item, "messages")} saved messages</span>
                     </span>
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex shrink-0 gap-2 border-b border-white/[0.08] p-3">
+            <div className="hidden shrink-0 gap-2 border-b border-white/[0.08] p-3 lg:flex">
               <input value={customRoom} onChange={(event) => setCustomRoom(event.target.value)} placeholder="Create room" className="min-w-0 flex-1 rounded-2xl border border-white/[0.08] bg-black/24 px-3 text-sm font-semibold outline-none placeholder:text-white/35" />
               <button type="button" onClick={joinRoom} className="grid h-11 w-11 place-items-center rounded-2xl bg-white/[0.08]"><Plus size={17} /></button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <div className="hidden min-h-0 flex-1 overflow-y-auto p-3 lg:block">
               <p className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-white/45"><Users size={14} /> Online</p>
               <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
                 {onlineUsers.slice(0, 20).map((row) => (
@@ -376,21 +376,21 @@ export function ChatPage() {
           </aside>
 
           <section className="flex min-h-0 flex-col">
-            <header className="flex shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#090b14]/95 px-4 py-3">
+            <header className="flex shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#090b14]/95 px-3 py-2.5 sm:px-4 sm:py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#e11d48,#7f1d1d)] text-sm font-black">
+                <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#e11d48,#7f1d1d)] text-xs font-black sm:h-12 sm:w-12 sm:text-sm">
                   {avatar(label(room))}
-                  <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[#090b14] bg-emerald-400" />
+                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#090b14] bg-emerald-400 sm:h-3.5 sm:w-3.5" />
                 </span>
                 <div className="min-w-0">
-                  <h2 className="truncate text-lg font-black capitalize">{label(room)}</h2>
+                  <h2 className="truncate text-base font-black capitalize sm:text-lg">{label(room)}</h2>
                   <p className="truncate text-xs font-semibold text-white/45">{socketUsers.length || onlineUsers.length} online now</p>
                 </div>
               </div>
               <MessageCircle size={19} className="text-white/38" />
             </header>
 
-            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_20%_0%,rgba(225,29,72,0.08),transparent_30%)] px-3 py-4 sm:px-5">
+            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_20%_0%,rgba(225,29,72,0.08),transparent_30%)] px-3 py-3 sm:px-5 sm:py-4">
               <div className="space-y-3">
                 {messages.map((item, index) => {
                   const own = String(item.user_id) === String(user?.id);
@@ -398,9 +398,9 @@ export function ChatPage() {
                   return (
                     <div key={`${item.id ?? index}-${item.created_at}-${item.message}`} className={cn("flex gap-2", own ? "justify-end" : "justify-start")}>
                       {!own ? <span className="mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.08] text-[10px] font-black">{avatar(item.username || "user")}</span> : null}
-                      <div className={cn("max-w-[82%] sm:max-w-[66%]", own ? "text-right" : "text-left")}>
+                      <div className={cn("max-w-[86%] sm:max-w-[66%]", own ? "text-right" : "text-left")}>
                         {!own ? <p className="mb-1 px-1 text-[11px] font-black text-white/42">@{item.username || "user"}</p> : null}
-                        <div className={cn("inline-block rounded-[1.35rem] px-4 py-2.5 text-left text-sm font-semibold leading-5 shadow-lg", own ? "rounded-br-md bg-[#e11d48] text-white" : "rounded-bl-md border border-white/[0.07] bg-white/[0.075] text-white/92")}>
+                        <div className={cn("inline-block rounded-[1.2rem] px-3.5 py-2 text-left text-sm font-semibold leading-5 shadow-lg sm:rounded-[1.35rem] sm:px-4 sm:py-2.5", own ? "rounded-br-md bg-[#e11d48] text-white" : "rounded-bl-md border border-white/[0.07] bg-white/[0.075] text-white/92")}>
                           <p className="whitespace-pre-wrap break-words">{item.message}</p>
                           {item.kind === "watching" && typeof meta.href === "string" ? <Link href={meta.href} className="mt-2 inline-flex rounded-xl bg-black/24 px-2.5 py-1 text-xs font-black">Open timestamp</Link> : null}
                         </div>
@@ -433,14 +433,14 @@ export function ChatPage() {
               </div>
             </div>
 
-            <form onSubmit={submit} className="shrink-0 border-t border-white/[0.08] bg-[#090b14] p-3">
-              <div className="flex items-end gap-2 rounded-[1.35rem] border border-white/[0.08] bg-white/[0.055] p-2">
+            <form onSubmit={submit} className="shrink-0 border-t border-white/[0.08] bg-[#090b14] p-2.5 sm:p-3">
+              <div className="flex items-end gap-2 rounded-[1.2rem] border border-white/[0.08] bg-white/[0.055] p-2 sm:rounded-[1.35rem]">
                 <textarea value={message} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} rows={1} placeholder="Message..." className="max-h-28 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm font-semibold outline-none placeholder:text-white/35" />
                 <button disabled={!message.trim()} type="submit" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e11d48] text-white disabled:bg-white/[0.08] disabled:text-white/30">
                   <Send size={17} />
                 </button>
               </div>
-              <p className="mt-2 text-center text-[11px] font-semibold text-white/30">Press Enter to send, Shift+Enter for a new line.</p>
+              <p className="mt-1.5 hidden text-center text-[11px] font-semibold text-white/30 sm:block">Press Enter to send, Shift+Enter for a new line.</p>
             </form>
           </section>
         </section>
