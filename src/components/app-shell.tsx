@@ -46,7 +46,7 @@ function Footer() {
               </span>
             </Link>
             <p className="mt-3 max-w-[230px] text-[12px] leading-relaxed text-white/72">
-              animeTVplus at animetvplus.xyz offers safe, secure anime streaming over HTTPS with fast HD playback, sub &amp; dub discovery, and personal watch history.
+              animeTVplus, searched as animetvplus, animetv plus, anime tv plus, and anime tvplus, offers safe, secure anime streaming over HTTPS with fast HD playback, sub &amp; dub discovery, and personal watch history.
             </p>
             <p className="mt-4 text-[11px] text-white/68">
               Smooth browsing, secure accounts, and clean anime discovery for every screen.
@@ -130,7 +130,7 @@ function Footer() {
         <div className="mt-5 border-t border-white/[0.04] pt-5">
           <p className="max-w-4xl text-[12px] leading-6 text-white/68">
             Popular anime pages on animeTVplus include currently airing anime, new release anime, top rated anime, anime genres,
-            free anime streaming, dubbed anime discovery, subbed anime, and a monthly anime release schedule. These internal links help viewers and search engines discover the site naturally.
+            free anime streaming, dubbed anime discovery, subbed anime, and a monthly anime release schedule. animeTVplus is also searchable as animetvplus, animetv plus, anime tv plus, and anime tvplus. These internal links help viewers and search engines discover the site naturally.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {[

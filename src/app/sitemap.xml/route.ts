@@ -1,28 +1,26 @@
-import { staticSitemapRoutes } from "@/lib/sitemap-data";
+import { SITE_URL } from "@/lib/site";
 
 export const revalidate = 3600;
 
-export async function GET() {
-  const routes = staticSitemapRoutes();
+const SITEMAPS = [
+  "/site-pages.xml",
+  "/anime-sitemap.xml",
+  "/watch-sitemap.xml",
+  "/video-sitemap.xml",
+];
 
-  return new Response(toUrlSet(routes), {
+export async function GET() {
+  const now = new Date().toISOString();
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${SITEMAPS.map((path) => `  <sitemap><loc>${SITE_URL}${path}</loc><lastmod>${now}</lastmod></sitemap>`).join("\n")}
+</sitemapindex>`;
+
+  return new Response(xml, {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
       "Cache-Control": "public, max-age=900, s-maxage=3600, stale-while-revalidate=86400",
+      "X-Robots-Tag": "index, follow",
     },
   });
-}
-
-function toUrlSet(routes: ReturnType<typeof staticSitemapRoutes>) {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${routes
-    .map((route) => {
-      const lastModified =
-        route.lastModified instanceof Date ? route.lastModified.toISOString() : new Date().toISOString();
-      return `  <url><loc>${escapeXml(route.url)}</loc><lastmod>${lastModified}</lastmod><changefreq>${route.changeFrequency ?? "daily"}</changefreq><priority>${route.priority ?? 0.7}</priority></url>`;
-    })
-    .join("\n")}\n</urlset>`;
-}
-
-function escapeXml(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

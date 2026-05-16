@@ -113,6 +113,71 @@ const organizationJsonLd = {
   ],
 };
 
+const webApplicationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "@id": `${SITE_URL}/#webapp`,
+  name: SITE_NAME,
+  alternateName: ["animetvplus", "animetv plus", "anime tv plus", "anime tvplus"],
+  url: SITE_URL,
+  applicationCategory: "EntertainmentApplication",
+  operatingSystem: "Web",
+  browserRequirements: "Requires JavaScript and a modern browser",
+  description: SITE_DESCRIPTION,
+  image: absoluteUrl("/opengraph-image"),
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  featureList: [
+    "Anime search",
+    "Anime episode pages",
+    "Watch history",
+    "Watchlist",
+    "Global chat",
+    "Anime release schedule",
+    "Subbed and dubbed anime discovery",
+  ],
+  isPartOf: {
+    "@id": `${SITE_URL}/#website`,
+  },
+  publisher: {
+    "@id": `${SITE_URL}/#organization`,
+  },
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "What is animetvplus?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "animetvplus is the official animeTVplus anime streaming and discovery site at animetvplus.xyz.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Is animeTVplus the same as animetv plus?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes. animeTVplus is also searched as animetvplus, animetv plus, anime tv plus, and anime tvplus.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Does animeTVplus have anime schedules and watch history?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "animeTVplus includes anime episode discovery, monthly schedules, watch history, watchlists, and global chat.",
+      },
+    },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -135,7 +200,7 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify([websiteJsonLd, organizationJsonLd]).replace(/</g, "\\u003c"),
+            __html: JSON.stringify([websiteJsonLd, organizationJsonLd, webApplicationJsonLd, faqJsonLd]).replace(/</g, "\\u003c"),
           }}
         />
         <Providers>{children}</Providers>

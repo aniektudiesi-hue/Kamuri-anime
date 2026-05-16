@@ -1,3 +1,3 @@
-export { GET } from "../sitemap.xml/route";
+export { GET } from "../site-pages.xml/route";
 
 export const revalidate = 3600;
