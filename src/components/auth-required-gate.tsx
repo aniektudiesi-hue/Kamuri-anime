@@ -9,10 +9,24 @@ const OPEN_PATHS = new Set(["/login", "/register"]);
 
 export function AuthRequiredGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isReady } = useAuth();
   const isOpen = OPEN_PATHS.has(pathname);
 
   if (isLoggedIn || isOpen) return <>{children}</>;
+
+  if (!isReady) {
+    return (
+      <main className="grid min-h-dvh place-items-center bg-[#03040a] px-4 text-white">
+        <div className="grid place-items-center gap-4">
+          <div className="relative grid h-16 w-16 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.045]">
+            <Play size={22} className="text-[#e11d48]" fill="currentColor" />
+            <span className="absolute inset-[-5px] rounded-[1.45rem] border border-[#e11d48]/30 opacity-70" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-white/38">animeTVplus</p>
+        </div>
+      </main>
+    );
+  }
 
   const returnTo = typeof window === "undefined" ? pathname : `${pathname}${window.location.search}`;
 

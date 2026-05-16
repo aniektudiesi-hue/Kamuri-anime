@@ -12,6 +12,7 @@ type AuthContextValue = {
   token: string | null;
   user: User | null;
   isLoggedIn: boolean;
+  isReady: boolean;
   setSession: (token: string) => void;
   logout: () => void;
 };
@@ -19,11 +20,14 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(TOKEN_KEY);
-  });
+  const [token, setToken] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
   const syncedTokenRef = useRef("");
+
+  useEffect(() => {
+    setToken(localStorage.getItem(TOKEN_KEY));
+    setIsReady(true);
+  }, []);
 
   const me = useQuery({
     queryKey: ["me", token],
@@ -51,17 +55,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token,
       user: me.data ?? null,
       isLoggedIn: Boolean(token),
+      isReady,
       setSession(nextToken) {
         localStorage.setItem(TOKEN_KEY, nextToken);
         localStorage.removeItem("animetvplus_guest_started_at");
         setToken(nextToken);
+        setIsReady(true);
       },
       logout() {
         localStorage.removeItem(TOKEN_KEY);
         setToken(null);
+        setIsReady(true);
       },
     }),
-    [me.data, token],
+    [isReady, me.data, token],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
