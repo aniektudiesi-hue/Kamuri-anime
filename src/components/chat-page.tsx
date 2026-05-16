@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AtSign,
@@ -236,7 +236,10 @@ export function ChatPage() {
           if (data.type === "online") setRoomOnline(data.users ?? []);
           if (data.type === "history") setLiveMessages(data.messages ?? []);
           if (data.type === "message" && data.message) {
-            setLiveMessages((current) => [...current, data.message!].slice(-160));
+            setLiveMessages((current) => [
+              ...current.filter((item) => !(Number(item.id) < 0 && item.message === data.message?.message && String(item.user_id) === String(data.message?.user_id))),
+              data.message!,
+            ].slice(-160));
             setTypingUsers((current) => {
               const next = { ...current };
               delete next[String(data.message?.user_id ?? "")];
@@ -300,8 +303,7 @@ export function ChatPage() {
     return () => window.clearInterval(tick);
   }, []);
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
+  function sendMessage() {
     const body = { message: message.trim(), kind: "text", meta: {} };
     if (!body.message || !token) return;
     const optimistic: ChatMessage = {
@@ -315,8 +317,24 @@ export function ChatPage() {
     };
     sendTyping(false);
     setLiveMessages((current) => [...current, optimistic].slice(-160));
-    sendFallback.mutate(body);
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(body));
+    } else {
+      sendFallback.mutate(body);
+    }
     setMessage("");
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    sendMessage();
+  }
+
+  function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    sendMessage();
   }
 
   function onMessageChange(value: string) {
@@ -346,9 +364,9 @@ export function ChatPage() {
 
   return (
     <AppShell>
-      <section className="mx-auto flex min-h-[calc(100vh-92px)] max-w-screen-2xl flex-col gap-4 px-3 py-4 sm:px-4 lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:px-6">
-        <aside className="overflow-hidden rounded-[1.6rem] border border-white/[0.08] bg-[#070913]/95 shadow-[0_22px_80px_rgba(0,0,0,0.42)] lg:h-[calc(100vh-124px)]">
-          <div className="border-b border-white/[0.07] p-4">
+      <section className="mx-auto grid h-[calc(100dvh-92px)] max-w-screen-2xl gap-3 overflow-hidden px-3 py-3 sm:px-4 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-6">
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[1.6rem] border border-white/[0.08] bg-[#070913]/95 shadow-[0_22px_80px_rgba(0,0,0,0.42)]">
+          <div className="shrink-0 border-b border-white/[0.07] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#ff5b78]">animeTVplus</p>
@@ -371,7 +389,7 @@ export function ChatPage() {
             </div>
           </div>
 
-          <div className="no-scrollbar flex gap-2 overflow-x-auto border-b border-white/[0.07] px-4 py-3 lg:block lg:max-h-[calc(100vh-268px)] lg:space-y-2 lg:overflow-y-auto">
+          <div className="no-scrollbar flex shrink-0 gap-2 overflow-x-auto border-b border-white/[0.07] px-4 py-3 lg:block lg:max-h-[34%] lg:space-y-2 lg:overflow-y-auto">
             {roomItems.map((item) => {
               const name = text(item, "room", "global");
               const active = room === name;
@@ -399,7 +417,7 @@ export function ChatPage() {
             })}
           </div>
 
-          <div className="border-t border-white/[0.07] p-4">
+          <div className="shrink-0 border-t border-white/[0.07] p-4">
             {token ? (
               <div className="flex gap-2">
                 <input
@@ -418,9 +436,22 @@ export function ChatPage() {
               </Link>
             )}
           </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden border-t border-white/[0.07] p-4">
+            <PeoplePanel
+              userSearch={userSearch}
+              setUserSearch={setUserSearch}
+              onlineUsers={onlineUsers}
+              searchItems={(searchUsers.data?.items ?? following.data?.items ?? []) as Row[]}
+              token={token}
+              nowSeconds={Math.floor(nowMs / 1000)}
+              startDirectChat={startDirectChat}
+              followUser={(id) => follow.mutate(id)}
+            />
+          </div>
         </aside>
 
-        <main className="flex min-h-[660px] flex-col overflow-hidden rounded-[1.6rem] border border-white/[0.08] bg-[#05060a]/96 shadow-[0_24px_90px_rgba(0,0,0,0.5)] lg:h-[calc(100vh-124px)]">
+        <main className="flex min-h-0 flex-col overflow-hidden rounded-[1.6rem] border border-white/[0.08] bg-[#05060a]/96 shadow-[0_24px_90px_rgba(0,0,0,0.5)]">
           <header className="flex items-center justify-between gap-3 border-b border-white/[0.08] bg-[#090b14]/92 px-4 py-3 backdrop-blur-xl">
             <div className="flex min-w-0 items-center gap-3">
               <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#e11d48,#7f1d1d)] text-sm font-black text-white">
@@ -514,6 +545,7 @@ export function ChatPage() {
                 <textarea
                   value={message}
                   onChange={(event) => onMessageChange(event.target.value)}
+                  onKeyDown={onComposerKeyDown}
                   placeholder="Message this room..."
                   rows={1}
                   className="max-h-28 min-h-12 min-w-0 flex-1 resize-none rounded-2xl border border-white/[0.08] bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white outline-none transition placeholder:text-white/35 focus:border-[#e11d48]/50"
@@ -530,31 +562,6 @@ export function ChatPage() {
           </form>
         </main>
 
-        <aside className="grid gap-4 lg:col-start-1 lg:row-start-2 lg:hidden">
-          <PeoplePanel
-            userSearch={userSearch}
-            setUserSearch={setUserSearch}
-            onlineUsers={onlineUsers}
-            searchItems={(searchUsers.data?.items ?? following.data?.items ?? []) as Row[]}
-            token={token}
-            nowSeconds={Math.floor(nowMs / 1000)}
-            startDirectChat={startDirectChat}
-            followUser={(id) => follow.mutate(id)}
-          />
-        </aside>
-
-        <aside className="hidden rounded-[1.6rem] border border-white/[0.08] bg-[#070913]/95 p-4 lg:col-start-1 lg:row-start-2 lg:block">
-          <PeoplePanel
-            userSearch={userSearch}
-            setUserSearch={setUserSearch}
-            onlineUsers={onlineUsers}
-            searchItems={(searchUsers.data?.items ?? following.data?.items ?? []) as Row[]}
-            token={token}
-            nowSeconds={Math.floor(nowMs / 1000)}
-            startDirectChat={startDirectChat}
-            followUser={(id) => follow.mutate(id)}
-          />
-        </aside>
       </section>
     </AppShell>
   );
