@@ -33,7 +33,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       const token = extractToken(response);
       if (!token) throw new Error("The API did not return an auth token.");
       setSession(token);
-      router.push("/");
+      const returnTo = new URLSearchParams(window.location.search).get("returnTo") || "/";
+      router.push(returnTo.startsWith("/") ? returnTo : "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");
     } finally {
