@@ -37,15 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    if (!token || !me.error) return;
-    const message = me.error instanceof Error ? me.error.message : String(me.error);
-    if (/401|not authenticated|invalid|expired/i.test(message)) {
-      localStorage.removeItem(TOKEN_KEY);
-      setToken(null);
-    }
-  }, [me.error, token]);
-
-  useEffect(() => {
     if (!token || syncedTokenRef.current === token) return;
     syncedTokenRef.current = token;
     const items = rememberedHistory(80);

@@ -272,12 +272,12 @@ function HomeSeoSection() {
       <div className="rounded-3xl border border-white/[0.055] bg-[#0d1020]/68 p-5 sm:p-7">
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-[#ff5b78]">animeTVplus</p>
         <h2 className="mt-2 max-w-3xl text-2xl font-black tracking-tight text-white sm:text-3xl">
-          Watch anime online with fast browsing, HD playback, and fresh episode discovery.
+          animetvplus official anime streaming, fast browsing, HD playback, and fresh episode discovery.
         </h2>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-white/72">
-          animeTVplus, also written as animetvplus, is the official animeTVplus website on animetvplus.xyz. It helps viewers
-          find licensed anime access, free anime discovery, subbed anime, dubbed anime, top rated shows, newly released
-          episodes, global anime chat, watch history, watchlists, and monthly airing schedules from one clean streaming interface.
+          animetvplus, also written as animeTVplus, is the official animeTVplus website on animetvplus.xyz. It helps viewers
+          find anime streaming pages, free anime discovery, subbed anime, dubbed anime, top rated shows, newly released episodes,
+          global anime chat, watch history, watchlists, and monthly airing schedules from one clean streaming interface.
         </p>
         <p className="mt-3 max-w-4xl text-xs font-semibold leading-6 text-white/48">
           Search animeTVplus on Google to find the official animetvplus.xyz anime streaming homepage, anime schedule,
