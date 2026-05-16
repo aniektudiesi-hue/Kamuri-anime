@@ -311,9 +311,9 @@ export function ChatPage() {
       <div className="hidden lg:block">
         <Header />
       </div>
-      <main className="h-dvh overflow-hidden bg-[#03040a] text-white lg:h-[calc(100dvh-72px)] lg:px-4 lg:py-4">
-        <section className="mx-auto grid h-full max-w-screen-2xl grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[#070913] shadow-[0_30px_110px_rgba(0,0,0,0.6)] lg:rounded-[28px] lg:border lg:border-white/[0.08] lg:grid-cols-[360px_1fr] lg:grid-rows-1">
-          <aside className="flex min-h-0 flex-col border-b border-white/[0.08] lg:border-b-0 lg:border-r">
+      <main className="h-dvh w-dvw max-w-[100dvw] overflow-hidden bg-[#03040a] text-white lg:h-[calc(100dvh-72px)] lg:px-4 lg:py-4">
+        <section className="mx-auto grid h-full w-full min-w-0 max-w-[100dvw] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[#070913] shadow-[0_30px_110px_rgba(0,0,0,0.6)] lg:max-w-screen-2xl lg:rounded-[28px] lg:border lg:border-white/[0.08] lg:grid-cols-[360px_1fr] lg:grid-rows-1">
+          <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden border-b border-white/[0.08] lg:border-b-0 lg:border-r">
             <div className="hidden shrink-0 border-b border-white/[0.08] p-4 lg:block">
               <div className="flex items-center justify-between">
                 <div>
@@ -330,12 +330,12 @@ export function ChatPage() {
               </div>
             </div>
 
-            <div className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto border-b border-white/[0.08] p-1.5 lg:block lg:max-h-[260px] lg:space-y-2 lg:overflow-y-auto lg:p-3">
+            <div className="no-scrollbar flex w-full min-w-0 shrink-0 gap-1.5 overflow-x-auto overflow-y-hidden border-b border-white/[0.08] p-1.5 lg:block lg:max-h-[260px] lg:space-y-2 lg:overflow-y-auto lg:p-3">
               {roomItems.map((item) => {
                 const name = text(item, "room", "global");
                 const active = room === name;
                 return (
-                  <button key={name} type="button" onClick={() => setRoom(name)} className={cn("flex min-w-[108px] items-center gap-1.5 rounded-xl px-2 py-1.5 text-left transition lg:w-full lg:min-w-0 lg:gap-3 lg:rounded-2xl lg:p-3", active ? "bg-[#e11d48] text-white" : "bg-white/[0.045] text-white/74 hover:bg-white/[0.075]")}>
+                  <button key={name} type="button" onClick={() => setRoom(name)} className={cn("flex w-[31vw] max-w-[124px] shrink-0 items-center gap-1.5 rounded-xl px-2 py-1.5 text-left transition lg:w-full lg:max-w-none lg:min-w-0 lg:gap-3 lg:rounded-2xl lg:p-3", active ? "bg-[#e11d48] text-white" : "bg-white/[0.045] text-white/74 hover:bg-white/[0.075]")}>
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-black/20 lg:h-11 lg:w-11"><Hash size={13} /></span>
                     <span className="min-w-0">
                       <span className="block truncate text-[11px] font-black capitalize lg:text-sm">{label(name)}</span>
@@ -381,7 +381,7 @@ export function ChatPage() {
             </div>
           </aside>
 
-          <section className="flex min-h-0 flex-col">
+          <section className="flex min-h-0 min-w-0 flex-col overflow-hidden">
             <header className="flex shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#090b14]/95 px-2.5 py-2 lg:px-4 lg:py-3">
               <div className="flex min-w-0 items-center gap-2 lg:gap-3">
                 <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#e11d48,#7f1d1d)] text-[10px] font-black lg:h-12 lg:w-12 lg:text-sm">
@@ -396,8 +396,8 @@ export function ChatPage() {
               <MessageCircle size={17} className="text-white/38 lg:size-[19px]" />
             </header>
 
-            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_20%_0%,rgba(225,29,72,0.08),transparent_30%)] px-2.5 py-2.5 lg:px-5 lg:py-4">
-              <div className="space-y-2.5 lg:space-y-3">
+            <div ref={listRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[radial-gradient(circle_at_20%_0%,rgba(225,29,72,0.08),transparent_30%)] px-2.5 py-2.5 lg:px-5 lg:py-4">
+              <div className="min-w-0 space-y-2.5 lg:space-y-3">
                 {messages.map((item, index) => {
                   const own = String(item.user_id) === String(user?.id);
                   const meta = item.meta ?? {};
