@@ -61,8 +61,16 @@ export const metadata: Metadata = {
 const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
+  "@id": `${SITE_URL}/#website`,
   name: SITE_NAME,
-  alternateName: ["animeTVplus", "animetvplus", "animetvplus.xyz"],
+  alternateName: [
+    "animeTVplus",
+    "animetvplus",
+    "anime tv plus",
+    "animeTVplus official",
+    "animetvplus.xyz",
+    "animetvplus anime",
+  ],
   url: SITE_URL,
   description: SITE_DESCRIPTION,
   inLanguage: ["en", "ja"],
@@ -84,10 +92,14 @@ const websiteJsonLd = {
 const organizationJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
+  "@id": `${SITE_URL}/#organization`,
   name: SITE_NAME,
+  legalName: "animeTVplus",
+  alternateName: ["animetvplus", "anime tv plus", "animetvplus.xyz"],
   url: SITE_URL,
   logo: absoluteUrl("/logo.svg"),
   image: absoluteUrl("/logo.svg"),
+  sameAs: [SITE_URL, `${SITE_URL}/licensing`, `${SITE_URL}/schedule`, `${SITE_URL}/free-anime`],
   publishingPrinciples: absoluteUrl("/licensing"),
   knowsAbout: [
     "licensed anime streaming",

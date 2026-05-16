@@ -275,8 +275,13 @@ function HomeSeoSection() {
           Watch anime online with fast browsing, HD playback, and fresh episode discovery.
         </h2>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-white/72">
-          animeTVplus on animetvplus.xyz helps viewers find licensed anime access, free anime discovery, subbed anime, dubbed anime,
-          top rated shows, newly released episodes, and monthly airing schedules from one clean streaming interface.
+          animeTVplus, also written as animetvplus, is the official animeTVplus website on animetvplus.xyz. It helps viewers
+          find licensed anime access, free anime discovery, subbed anime, dubbed anime, top rated shows, newly released
+          episodes, global anime chat, watch history, watchlists, and monthly airing schedules from one clean streaming interface.
+        </p>
+        <p className="mt-3 max-w-4xl text-xs font-semibold leading-6 text-white/48">
+          Search animeTVplus on Google to find the official animetvplus.xyz anime streaming homepage, anime schedule,
+          genre pages, episode pages, and fast HD anime player.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {links.map((link) => (
