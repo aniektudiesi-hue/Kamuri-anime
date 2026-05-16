@@ -72,34 +72,6 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       <Button disabled={loading} className="mt-6 w-full">
         {loading ? "Working..." : isLoggedIn ? "Switch profile" : mode === "login" ? "Sign in" : "Create account"}
       </Button>
-      {mode === "login" ? (
-        <button
-          type="button"
-          disabled={loading}
-          onClick={async () => {
-            setError("");
-            setLoading(true);
-            const form = formRef.current;
-            const data = form ? new FormData(form) : new FormData();
-            const username = String(data.get("username") || "");
-            const password = String(data.get("password") || "");
-            try {
-              const response = await api.recover({ username, new_password: password });
-              const token = extractToken(response);
-              if (!token) throw new Error("The API did not return an auth token.");
-              setSession(token);
-              router.push("/");
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Recovery failed.");
-            } finally {
-              setLoading(false);
-            }
-          }}
-          className="mt-3 w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-black text-white/70 transition hover:border-[#cf2442]/35 hover:text-white disabled:opacity-50"
-        >
-          Recover old username
-        </button>
-      ) : null}
       <p className="mt-4 text-center text-sm text-muted">
         {mode === "login" ? "New here? " : "Already have an account? "}
         <Link className="font-semibold text-accent-2" href={mode === "login" ? "/register" : "/login"}>

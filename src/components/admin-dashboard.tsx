@@ -128,9 +128,25 @@ function visitorLabel(row: Row) {
 function onlineRows(users: Row[], visits: Row[], nowMs: number) {
   const rows: Row[] = [];
   const seen = new Set<string>();
+  const userFingerprints = new Set<string>();
+
+  users.forEach((row) => {
+    if (!isOnline(row, nowMs)) return;
+    const key = `user:${row.id ?? text(row, "username")}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const ip = text(row, "last_ip");
+    const device = text(row, "last_device");
+    if (ip || device) userFingerprints.add(`${ip}|${device}`);
+    rows.push({ ...row, presence_name: text(row, "username"), presence_type: "User", presence_seen_at: row.last_seen_at });
+  });
 
   visits.forEach((row) => {
     if (!isOnline(row, nowMs)) return;
+    if (!row.user_id) {
+      const fp = `${text(row, "ip_address")}|${text(row, "device")}`;
+      if (userFingerprints.has(fp)) return;
+    }
     const key = row.user_id ? `user:${row.user_id}` : `visitor:${text(row, "visitor_key", String(row.id ?? ""))}`;
     if (seen.has(key)) return;
     seen.add(key);
@@ -140,14 +156,6 @@ function onlineRows(users: Row[], visits: Row[], nowMs: number) {
       presence_type: row.user_id ? "User" : "Visitor",
       presence_seen_at: row.created_at,
     });
-  });
-
-  users.forEach((row) => {
-    if (!isOnline(row, nowMs)) return;
-    const key = `user:${row.id ?? text(row, "username")}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    rows.push({ ...row, presence_name: text(row, "username"), presence_type: "User", presence_seen_at: row.last_seen_at });
   });
 
   return rows.sort((a, b) => lastSeenSeconds(b) - lastSeenSeconds(a));

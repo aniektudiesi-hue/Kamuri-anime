@@ -148,8 +148,8 @@ export const api = {
     request<{ items: Record<string, unknown>[] }>(`/admin/visits?limit=${limit}`, { token, adminKey }),
   adminSearchVisibility: (token: string, adminKey?: string | null) => request<Record<string, unknown>>("/admin/search-visibility", { token, adminKey }),
   chatRooms: (token: string) => request<{ items: Record<string, unknown>[] }>("/chat/rooms", { token }),
-  chatOnline: (token: string) => request<{ items: Record<string, unknown>[]; count?: number }>("/chat/online", { token }),
-  chatMessages: (token: string, room: string, limit = 80) =>
+  chatOnline: (token?: string | null) => request<{ items: Record<string, unknown>[]; count?: number }>("/chat/online", { token }),
+  chatMessages: (token: string | null | undefined, room: string, limit = 80) =>
     request<{ items: Record<string, unknown>[] }>(`/chat/messages/${encodeURIComponent(room)}?limit=${limit}`, { token }),
   sendChatMessage: (token: string, room: string, body: Record<string, unknown>) =>
     request<{ ok: boolean; message: Record<string, unknown> }>(`/chat/messages/${encodeURIComponent(room)}`, {

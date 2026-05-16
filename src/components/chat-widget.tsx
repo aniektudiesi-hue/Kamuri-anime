@@ -64,8 +64,8 @@ export function ChatWidget() {
 
   const history = useQuery({
     queryKey: ["chat", "messages", token, room],
-    queryFn: () => api.chatMessages(token!, room, 80),
-    enabled: Boolean(token && open && room),
+    queryFn: () => api.chatMessages(token, room, 80),
+    enabled: Boolean(open && room && (token || room === "global")),
     staleTime: 1000 * 5,
   });
 
@@ -78,8 +78,8 @@ export function ChatWidget() {
 
   const online = useQuery({
     queryKey: ["chat", "online", token],
-    queryFn: () => api.chatOnline(token!),
-    enabled: Boolean(token && open),
+    queryFn: () => api.chatOnline(token),
+    enabled: Boolean(open),
     staleTime: 1000 * 5,
     refetchInterval: 8_000,
     refetchIntervalInBackground: true,
@@ -113,6 +113,7 @@ export function ChatWidget() {
   });
 
   const roomItems = useMemo(() => {
+    if (!token) return [{ room: "global" }];
     const seen = new Set<string>();
     const items = [
       ...DEFAULT_ROOMS.map((name) => ({ room: name })),
@@ -124,7 +125,7 @@ export function ChatWidget() {
       return true;
     });
     return items;
-  }, [rooms.data]);
+  }, [rooms.data, token]);
 
   const messages = useMemo(() => {
     const merged = [...((history.data?.items ?? []) as ChatMessage[]), ...liveMessages];
@@ -280,19 +281,7 @@ export function ChatWidget() {
           </button>
         </div>
 
-        {!token ? (
-          <div className="grid flex-1 place-items-center p-6 text-center">
-            <div>
-              <MessageCircle className="mx-auto text-[#f43f5e]" size={42} />
-              <h3 className="mt-4 text-2xl font-black text-white">Login to chat</h3>
-              <p className="mt-2 text-sm leading-6 text-white/55">Create a username to join rooms, follow users, and share what you are watching.</p>
-              <Link href="/login" className="mt-5 inline-flex h-11 items-center rounded-2xl bg-[#e11d48] px-5 text-sm font-black text-white">
-                Sign in
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <>
+        <>
             <div className="grid gap-3 border-b border-white/[0.08] p-3">
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {roomItems.map((item) => {
@@ -317,9 +306,10 @@ export function ChatWidget() {
                   value={customRoom}
                   onChange={(event) => setCustomRoom(event.target.value)}
                   placeholder="Create anime/topic room"
+                  disabled={!token}
                   className="min-w-0 flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.055] px-3 text-sm text-white outline-none focus:border-[#e11d48]/45"
                 />
-                <button type="button" onClick={joinCustomRoom} className="grid h-10 w-10 place-items-center rounded-2xl bg-white/[0.08] text-white">
+                <button type="button" disabled={!token} onClick={joinCustomRoom} className="grid h-10 w-10 place-items-center rounded-2xl bg-white/[0.08] text-white disabled:opacity-40">
                   <Plus size={17} />
                 </button>
               </div>
@@ -360,10 +350,12 @@ export function ChatWidget() {
                   <input
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
-                    placeholder="Message everyone..."
-                    className="min-w-0 flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.055] px-4 text-sm text-white outline-none focus:border-[#e11d48]/45"
+                    disabled={!token}
+                    placeholder={token ? "Message everyone..." : "Login to send messages"}
+                    className="min-w-0 flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.055] px-4 text-sm text-white outline-none focus:border-[#e11d48]/45 disabled:opacity-60"
                   />
-                  <button type="submit" className="grid h-11 w-11 place-items-center rounded-2xl bg-[#e11d48] text-white">
+                  {token ? null : <Link href="/login" className="grid h-11 place-items-center rounded-2xl bg-white/[0.08] px-3 text-xs font-black text-white">Login</Link>}
+                  <button type="submit" disabled={!token} className="grid h-11 w-11 place-items-center rounded-2xl bg-[#e11d48] text-white disabled:opacity-40">
                     <Send size={17} />
                   </button>
                 </form>
@@ -404,7 +396,6 @@ export function ChatWidget() {
               </aside>
             </div>
           </>
-        )}
       </section>
     </div>
   );

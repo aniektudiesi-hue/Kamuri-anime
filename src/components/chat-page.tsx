@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AtSign, MessageCircle, Plus, Radio, Search, Send, Settings2, Users } from "lucide-react";
+import { AtSign, Plus, Radio, Search, Send, Settings2, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { chatSocketUrl } from "@/lib/chat";
@@ -64,8 +64,8 @@ export function ChatPage() {
 
   const online = useQuery({
     queryKey: ["chat", "online", token],
-    queryFn: () => api.chatOnline(token!),
-    enabled: Boolean(token),
+    queryFn: () => api.chatOnline(token),
+    enabled: true,
     staleTime: 1000 * 5,
     refetchInterval: 8_000,
     refetchIntervalInBackground: true,
@@ -73,8 +73,8 @@ export function ChatPage() {
 
   const history = useQuery({
     queryKey: ["chat", "messages", token, room],
-    queryFn: () => api.chatMessages(token!, room, 120),
-    enabled: Boolean(token && room),
+    queryFn: () => api.chatMessages(token, room, 120),
+    enabled: Boolean(room && (token || room === "global")),
     staleTime: 1000 * 5,
   });
 
@@ -113,6 +113,7 @@ export function ChatPage() {
   });
 
   const roomItems = useMemo(() => {
+    if (!token) return [{ room: "global" }];
     const seen = new Set<string>();
     return [
       ...DEFAULT_ROOMS.map((name) => ({ room: name })),
@@ -123,7 +124,7 @@ export function ChatPage() {
       seen.add(name);
       return true;
     });
-  }, [rooms.data]);
+  }, [rooms.data, token]);
 
   const onlineUsers = useMemo(() => {
     const byId = new Map<string, Row>();
@@ -214,15 +215,7 @@ export function ChatPage() {
   return (
     <AppShell>
       <section className="mx-auto grid min-h-[calc(100vh-92px)] max-w-screen-2xl gap-4 px-4 py-5 lg:grid-cols-[280px_1fr_300px] lg:px-6">
-        {!token ? (
-          <div className="col-span-full grid place-items-center rounded-[2rem] border border-white/[0.08] bg-panel/90 p-10 text-center">
-            <MessageCircle className="mx-auto text-[#f43f5e]" size={48} />
-            <h1 className="mt-4 text-3xl font-black text-white">Login to use chat</h1>
-            <p className="mt-2 text-sm text-white/55">Rooms, follows, online users, and direct chat require a username.</p>
-            <Link href="/login" className="mt-5 rounded-2xl bg-[#e11d48] px-5 py-3 text-sm font-black text-white">Sign in</Link>
-          </div>
-        ) : (
-          <>
+        <>
             <aside className="rounded-[1.75rem] border border-white/[0.08] bg-[#0b0e18]/92 p-4">
               <div className="mb-4 flex items-center justify-between">
                 <h1 className="text-2xl font-black text-white">Chat</h1>
@@ -247,8 +240,8 @@ export function ChatPage() {
                 })}
               </div>
               <div className="mt-4 flex gap-2">
-                <input value={customRoom} onChange={(e) => setCustomRoom(e.target.value)} placeholder="anime/topic room" className="min-w-0 flex-1 rounded-2xl border border-white/[0.08] bg-black/24 px-3 text-sm text-white outline-none" />
-                <button onClick={joinCustomRoom} type="button" className="grid h-11 w-11 place-items-center rounded-2xl bg-white/[0.08] text-white"><Plus size={17} /></button>
+                <input disabled={!token} value={customRoom} onChange={(e) => setCustomRoom(e.target.value)} placeholder="anime/topic room" className="min-w-0 flex-1 rounded-2xl border border-white/[0.08] bg-black/24 px-3 text-sm text-white outline-none disabled:opacity-50" />
+                <button disabled={!token} onClick={joinCustomRoom} type="button" className="grid h-11 w-11 place-items-center rounded-2xl bg-white/[0.08] text-white disabled:opacity-40"><Plus size={17} /></button>
               </div>
             </aside>
 
@@ -284,8 +277,9 @@ export function ChatPage() {
                 )}
               </div>
               <form onSubmit={submit} className="flex gap-2 border-t border-white/[0.08] p-4">
-                <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message this room..." className="min-w-0 flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.055] px-4 text-sm text-white outline-none focus:border-[#e11d48]/45" />
-                <button type="submit" className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e11d48] text-white"><Send size={18} /></button>
+                <input disabled={!token} value={message} onChange={(e) => setMessage(e.target.value)} placeholder={token ? "Message this room..." : "Login to send messages"} className="min-w-0 flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.055] px-4 text-sm text-white outline-none focus:border-[#e11d48]/45 disabled:opacity-60" />
+                {token ? null : <Link href="/login" className="grid h-12 place-items-center rounded-2xl bg-white/[0.08] px-4 text-sm font-black text-white">Login</Link>}
+                <button disabled={!token} type="submit" className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e11d48] text-white disabled:opacity-40"><Send size={18} /></button>
               </form>
             </main>
 
@@ -313,7 +307,6 @@ export function ChatPage() {
               </div>
             </aside>
           </>
-        )}
       </section>
     </AppShell>
   );
