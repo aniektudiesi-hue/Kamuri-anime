@@ -26,7 +26,7 @@ import {
   streamProviderQueryKey,
   type StreamProviderId,
 } from "@/lib/stream-providers";
-import type { Anime } from "@/lib/types";
+import type { Anime, StreamResponse } from "@/lib/types";
 import {
   animePath,
   episodeNumberFromSlug,
@@ -77,6 +77,7 @@ export default function WatchPage({
   const [known, setKnown] = useState<Anime | undefined>();
   const [localResumeItem, setLocalResumeItem] = useState<Record<string, unknown> | undefined>();
   const [playedEps, setPlayedEps] = useState<number[]>([]);
+  const [instantStream, setInstantStream] = useState<{ server: StreamProviderId; stream: StreamResponse } | undefined>();
   const [secondaryDataEnabled, setSecondaryDataEnabled] = useState(false);
   const { token } = useAuth();
   const settings = useSettings();
@@ -107,6 +108,31 @@ export default function WatchPage({
     return () => window.clearTimeout(id);
   }, [episode, malId]);
 
+  useEffect(() => {
+    setInstantStream(undefined);
+    if (!malId || !Number.isFinite(episodeNum)) return;
+
+    let cancelled = false;
+    const providers = type === "dub"
+      ? STREAM_PROVIDERS.filter((provider) => provider.id === DEFAULT_STREAM_PROVIDER_ID)
+      : STREAM_PROVIDERS;
+
+    providers.forEach((provider) => {
+      queryClient.fetchQuery({
+        queryKey: streamProviderQueryKey(provider, malId, episode, type),
+        queryFn: () => fetchStreamProvider(provider, { malId, episode, type }),
+        staleTime: 1000 * 60 * 25,
+      }).then((stream) => {
+        if (cancelled || !hasPlayableStream(stream)) return;
+        setInstantStream((current) => current ?? { server: provider.id, stream });
+      }).catch(() => undefined);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [episode, episodeNum, malId, queryClient, type]);
+
   const streamQueries = useQueries({
     queries: STREAM_PROVIDERS.map((provider) => ({
       queryKey: streamProviderQueryKey(provider, malId, episode, type),
@@ -130,10 +156,17 @@ export default function WatchPage({
     if (type === "dub") return provider.id === DEFAULT_STREAM_PROVIDER_ID && hasPlayableStream(streamQueries[i]?.data);
     return hasPlayableStream(streamQueries[i]?.data);
   });
-  const availableServers = playableServers;
+  const instantServer = instantStream
+    ? STREAM_PROVIDERS.find((provider) => provider.id === instantStream.server)
+    : undefined;
+  const availableServers = instantServer && !playableServers.some((provider) => provider.id === instantServer.id)
+    ? [instantServer, ...playableServers]
+    : playableServers;
   const selectedServer = availableServers.find((s) => s.id === server) ?? availableServers[0];
   const selectedStream = selectedServer
-    ? streamQueries[streamProviderIndex(selectedServer.id)]?.data
+    ? instantStream?.server === selectedServer.id
+      ? instantStream.stream
+      : streamQueries[streamProviderIndex(selectedServer.id)]?.data
     : undefined;
   const selectedStreamForPlayer = selectedStream;
   const activeServerId = selectedServer?.id;
