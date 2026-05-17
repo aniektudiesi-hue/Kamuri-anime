@@ -53,7 +53,7 @@ export const STREAM_PROVIDERS = [
 ] as const satisfies readonly StreamProvider[];
 
 export function streamUrlOf(data: StreamResponse | undefined) {
-  return data?.m3u8_url || data?.url || data?.stream_url || data?.iframe_url || data?.embed_url || "";
+  return data?.m3u8_url || data?.url || data?.stream_url || "";
 }
 
 export function hasPlayableStream(data: StreamResponse | undefined) {
