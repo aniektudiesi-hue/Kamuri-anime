@@ -333,8 +333,8 @@ export function VideoPlayer({
     let playRequested = false;
     const targetForwardBuffer = deepBuffer
       ? (isMoonStream ? 2.5 * 60 : 6 * 60)
-      : (isMoonStream ? 2 * 60 : 2 * 60);
-    const initialForwardBuffer = Math.min(targetForwardBuffer, isMoonStream ? 18 : 60);
+      : (isMoonStream ? 60 : 90);
+    const initialForwardBuffer = isMoonStream ? 6 : 10;
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
