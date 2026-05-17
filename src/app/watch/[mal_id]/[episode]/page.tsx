@@ -77,7 +77,6 @@ export default function WatchPage({
   const [known, setKnown] = useState<Anime | undefined>();
   const [localResumeItem, setLocalResumeItem] = useState<Record<string, unknown> | undefined>();
   const [playedEps, setPlayedEps] = useState<number[]>([]);
-  const [backupStreamsEnabled, setBackupStreamsEnabled] = useState(false);
   const [secondaryDataEnabled, setSecondaryDataEnabled] = useState(false);
   const { token } = useAuth();
   const settings = useSettings();
@@ -103,12 +102,6 @@ export default function WatchPage({
   }, [episodeNum, malId]);
 
   useEffect(() => {
-    setBackupStreamsEnabled(false);
-    const id = window.setTimeout(() => setBackupStreamsEnabled(true), 900);
-    return () => window.clearTimeout(id);
-  }, [episode, malId, type]);
-
-  useEffect(() => {
     setSecondaryDataEnabled(false);
     const id = window.setTimeout(() => setSecondaryDataEnabled(true), 900);
     return () => window.clearTimeout(id);
@@ -119,9 +112,7 @@ export default function WatchPage({
       queryKey: streamProviderQueryKey(provider, malId, episode, type),
       queryFn: () => fetchStreamProvider(provider, { malId, episode, type }),
       enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
-        provider.id === DEFAULT_STREAM_PROVIDER_ID ||
-        backupStreamsEnabled ||
-        serverMenuOpen
+        type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID
       ),
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,
@@ -146,11 +137,9 @@ export default function WatchPage({
     : undefined;
   const selectedStreamForPlayer = selectedStream;
   const activeServerId = selectedServer?.id;
-  const selectedQueryIndex = selectedServer ? streamProviderIndex(selectedServer.id) : 0;
-  const selectedQuery = streamQueries[selectedQueryIndex];
   const availableServerIds = availableServers.map((s) => s.id).join("|");
   const firstAvailableServerId = availableServers[0]?.id;
-  const streamsLoading = Boolean((selectedQuery?.isLoading || selectedQuery?.isFetching) || (!selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching)));
+  const streamsLoading = !selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
 
@@ -549,7 +538,6 @@ export default function WatchPage({
                       type="button"
                       aria-expanded={serverMenuOpen}
                       onClick={() => {
-                        setBackupStreamsEnabled(true);
                         setServerMenuOpen((value) => !value);
                       }}
                       className="flex h-12 w-full items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#141828] px-3.5 text-left transition hover:border-white/[0.13] hover:bg-[#1b2036]"
