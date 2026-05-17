@@ -1,0 +1,7 @@
+.next
+.next-perf
+.next-verify
+.next-webpack-perf
+node_modules
+lh-*.json
+dev-server*.log
