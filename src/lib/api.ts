@@ -3,6 +3,8 @@ import { listFromPayload } from "./utils";
 import { readCachedStream, writeCachedStream } from "./stream-cache";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
+const HISTORY_CACHE_PREFIX = "anime-tv-server-history:";
+const HISTORY_CACHE_TTL = 1000 * 60 * 15;
 
 type RequestOptions = RequestInit & { token?: string | null; adminKey?: string | null };
 
@@ -83,6 +85,46 @@ async function cachedStreamRequest(key: string, path: string) {
   return stream;
 }
 
+function historyCacheKey(token: string) {
+  return `${HISTORY_CACHE_PREFIX}${token.slice(-24)}`;
+}
+
+function readCachedHistory(token: string) {
+  try {
+    const raw = window.localStorage.getItem(historyCacheKey(token));
+    if (!raw) return undefined;
+    const cached = JSON.parse(raw) as { expiresAt: number; value: LibraryItem[] };
+    if (!Array.isArray(cached.value) || cached.expiresAt < Date.now()) {
+      window.localStorage.removeItem(historyCacheKey(token));
+      return undefined;
+    }
+    return cached.value;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCachedHistory(token: string, value: LibraryItem[]) {
+  try {
+    window.localStorage.setItem(
+      historyCacheKey(token),
+      JSON.stringify({ expiresAt: Date.now() + HISTORY_CACHE_TTL, value }),
+    );
+  } catch {
+    // Best-effort cache.
+  }
+}
+
+function mergeCachedHistory(token: string, body: Record<string, unknown>) {
+  const normalized = normalizeHistoryBody(body) as LibraryItem;
+  const id = String(normalized.mal_id || normalized.anime_id || "");
+  const current = readCachedHistory(token) ?? [];
+  writeCachedHistory(
+    token,
+    [normalized, ...current.filter((item) => String(item.mal_id || item.anime_id || "") !== id)].slice(0, 500),
+  );
+}
+
 export const api = {
   banners: async () => listFromPayload<Anime>(await request("/api/v1/banners")),
   thumbnails: async () => listFromPayload<Anime>(await request("/home/thumbnails")),
@@ -101,19 +143,35 @@ export const api = {
   register: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   recover: (body: Record<string, string>) => request<Record<string, unknown>>("/auth/recover", { method: "POST", body: JSON.stringify(body) }),
   me: (token: string) => request<User>("/auth/me", { token }),
-  addHistory: (token: string, body: Record<string, unknown>) =>
-    request("/user/history", { method: "POST", token, body: JSON.stringify(normalizeHistoryBody(body)) }),
+  addHistory: (token: string, body: Record<string, unknown>) => {
+    const normalized = normalizeHistoryBody(body);
+    mergeCachedHistory(token, normalized);
+    return request("/user/history", { method: "POST", token, body: JSON.stringify(normalized) });
+  },
   addHistoryKeepalive: (token: string, body: Record<string, unknown>) => {
+    const normalized = normalizeHistoryBody(body);
+    mergeCachedHistory(token, normalized);
     const headers = new Headers({ "Content-Type": "application/json", Accept: "application/json" });
     headers.set("Authorization", `Bearer ${token}`);
     return fetch(`${API_BASE}/user/history`, {
       method: "POST",
       headers,
-      body: JSON.stringify(normalizeHistoryBody(body)),
+      body: JSON.stringify(normalized),
       keepalive: true,
     }).catch(() => undefined);
   },
-  history: async (token: string) => listFromPayload<LibraryItem>(await request("/user/history", { token })),
+  history: async (token: string) => {
+    const cached = readCachedHistory(token);
+    if (cached) {
+      void request("/user/history", { token })
+        .then((payload) => writeCachedHistory(token, listFromPayload<LibraryItem>(payload)))
+        .catch(() => undefined);
+      return cached;
+    }
+    const value = listFromPayload<LibraryItem>(await request("/user/history", { token }));
+    writeCachedHistory(token, value);
+    return value;
+  },
   clearHistory: (token: string) => request("/user/history", { method: "DELETE", token }),
   addWatchlist: (token: string, body: Record<string, unknown>) =>
     request("/user/watchlist", { method: "POST", token, body: JSON.stringify(normalizeWatchlistBody(body)) }),

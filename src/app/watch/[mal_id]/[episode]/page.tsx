@@ -117,7 +117,7 @@ export default function WatchPage({
 
   useEffect(() => {
     setSecondaryDataEnabled(false);
-    const id = window.setTimeout(() => setSecondaryDataEnabled(true), 3000);
+    const id = window.setTimeout(() => setSecondaryDataEnabled(true), 900);
     return () => window.clearTimeout(id);
   }, [episode, malId]);
 
@@ -186,7 +186,7 @@ export default function WatchPage({
   const history = useQuery({
     queryKey: ["history", token],
     queryFn: () => api.history(token!),
-    enabled: Boolean(token && malId && settings.autoResume && explicitResumeTime <= 0 && selectedStream),
+    enabled: Boolean(token && malId && settings.autoResume && explicitResumeTime <= 0 && secondaryDataEnabled),
     staleTime: 1000 * 20,
   });
 
@@ -212,12 +212,11 @@ export default function WatchPage({
     ),
     [episodeNum, history.data, malId],
   );
-  const serverResumeTime = progressOf(serverResumeItem);
   const localResumeTime = progressOf(localResumeItem);
   const initialTime = explicitResumeTime > 0
     ? explicitResumeTime
     : settings.autoResume
-      ? Number(serverResumeTime || localResumeTime || 0)
+      ? Number(localResumeTime || progressOf(serverResumeItem) || 0)
       : 0;
 
   const saveHistory = useMutation({
@@ -470,14 +469,7 @@ export default function WatchPage({
               </div>
             ) : streamsLoading && !selectedStream ? (
               <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] sm:rounded-[22px]">
-                {animePoster ? (
-                  <>
-                    <Image src={animePoster} alt="" fill priority sizes="100vw" className="scale-105 object-cover opacity-80 blur-[1px]" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/28 to-black/32" />
-                  </>
-                ) : (
-                  <div className="absolute inset-0 animate-pulse bg-[#141828]" />
-                )}
+                <div className="absolute inset-0 bg-black" />
                 <div className="absolute inset-0 grid place-items-center">
                   <div className="relative grid h-14 w-14 place-items-center rounded-full border border-white/[0.08] bg-black/18 shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
                     <div className="absolute inset-2 animate-spin rounded-full border-2 border-white/10 border-t-white/90" />
@@ -493,7 +485,7 @@ export default function WatchPage({
                 serverId={activeServerId}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
-                autoPlay={settings.autoResume}
+                autoPlay
                 deepBuffer={settings.autoFetchWhileWatching}
                 nextHref={nextHref}
                 onProgress={saveWatchProgress}
