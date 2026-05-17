@@ -9,8 +9,10 @@ const MANIFEST_CACHE_TTL = 30;
 const MANIFEST_STALE_TTL = 60;
 const SEGMENT_CACHE_TTL = 86400;
 const MOON_SEGMENT_CACHE_TTL = SEGMENT_CACHE_TTL;
+const STREAM_API_MEMORY_TTL = 120 * 1000;
 const IMAGE_CACHE_TTL = 60 * 60 * 24 * 30;
 const moonInflight = new Map();
+const streamApiMemoryCache = new Map();
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -60,6 +62,9 @@ async function proxyOrigin(request, env, ctx) {
   const cache = caches.default;
   const cacheKey = new Request(target.toString(), { headers: cacheVaryHeaders(request) });
   if (canCache) {
+    const hot = streamApiMemoryGet(target.toString());
+    if (hot) return json(rewriteStreamPayload(hot, incoming.origin), 200, cacheHeaders("public, s-maxage=120, stale-while-revalidate=600"));
+
     const cached = await cache.match(cacheKey);
     if (cached) return withCors(cached, true);
   }
@@ -79,7 +84,10 @@ async function proxyOrigin(request, env, ctx) {
       response.status,
       cacheHeaders("public, s-maxage=120, stale-while-revalidate=600"),
     );
-    if (canCache && response.ok) ctx.waitUntil(cache.put(cacheKey, rewritten.clone()));
+    if (canCache && response.ok) {
+      streamApiMemorySet(target.toString(), payload);
+      ctx.waitUntil(cache.put(cacheKey, rewritten.clone()));
+    }
     return rewritten;
   }
 
@@ -990,4 +998,22 @@ function cacheVaryHeaders(request) {
   const accept = request.headers.get("accept");
   if (accept) headers.set("accept", accept);
   return headers;
+}
+
+function streamApiMemoryGet(key) {
+  const entry = streamApiMemoryCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    streamApiMemoryCache.delete(key);
+    return null;
+  }
+  return entry.payload;
+}
+
+function streamApiMemorySet(key, payload) {
+  if (streamApiMemoryCache.size > 300) {
+    const firstKey = streamApiMemoryCache.keys().next().value;
+    if (firstKey) streamApiMemoryCache.delete(firstKey);
+  }
+  streamApiMemoryCache.set(key, { payload, expiresAt: Date.now() + STREAM_API_MEMORY_TTL });
 }
