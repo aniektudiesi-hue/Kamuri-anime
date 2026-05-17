@@ -3,7 +3,7 @@ import type { Anime, EpisodeResponse } from "@/lib/types";
 import { animeId, listFromPayload } from "@/lib/utils";
 import { fetchAnimeMetadataByMalId } from "./anime-metadata";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
+const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
 const HOME_PATHS = ["/api/v1/banners", "/home/thumbnails", "/home/recently-added", "/home/top-rated"];
 
 async function serverRequest<T>(path: string, revalidate = 3600): Promise<T | null> {

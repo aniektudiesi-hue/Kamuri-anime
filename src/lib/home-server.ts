@@ -1,7 +1,7 @@
 import type { AiringScheduleItem, Anime, HomeInitialData } from "./types";
 import { listFromPayload } from "./utils";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
+const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
 const ANILIST_URL = "https://graphql.anilist.co";
 const HOME_REVALIDATE_SECONDS = 30 * 60;
 const SCHEDULE_REVALIDATE_SECONDS = 6 * 60 * 60;
@@ -44,7 +44,7 @@ export async function getHomeInitialData(options: HomeInitialDataOptions = {}): 
     fetchHomeList("/home/thumbnails"),
     fetchHomeList("/home/recently-added", 15 * 60),
     fetchHomeList("/home/top-rated"),
-    fetchMonthlyAiringSchedule(),
+    fetchMonthlyAiringSchedule(options.fullSchedule ? MONTHLY_SCHEDULE_MAX_PAGES : 1),
   ]);
 
   const scheduleItems = options.fullSchedule ? schedule : schedule.slice(0, HOMEPAGE_SCHEDULE_LIMIT);
@@ -70,7 +70,7 @@ async function fetchHomeList(path: string, revalidate = HOME_REVALIDATE_SECONDS)
   }, []);
 }
 
-async function fetchMonthlyAiringSchedule(): Promise<AiringScheduleItem[]> {
+async function fetchMonthlyAiringSchedule(maxPages: number): Promise<AiringScheduleItem[]> {
   return safeJson(async () => {
     const now = new Date();
     const start = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0) / 1000) - 1;
@@ -96,7 +96,7 @@ async function fetchMonthlyAiringSchedule(): Promise<AiringScheduleItem[]> {
     `;
 
     const pages: AniListSchedule[][] = [];
-    for (let page = 1; page <= MONTHLY_SCHEDULE_MAX_PAGES; page += 1) {
+    for (let page = 1; page <= maxPages; page += 1) {
       const response = await timedFetch(ANILIST_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },

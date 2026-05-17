@@ -2,7 +2,7 @@ import type { Anime } from "@/lib/types";
 import { fetchAniListDiscovery, fetchJikanDiscovery, mergeAnimeSources, resolveDiscoveryIntent } from "@/lib/anime-discovery";
 import { listFromPayload, rankAnimeForSearch } from "@/lib/utils";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
+const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
 
 export type SeoCategorySlug = "popular" | "new-releases" | "top-rated" | "airing" | "free-anime";
 

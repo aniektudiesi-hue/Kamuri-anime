@@ -3,6 +3,7 @@ import { listFromPayload } from "./utils";
 import { readCachedStream, writeCachedStream } from "./stream-cache";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
+const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
 const HISTORY_CACHE_PREFIX = "anime-tv-server-history:";
 const HISTORY_CACHE_TTL = 1000 * 60 * 15;
 
@@ -55,7 +56,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(`${baseForPath(path, options)}${path}`, {
       ...options,
       headers,
       signal: controller.signal,
@@ -83,6 +84,23 @@ async function cachedStreamRequest(key: string, path: string) {
   const stream = await request<StreamResponse>(path);
   writeCachedStream(key, stream);
   return stream;
+}
+
+function baseForPath(path: string, options: RequestOptions) {
+  if (options.token || options.adminKey || options.method && options.method !== "GET") return API_BASE;
+  if (
+    path.startsWith("/api/stream/") ||
+    path.startsWith("/api/moon/") ||
+    path.startsWith("/api/hd1/") ||
+    path.startsWith("/home/") ||
+    path.startsWith("/anime/episode/") ||
+    path.startsWith("/search/") ||
+    path.startsWith("/suggest/") ||
+    path === "/api/v1/banners"
+  ) {
+    return PUBLIC_API_BASE;
+  }
+  return API_BASE;
 }
 
 function historyCacheKey(token: string) {

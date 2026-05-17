@@ -4,6 +4,14 @@ const DESKTOP_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 const STREAM_API_PREFIXES = ["/api/stream/", "/api/moon/", "/api/hd1/"];
+const PUBLIC_API_PREFIXES = [
+  ...STREAM_API_PREFIXES,
+  "/home/",
+  "/anime/episode/",
+  "/search/",
+  "/suggest/",
+];
+const PUBLIC_API_PATHS = ["/api/v1/banners"];
 const MOON_CACHE_TTL = 1800;
 const MANIFEST_CACHE_TTL = 30;
 const MANIFEST_STALE_TTL = 60;
@@ -58,15 +66,22 @@ async function proxyOrigin(request, env, ctx) {
   headers.set("x-forwarded-proto", incoming.protocol.replace(":", ""));
   headers.set("x-forwarded-for", request.headers.get("cf-connecting-ip") || "");
 
-  const canCache = request.method === "GET" && STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix));
+  const streamApi = STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix));
+  const canCache =
+    request.method === "GET" &&
+    (PUBLIC_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)) || PUBLIC_API_PATHS.includes(incoming.pathname));
+  const apiCacheControl = originApiCacheControl(incoming.pathname);
   const cache = caches.default;
   const cacheKey = new Request(target.toString(), { headers: cacheVaryHeaders(request) });
   if (canCache) {
     const hot = streamApiMemoryGet(target.toString());
-    if (hot) return json(rewriteStreamPayload(hot, incoming.origin), 200, cacheHeaders("public, s-maxage=120, stale-while-revalidate=600"));
+    if (hot) {
+      const payload = streamApi ? rewriteStreamPayload(hot, incoming.origin) : hot;
+      return json(payload, 200, cacheHeaders(apiCacheControl));
+    }
 
     const cached = await cache.match(cacheKey);
-    if (cached) return withCors(cached, true);
+    if (cached) return withCors(cached, streamApi);
   }
 
   const response = await fetch(target, {
@@ -74,15 +89,16 @@ async function proxyOrigin(request, env, ctx) {
     headers,
     body: bodyFor(request),
     redirect: "follow",
-    cf: canCache ? { cacheEverything: true, cacheTtl: 120 } : undefined,
+    cf: canCache ? { cacheEverything: true, cacheTtl: originApiTtl(incoming.pathname) } : undefined,
   });
 
-  if (STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)) && isJson(response)) {
+  if (canCache && isJson(response)) {
     const payload = await response.json();
+    const body = streamApi ? rewriteStreamPayload(payload, incoming.origin) : payload;
     const rewritten = json(
-      rewriteStreamPayload(payload, incoming.origin),
+      body,
       response.status,
-      cacheHeaders("public, s-maxage=120, stale-while-revalidate=600"),
+      cacheHeaders(apiCacheControl),
     );
     if (canCache && response.ok) {
       streamApiMemorySet(target.toString(), payload);
@@ -91,7 +107,7 @@ async function proxyOrigin(request, env, ctx) {
     return rewritten;
   }
 
-  return withCors(response, STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)));
+  return withCors(response, streamApi);
 }
 
 async function proxyImage(request) {
@@ -991,6 +1007,20 @@ function json(payload, status = 200, headers = corsHeaders()) {
 
 function streamCacheRequest(kind, src, range = "") {
   return new Request(`https://anime-tv-stream-proxy.local/${kind}/${encodeURIComponent(src)}${range ? `?range=${encodeURIComponent(range)}` : ""}`);
+}
+
+function originApiTtl(pathname) {
+  if (pathname.startsWith("/anime/episode/")) return 3600;
+  if (pathname.startsWith("/home/") || pathname === "/api/v1/banners") return 600;
+  if (pathname.startsWith("/search/") || pathname.startsWith("/suggest/")) return 300;
+  return 120;
+}
+
+function originApiCacheControl(pathname) {
+  if (pathname.startsWith("/anime/episode/")) return "public, s-maxage=3600, stale-while-revalidate=86400";
+  if (pathname.startsWith("/home/") || pathname === "/api/v1/banners") return "public, s-maxage=600, stale-while-revalidate=3600";
+  if (pathname.startsWith("/search/") || pathname.startsWith("/suggest/")) return "public, s-maxage=300, stale-while-revalidate=900";
+  return "public, s-maxage=120, stale-while-revalidate=600";
 }
 
 function cacheVaryHeaders(request) {
