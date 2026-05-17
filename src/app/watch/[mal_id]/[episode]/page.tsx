@@ -10,10 +10,11 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import { AppShell } from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
+import { VideoPlayer } from "@/components/video-player";
 import { useAuth } from "@/lib/auth";
 import { shareWatching } from "@/lib/chat";
 import { historySocketUrl } from "@/lib/history-realtime";
-import { clearCachedStream } from "@/lib/stream-cache";
+import { clearCachedStream, readCachedStream } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
 import {
   DEFAULT_STREAM_PROVIDER_ID,
@@ -39,18 +40,6 @@ import {
   titleOf,
   watchPath,
 } from "@/lib/utils";
-
-const VideoPlayer = dynamic(
-  () => import("@/components/video-player").then((module) => module.VideoPlayer),
-  {
-    ssr: false,
-    loading: () => <div className="aspect-video w-full rounded-2xl border border-white/[0.08] bg-black" />,
-  },
-);
-
-function preloadVideoPlayer() {
-  void import("@/components/video-player");
-}
 
 const EpisodeDownloadButton = dynamic(
   () => import("@/components/episode-download-button").then((module) => module.EpisodeDownloadButton),
@@ -120,10 +109,6 @@ export default function WatchPage({
   }, [episode, malId, type]);
 
   useEffect(() => {
-    preloadVideoPlayer();
-  }, []);
-
-  useEffect(() => {
     setSecondaryDataEnabled(false);
     const id = window.setTimeout(() => setSecondaryDataEnabled(true), 900);
     return () => window.clearTimeout(id);
@@ -141,6 +126,9 @@ export default function WatchPage({
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,
       gcTime: 1000 * 60 * 120,
+      initialData: typeof window === "undefined"
+        ? undefined
+        : readCachedStream(streamProviderCacheKey(provider, malId, episode, type)),
     })),
   });
 
