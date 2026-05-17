@@ -48,6 +48,10 @@ const VideoPlayer = dynamic(
   },
 );
 
+function preloadVideoPlayer() {
+  void import("@/components/video-player");
+}
+
 const EpisodeDownloadButton = dynamic(
   () => import("@/components/episode-download-button").then((module) => module.EpisodeDownloadButton),
   { ssr: false },
@@ -111,9 +115,13 @@ export default function WatchPage({
 
   useEffect(() => {
     setBackupStreamsEnabled(false);
-    const id = window.setTimeout(() => setBackupStreamsEnabled(true), 4500);
+    const id = window.setTimeout(() => setBackupStreamsEnabled(true), 900);
     return () => window.clearTimeout(id);
   }, [episode, malId, type]);
+
+  useEffect(() => {
+    preloadVideoPlayer();
+  }, []);
 
   useEffect(() => {
     setSecondaryDataEnabled(false);
@@ -161,7 +169,7 @@ export default function WatchPage({
   const episodes = useQuery({
     queryKey: ["episodes", malId, 0],
     queryFn: () => api.episodes(malId),
-    enabled: Boolean(selectedStream || secondaryDataEnabled),
+    enabled: Boolean(malId),
     staleTime: 1000 * 60 * 20,
   });
 

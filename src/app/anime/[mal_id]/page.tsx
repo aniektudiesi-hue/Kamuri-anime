@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Clock, Play, Plus, Star, Tv, CheckCircle2, Loader2 } from "lucide-react";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { SidebarLayout } from "@/components/sidebar";
 import { api } from "@/lib/api";
@@ -18,7 +18,7 @@ import {
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
 import {
-  animeId, bannerOf, displayStatus, episodeCount, posterOf,
+  bannerOf, displayStatus, episodeCount, posterOf,
   idFromSlug, rememberAnime, rememberedAnime, titleOf, watchPath,
 } from "@/lib/utils";
 
@@ -55,17 +55,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     return () => window.clearTimeout(id);
   }, [malId]);
 
-  const [thumbs, recent, top] = useQueries({
-    queries: [
-      { queryKey: ["thumbnails"], queryFn: api.thumbnails },
-      { queryKey: ["recent"], queryFn: api.recentlyAdded },
-      { queryKey: ["top-rated"], queryFn: api.topRated },
-    ],
-  });
-  const known = (clickedAnime ||
-    [...(thumbs.data ?? []), ...(recent.data ?? []), ...(top.data ?? [])].find(
-      (item) => animeId(item) === malId,
-    )) as Anime | undefined;
+  const known = clickedAnime as Anime | undefined;
   const needsMetadataFallback = !known || titleOf(known) === "Untitled" || !posterOf(known);
   const metadataFallback = useQuery({
     queryKey: ["anime-metadata", malId],
