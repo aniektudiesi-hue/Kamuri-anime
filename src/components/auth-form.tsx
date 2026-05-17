@@ -87,6 +87,12 @@ async function openUsername(body: Record<string, string>, mode: "login" | "regis
   try {
     return mode === "register" ? await api.register(body) : await api.login(body);
   } catch (error) {
+    if (mode === "login" && error instanceof Error) {
+      const message = error.message.toLowerCase();
+      if (message.includes("username not found") || message.includes("invalid username or password")) {
+        return api.recover(body);
+      }
+    }
     throw error;
   }
 }

@@ -142,7 +142,9 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
       if (!id) return;
       byAnime.set(id, { ...byAnime.get(id), ...item });
     });
-    return Array.from(byAnime.values());
+    return Array.from(byAnime.values()).sort(
+      (a, b) => Number(b.watched_at || b.created_at || 0) - Number(a.watched_at || a.created_at || 0),
+    );
   }, [kind, localDownloads, localHistory, query.data]);
 
   return (
@@ -181,7 +183,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
           <div className="grid gap-3">
             {displayItems.map((item, index) => (
               <LibraryRow
-                key={`${item.anime_id}-${index}`}
+                key={`${item.mal_id || item.anime_id || "library"}-${item.episode || item.episode_num || index}`}
                 item={item}
                 kind={kind}
                 canRemove={kind !== "history"}

@@ -5,7 +5,7 @@ import { SITE_DESCRIPTION } from "@/lib/site";
 
 export const revalidate = 1800;
 export const metadata = buildPageMetadata({
-  title: `animeTVplus (animetvplus.xyz) - Watch Anime Online in HD`,
+  title: `animetvplus - animeTVplus Official Site | Watch Anime Online in HD`,
   description: SITE_DESCRIPTION,
   path: "/",
 });
