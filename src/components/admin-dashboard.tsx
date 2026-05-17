@@ -179,15 +179,18 @@ export function AdminDashboard() {
     queryKey: ["admin", "overview", token, adminKey],
     queryFn: () => api.adminOverview(token!, adminKey),
     enabled: Boolean(token),
+    staleTime: 1000 * 20,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     retry: false,
   });
   const users = useQuery({
     queryKey: ["admin", "users", token, adminKey],
-    queryFn: () => api.adminUsers(token!, adminKey, 1000),
+    queryFn: () => api.adminUsers(token!, adminKey, 250),
     enabled: Boolean(token),
-    staleTime: 1000 * 4,
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: true,
+    staleTime: 1000 * 20,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     retry: false,
   });
   const logins = useQuery({
@@ -199,11 +202,11 @@ export function AdminDashboard() {
   });
   const visits = useQuery({
     queryKey: ["admin", "visits", token, adminKey],
-    queryFn: () => api.adminVisits(token!, adminKey, 500),
+    queryFn: () => api.adminVisits(token!, adminKey, 120),
     enabled: Boolean(token),
-    staleTime: 1000 * 4,
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: true,
+    staleTime: 1000 * 20,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
     retry: false,
   });
   const visibility = useQuery({
@@ -214,7 +217,7 @@ export function AdminDashboard() {
   });
   const activity = useQuery({
     queryKey: ["admin", "user-activity", token, adminKey, selectedUserId],
-    queryFn: () => api.adminUserActivity(token!, selectedUserId!, adminKey, 500),
+    queryFn: () => api.adminUserActivity(token!, selectedUserId!, adminKey, 120),
     enabled: Boolean(token && selectedUserId),
     staleTime: 1000 * 15,
     retry: false,

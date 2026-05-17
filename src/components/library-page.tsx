@@ -136,6 +136,11 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
   const displayItems = useMemo(() => {
     if (kind === "downloads") return localDownloads;
     if (kind !== "history") return query.data ?? [];
+    if (token) {
+      return [...(query.data ?? [])].sort(
+        (a, b) => Number(b.watched_at || b.created_at || 0) - Number(a.watched_at || a.created_at || 0),
+      );
+    }
     const byAnime = new Map<string, LibraryItem>();
     [...localHistory, ...(query.data ?? [])].forEach((item) => {
       const id = String(item.mal_id || item.anime_id || "");
@@ -145,7 +150,7 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
     return Array.from(byAnime.values()).sort(
       (a, b) => Number(b.watched_at || b.created_at || 0) - Number(a.watched_at || a.created_at || 0),
     );
-  }, [kind, localDownloads, localHistory, query.data]);
+  }, [kind, localDownloads, localHistory, query.data, token]);
 
   return (
     <AppShell>
