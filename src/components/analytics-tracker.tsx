@@ -24,10 +24,11 @@ export function AnalyticsTracker() {
     const key = `${identity}:${path}`;
     if (lastTrackedKey.current === key) return;
 
+    const isWatchPage = path.startsWith("/watch/");
     const timer = window.setTimeout(() => {
       lastTrackedKey.current = key;
       api.trackVisit(makePayload(), token);
-    }, token ? 250 : 900);
+    }, isWatchPage ? 6000 : token ? 250 : 900);
 
     return () => window.clearTimeout(timer);
   }, [pathname, token]);
@@ -54,10 +55,14 @@ export function AnalyticsTracker() {
     const onVisible = () => {
       if (document.visibilityState === "visible") sendPresence();
     };
-    window.setTimeout(sendPresence, 1200);
+    const firstPresence = window.setTimeout(
+      sendPresence,
+      window.location.pathname.startsWith("/watch/") ? 8000 : 1200,
+    );
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
+      window.clearTimeout(firstPresence);
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
     };

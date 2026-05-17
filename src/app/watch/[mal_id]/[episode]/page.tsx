@@ -23,8 +23,6 @@ import {
   streamProviderCacheKey,
   streamProviderIndex,
   streamProviderQueryKey,
-  streamUrlOf,
-  warmStreamProvider,
   type StreamProviderId,
 } from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
@@ -138,9 +136,6 @@ export default function WatchPage({
   const selectedQuery = streamQueries[selectedQueryIndex];
   const availableServerIds = availableServers.map((s) => s.id).join("|");
   const firstAvailableServerId = availableServers[0]?.id;
-  const warmSignature = STREAM_PROVIDERS
-    .map((provider, index) => `${provider.id}:${streamUrlOf(streamQueries[index]?.data)}`)
-    .join("|");
   const streamsLoading = Boolean((selectedQuery?.isLoading || selectedQuery?.isFetching) || (!selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching)));
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
@@ -266,10 +261,11 @@ export default function WatchPage({
       };
     };
 
-    connect();
+    const connectTimer = window.setTimeout(connect, 5000);
 
     return () => {
       closed = true;
+      if (connectTimer) window.clearTimeout(connectTimer);
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       historySocketReadyRef.current = false;
       historySocketRef.current?.close();
@@ -403,14 +399,6 @@ export default function WatchPage({
       setServer(firstAvailableServerId);
     }
   }, [allSettled, availableServerIds, firstAvailableServerId, megaHasPlayableStream, server, type]);
-
-  useEffect(() => {
-    STREAM_PROVIDERS.forEach((provider, index) => {
-      warmStreamProvider(provider, streamQueries[index]?.data);
-    });
-  // warmSignature intentionally captures the stream URLs that matter for warmups.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [warmSignature]);
 
   function handlePlayerFatalError() {
     if (!activeServerId) return;

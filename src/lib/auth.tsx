@@ -1,10 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
 import type { User } from "./types";
-import { rememberedHistory } from "./utils";
 
 const TOKEN_KEY = "kairostream_token";
 
@@ -22,7 +21,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const syncedTokenRef = useRef("");
 
   useEffect(() => {
     setToken(localStorage.getItem(TOKEN_KEY));
@@ -39,16 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
-
-  useEffect(() => {
-    if (!token || syncedTokenRef.current === token) return;
-    syncedTokenRef.current = token;
-    const items = rememberedHistory(80);
-    if (!items.length) return;
-    items.forEach((item) => {
-      api.addHistory(token, item as Record<string, unknown>).catch(() => undefined);
-    });
-  }, [token]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

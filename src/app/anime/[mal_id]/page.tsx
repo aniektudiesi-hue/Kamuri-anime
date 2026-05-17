@@ -14,7 +14,6 @@ import {
   STREAM_PROVIDERS,
   fetchStreamProvider,
   streamProviderQueryKey,
-  warmStreamProvider,
 } from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
@@ -129,16 +128,11 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
 
   const prefetchWatch = useCallback((ep: number) => {
     const episode = String(ep);
-    STREAM_PROVIDERS.forEach((provider) => {
-      queryClient.prefetchQuery({
-        queryKey: streamProviderQueryKey(provider, malId, episode, "sub"),
-        queryFn: async () => {
-          const stream = await fetchStreamProvider(provider, { malId, episode, type: "sub" });
-          warmStreamProvider(provider, stream);
-          return stream;
-        },
-        staleTime: 1000 * 60 * 25,
-      });
+    const primary = STREAM_PROVIDERS[0];
+    queryClient.prefetchQuery({
+      queryKey: streamProviderQueryKey(primary, malId, episode, "sub"),
+      queryFn: () => fetchStreamProvider(primary, { malId, episode, type: "sub" }),
+      staleTime: 1000 * 60 * 25,
     });
   }, [malId, queryClient]);
 
@@ -166,11 +160,6 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   useEffect(() => {
     setEpisodeLimit(24);
   }, [activeRange, malId]);
-
-  useEffect(() => {
-    const id = window.setTimeout(() => prefetchWatch(lastEp || 1), 350);
-    return () => window.clearTimeout(id);
-  }, [lastEp, prefetchWatch]);
 
   const rangeEpisodes = ranges.length
     ? allEpisodes.filter(
