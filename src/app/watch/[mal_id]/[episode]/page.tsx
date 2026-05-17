@@ -481,7 +481,7 @@ export default function WatchPage({
               <VideoPlayer
                 key={`${activeServerId}-${type}-${selectedStreamForPlayer?.m3u8_url || selectedStreamForPlayer?.url || selectedStreamForPlayer?.stream_url}`}
                 stream={selectedStreamForPlayer}
-                poster={animePoster}
+                poster={undefined}
                 serverId={activeServerId}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}

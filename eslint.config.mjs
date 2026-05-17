@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".next-verify/**",
+    ".next-perf/**",
+    ".next-webpack-perf/**",
     "lh-*.json",
     "out/**",
     "build/**",

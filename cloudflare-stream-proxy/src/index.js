@@ -5,7 +5,10 @@ const DESKTOP_UA =
 
 const STREAM_API_PREFIXES = ["/api/stream/", "/api/moon/", "/api/hd1/"];
 const MOON_CACHE_TTL = 1800;
-const MOON_SEGMENT_CACHE_TTL = 3600;
+const MANIFEST_CACHE_TTL = 30;
+const MANIFEST_STALE_TTL = 60;
+const SEGMENT_CACHE_TTL = 86400;
+const MOON_SEGMENT_CACHE_TTL = SEGMENT_CACHE_TTL;
 const IMAGE_CACHE_TTL = 60 * 60 * 24 * 30;
 const moonInflight = new Map();
 const HOP_BY_HOP_HEADERS = new Set([
@@ -30,10 +33,10 @@ const worker = {
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/warm")) return await warmMoon(request, env, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return await proxyMoonM3u8(request, env, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/chunk")) return await proxyMoonChunk(request, env, ctx);
-      if (url.pathname === "/proxy/m3u8") return await proxyM3u8(request, env);
-      if (url.pathname === "/proxy/chunk") return await proxyChunk(request, env);
-      if (url.pathname === "/proxy/vtt") return await proxyVtt(request, env);
-      return await proxyOrigin(request, env);
+      if (url.pathname === "/proxy/m3u8") return await proxyM3u8(request, env, ctx);
+      if (url.pathname === "/proxy/chunk") return await proxyChunk(request, env, ctx);
+      if (url.pathname === "/proxy/vtt") return await proxyVtt(request, env, ctx);
+      return await proxyOrigin(request, env, ctx);
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : "Proxy error" }, 502);
     }
@@ -42,7 +45,7 @@ const worker = {
 
 export default worker;
 
-async function proxyOrigin(request, env) {
+async function proxyOrigin(request, env, ctx) {
   const incoming = new URL(request.url);
   const origin = new URL(env.ORIGIN_BASE);
   const target = new URL(incoming.pathname + incoming.search, origin);
@@ -53,16 +56,31 @@ async function proxyOrigin(request, env) {
   headers.set("x-forwarded-proto", incoming.protocol.replace(":", ""));
   headers.set("x-forwarded-for", request.headers.get("cf-connecting-ip") || "");
 
+  const canCache = request.method === "GET" && STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix));
+  const cache = caches.default;
+  const cacheKey = new Request(target.toString(), { headers: cacheVaryHeaders(request) });
+  if (canCache) {
+    const cached = await cache.match(cacheKey);
+    if (cached) return withCors(cached, true);
+  }
+
   const response = await fetch(target, {
     method: request.method,
     headers,
     body: bodyFor(request),
     redirect: "follow",
+    cf: canCache ? { cacheEverything: true, cacheTtl: 120 } : undefined,
   });
 
   if (STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)) && isJson(response)) {
     const payload = await response.json();
-    return json(rewriteStreamPayload(payload, incoming.origin), response.status, cacheHeaders("public, max-age=120"));
+    const rewritten = json(
+      rewriteStreamPayload(payload, incoming.origin),
+      response.status,
+      cacheHeaders("public, s-maxage=120, stale-while-revalidate=600"),
+    );
+    if (canCache && response.ok) ctx.waitUntil(cache.put(cacheKey, rewritten.clone()));
+    return rewritten;
   }
 
   return withCors(response, STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)));
@@ -109,25 +127,33 @@ async function proxyImage(request) {
   return cacheable;
 }
 
-async function proxyM3u8(request, env) {
+async function proxyM3u8(request, env, ctx) {
   const src = sourceUrl(request);
+  const cache = caches.default;
+  const cacheKey = streamCacheRequest("m3u8", src);
+  const cached = await cache.match(cacheKey);
+  if (cached) return withCors(cached, false);
+
   const upstream = await fetch(src, {
     headers: upstreamHeaders(src, env),
     redirect: "follow",
-    cf: { cacheTtl: 12, cacheEverything: false },
+    cf: { cacheTtl: MANIFEST_CACHE_TTL, cacheEverything: true },
   });
 
   if (!upstream.ok) return upstreamError(upstream);
 
   const rewritten = rewriteM3u8(await upstream.text(), src, new URL(request.url).origin);
-  return new Response(rewritten, {
+  const response = new Response(rewritten, {
     status: 200,
     headers: {
       ...corsHeaders(),
       "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
-      "cache-control": "no-cache",
+      "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
+      "vary": "Accept-Encoding",
     },
   });
+  ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
 }
 
 async function warmMoon(request, env, ctx) {
@@ -171,7 +197,7 @@ async function proxyMoonM3u8(request, env, ctx) {
       headers: {
         ...corsHeaders(),
         "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
-        "cache-control": "public, max-age=60, stale-while-revalidate=300",
+        "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
       },
     });
   }
@@ -188,7 +214,7 @@ async function proxyMoonM3u8(request, env, ctx) {
         headers: {
           ...corsHeaders(),
           "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
-          "cache-control": "public, max-age=60, stale-while-revalidate=300",
+          "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
         },
       });
     }
@@ -200,7 +226,7 @@ async function proxyMoonM3u8(request, env, ctx) {
       headers: {
         ...corsHeaders(),
         "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
-        "cache-control": "public, max-age=60, stale-while-revalidate=300",
+        "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
       },
     });
   }
@@ -214,7 +240,7 @@ async function proxyMoonM3u8(request, env, ctx) {
       headers: {
         ...corsHeaders(),
         "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
-        "cache-control": "public, max-age=60, stale-while-revalidate=300",
+        "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
       },
     });
   }
@@ -224,7 +250,7 @@ async function proxyMoonM3u8(request, env, ctx) {
     headers: {
       ...corsHeaders(),
       "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
-      "cache-control": "public, max-age=60, stale-while-revalidate=300",
+      "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
     },
   });
 }
@@ -251,25 +277,39 @@ async function proxyMoonChunk(request, env, ctx) {
   return streamUpstream(upstream, detectMime(segmentUrl));
 }
 
-async function proxyChunk(request, env) {
+async function proxyChunk(request, env, ctx) {
   const src = sourceUrl(request);
   const headers = upstreamHeaders(src, env);
   const range = request.headers.get("range");
   if (range) headers.set("range", range);
 
+  const cache = caches.default;
+  const cacheKey = streamCacheRequest("chunk", src, range || "");
+  if (!range) {
+    const cached = await cache.match(cacheKey);
+    if (cached) return streamUpstream(cached, detectMime(src));
+  }
+
   const upstream = await fetch(src, {
     method: "GET",
     headers,
     redirect: "follow",
-    cf: { cacheTtl: range ? 0 : 3600, cacheEverything: !range },
+    cf: { cacheTtl: range ? 0 : SEGMENT_CACHE_TTL, cacheEverything: !range },
   });
 
   if (!upstream.ok && upstream.status !== 206) return upstreamError(upstream);
-  return streamUpstream(upstream, detectMime(src));
+  const response = streamUpstream(upstream, detectMime(src), range ? undefined : `public, max-age=${SEGMENT_CACHE_TTL}, immutable`);
+  if (!range && upstream.status === 200) ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
 }
 
-async function proxyVtt(request, env) {
+async function proxyVtt(request, env, ctx) {
   const src = sourceUrl(request);
+  const cache = caches.default;
+  const cacheKey = streamCacheRequest("vtt", src);
+  const cached = await cache.match(cacheKey);
+  if (cached) return streamUpstream(cached, "text/vtt; charset=utf-8");
+
   const upstream = await fetch(src, {
     headers: upstreamHeaders(src, env),
     redirect: "follow",
@@ -277,7 +317,9 @@ async function proxyVtt(request, env) {
   });
 
   if (!upstream.ok) return upstreamError(upstream);
-  return streamUpstream(upstream, "text/vtt; charset=utf-8");
+  const response = streamUpstream(upstream, "text/vtt; charset=utf-8", "public, max-age=3600, stale-while-revalidate=86400");
+  ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
 }
 
 function sourceUrl(request) {
@@ -561,6 +603,7 @@ function moonCacheableResponse(response, ttl) {
   headers.delete("set-cookie");
   if (headers.get("vary") === "*") headers.delete("vary");
   headers.set("cache-control", `public, max-age=${ttl}`);
+  headers.set("vary", "Accept-Encoding");
   return new Response(response.body, { status: response.status, headers });
 }
 
@@ -858,7 +901,7 @@ function withImageHeaders(response) {
   return new Response(response.body, { status: response.status, headers });
 }
 
-function streamUpstream(upstream, forcedContentType) {
+function streamUpstream(upstream, forcedContentType, cacheControl) {
   const headers = new Headers();
   for (const [key, value] of upstream.headers) {
     if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) headers.set(key, value);
@@ -866,7 +909,8 @@ function streamUpstream(upstream, forcedContentType) {
   headers.set("access-control-allow-origin", "*");
   headers.set("access-control-expose-headers", "Content-Length, Content-Range, Accept-Ranges");
   headers.set("accept-ranges", upstream.headers.get("accept-ranges") || "bytes");
-  headers.set("cache-control", upstream.headers.get("cache-control") || "public, max-age=3600");
+  headers.set("cache-control", cacheControl || upstream.headers.get("cache-control") || `public, max-age=${SEGMENT_CACHE_TTL}, immutable`);
+  headers.set("vary", "Accept-Encoding");
   if (forcedContentType) headers.set("content-type", forcedContentType);
   return new Response(upstream.body, { status: upstream.status, headers });
 }
@@ -923,11 +967,11 @@ function corsHeaders() {
 }
 
 function cacheHeaders(cacheControl) {
-  return { ...corsHeaders(), "cache-control": cacheControl };
+  return { ...corsHeaders(), "cache-control": cacheControl, "vary": "Accept-Encoding" };
 }
 
 function corsPreflight() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: { ...corsHeaders(), "cache-control": "public, max-age=86400" } });
 }
 
 function json(payload, status = 200, headers = corsHeaders()) {
@@ -935,4 +979,15 @@ function json(payload, status = 200, headers = corsHeaders()) {
     status,
     headers: { ...headers, "content-type": "application/json; charset=utf-8" },
   });
+}
+
+function streamCacheRequest(kind, src, range = "") {
+  return new Request(`https://anime-tv-stream-proxy.local/${kind}/${encodeURIComponent(src)}${range ? `?range=${encodeURIComponent(range)}` : ""}`);
+}
+
+function cacheVaryHeaders(request) {
+  const headers = new Headers();
+  const accept = request.headers.get("accept");
+  if (accept) headers.set("accept", accept);
+  return headers;
 }

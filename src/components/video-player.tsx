@@ -331,10 +331,8 @@ export function VideoPlayer({
     deepBufferArmedRef.current = false;
     lastTimeRef.current = initialTime;
     let playRequested = false;
-    const targetForwardBuffer = deepBuffer
-      ? (isMoonStream ? 2.5 * 60 : 6 * 60)
-      : (isMoonStream ? 60 : 90);
-    const initialForwardBuffer = isMoonStream ? 6 : 10;
+    const targetForwardBuffer = deepBuffer ? 120 : 60;
+    const initialForwardBuffer = isMoonStream ? 12 : 18;
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
@@ -446,21 +444,29 @@ export function VideoPlayer({
         hls = new Hls({
           enableWorker: true,
           progressive: true,
-          lowLatencyMode: true,
+          lowLatencyMode: false,
           autoStartLoad: true,
           startFragPrefetch: true,
           startPosition: initialTime > 2 ? initialTime : 0,
           testBandwidth: false,
           capLevelToPlayerSize: true,
-          startLevel: isMoonStream ? 0 : -1,
+          startLevel: -1,
+          abrEwmaDefaultEstimate: 2_000_000,
+          abrEwmaFastVoD: 3,
+          abrEwmaSlowVoD: 9,
           maxBufferLength: initialForwardBuffer,
-          maxMaxBufferLength: Math.max(initialForwardBuffer, 180),
-          maxBufferSize: isMoonStream ? 96 * 1000 * 1000 : deepBuffer ? 240 * 1000 * 1000 : 140 * 1000 * 1000,
+          maxMaxBufferLength: 120,
+          maxBufferSize: 120 * 1024 * 1024,
           maxBufferHole: 0.35,
-          backBufferLength: isMoonStream ? 10 : 15,
-          fragLoadingMaxRetry: isMoonStream ? 8 : 5,
-          manifestLoadingMaxRetry: isMoonStream ? 5 : 3,
-          levelLoadingMaxRetry: isMoonStream ? 5 : 3,
+          backBufferLength: 30,
+          fragLoadingTimeOut: 8000,
+          fragLoadingMaxRetry: 4,
+          fragLoadingRetryDelay: 500,
+          fragLoadingMaxRetryTimeout: 4000,
+          manifestLoadingTimeOut: 5000,
+          manifestLoadingMaxRetry: 3,
+          levelLoadingTimeOut: 5000,
+          levelLoadingMaxRetry: 3,
         });
         hlsRef.current = hls;
         hls.loadSource(src);
@@ -492,6 +498,16 @@ export function VideoPlayer({
           updateBuffered(true);
           armDeepBuffer();
           playWhenReady();
+        });
+        hls.on(Hls.Events.FRAG_CHANGED, () => {
+          if (!nextHref || !video.duration || video.duration - video.currentTime > 90) return;
+          const existing = document.head.querySelector(`link[data-next-watch="${nextHref}"]`);
+          if (existing) return;
+          const link = document.createElement("link");
+          link.rel = "prefetch";
+          link.href = nextHref;
+          link.dataset.nextWatch = nextHref;
+          document.head.appendChild(link);
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (!data.fatal) return;
@@ -544,7 +560,7 @@ export function VideoPlayer({
       video.removeEventListener("stalled", markWaiting);
       video.removeEventListener("progress", updateBufferedFromEvent);
     };
-  }, [autoPlay, deepBuffer, hideControlsSoon, initialTime, isHlsStream, isMoonStream, src, syncCaptionAt]);
+  }, [autoPlay, deepBuffer, hideControlsSoon, initialTime, isHlsStream, isMoonStream, nextHref, src, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
