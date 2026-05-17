@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  Ban,
   Bookmark,
   Clock3,
   Download,
@@ -16,6 +17,7 @@ import {
   MonitorSmartphone,
   Search,
   ShieldCheck,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
@@ -163,6 +165,7 @@ function onlineRows(users: Row[], visits: Row[], nowMs: number) {
 
 export function AdminDashboard() {
   const { token, user } = useAuth();
+  const queryClient = useQueryClient();
   const [adminKey, setAdminKey] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(0);
@@ -231,6 +234,39 @@ export function AdminDashboard() {
   }, [userRows, userSearch]);
   const visitRows = useMemo(() => asItems(visits.data), [visits.data]);
   const activeRows = useMemo(() => onlineRows(userRows, visitRows, nowMs), [nowMs, userRows, visitRows]);
+
+  const refreshAdmin = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin"] });
+  };
+  const banUser = useMutation({
+    mutationFn: async (row: Row) => {
+      const id = number(row, "id");
+      if (!id || !token) throw new Error("User id missing");
+      const reason = window.prompt(`Ban ${text(row, "username")}? Reason:`, "Banned by admin") || "Banned by admin";
+      return api.adminBanUser(token, id, adminKey, reason);
+    },
+    onSuccess: refreshAdmin,
+  });
+  const unbanUser = useMutation({
+    mutationFn: async (row: Row) => {
+      const id = number(row, "id");
+      if (!id || !token) throw new Error("User id missing");
+      return api.adminUnbanUser(token, id, adminKey);
+    },
+    onSuccess: refreshAdmin,
+  });
+  const deleteUser = useMutation({
+    mutationFn: async (row: Row) => {
+      const id = number(row, "id");
+      const username = text(row, "username");
+      if (!id || !token) throw new Error("User id missing");
+      if (!window.confirm(`Delete ${username}? This removes account, history, watchlist, downloads metadata, visits, logins, follows, and chat messages.`)) {
+        throw new Error("cancelled");
+      }
+      return api.adminDeleteUser(token, id, adminKey);
+    },
+    onSuccess: refreshAdmin,
+  });
 
   const anyError = overview.error || users.error || logins.error || visits.error;
   const overviewData = overview.data ?? {};
@@ -307,6 +343,7 @@ export function AdminDashboard() {
               <StatCard icon={<Eye size={18} />} label="24h Unique" value={overviewData.unique_24h} loading={overview.isLoading} />
               <StatCard icon={<MapPin size={18} />} label="Locations" value={overviewData.known_locations} loading={overview.isLoading} />
               <StatCard icon={<Lock size={18} />} label="Failed" value={overviewData.login_failed} loading={overview.isLoading} />
+              <StatCard icon={<Ban size={18} />} label="Banned" value={overviewData.banned_users} loading={overview.isLoading} />
             </div>
 
             <Panel title="Online now" icon={<Activity size={16} />} loading={users.isLoading || visits.isLoading} className="mt-6">
@@ -362,6 +399,15 @@ export function AdminDashboard() {
                       },
                     ],
                     ["Status", (row) => <PresenceBadge row={row} nowMs={nowMs} />],
+                    [
+                      "Access",
+                      (row) =>
+                        number(row, "is_banned") ? (
+                          <Badge className="bg-[#3b1620] text-[#ffb5c3]">Banned</Badge>
+                        ) : (
+                          <Badge className="bg-emerald-500/12 text-emerald-200">Active</Badge>
+                        ),
+                    ],
                     ["Joined", (row) => formatTime(row.created_at)],
                     ["Last seen", (row) => lastSeenLabel(row.last_seen_at, nowMs)],
                     ["Last login", (row) => formatTime(row.last_login_at)],
@@ -372,6 +418,37 @@ export function AdminDashboard() {
                     ["History", (row) => number(row, "history_count")],
                     ["Watchlist", (row) => number(row, "watchlist_count")],
                     ["Downloads", (row) => number(row, "downloads_count")],
+                    [
+                      "Actions",
+                      (row) => {
+                        const id = number(row, "id");
+                        const isOwner = text(row, "username").toLowerCase() === "kali";
+                        if (!id || isOwner) return <span className="text-white/26">Protected</span>;
+                        const banned = Boolean(number(row, "is_banned"));
+                        return (
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => (banned ? unbanUser.mutate(row) : banUser.mutate(row))}
+                              className={`inline-flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-[11px] font-black transition ${
+                                banned ? "bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/20" : "bg-amber-500/12 text-amber-200 hover:bg-amber-500/20"
+                              }`}
+                            >
+                              <Ban size={13} />
+                              {banned ? "Unban" : "Ban"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteUser.mutate(row)}
+                              className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-[#cf2442]/14 px-2.5 text-[11px] font-black text-[#ffb5c3] transition hover:bg-[#cf2442]/24"
+                            >
+                              <Trash2 size={13} />
+                              Delete
+                            </button>
+                          </div>
+                        );
+                      },
+                    ],
                   ]}
                 />
               </Panel>

@@ -142,6 +142,17 @@ export const api = {
     request<{ items: Record<string, unknown>[] }>(`/admin/users?limit=${limit}`, { token, adminKey }),
   adminUserActivity: (token: string, userId: string | number, adminKey?: string | null, limit = 80) =>
     request<Record<string, unknown>>(`/admin/users/${userId}/activity?limit=${limit}`, { token, adminKey }),
+  adminBanUser: (token: string, userId: string | number, adminKey?: string | null, reason = "Banned by admin") =>
+    request<Record<string, unknown>>(`/admin/users/${userId}/ban`, {
+      method: "POST",
+      token,
+      adminKey,
+      body: JSON.stringify({ reason }),
+    }),
+  adminUnbanUser: (token: string, userId: string | number, adminKey?: string | null) =>
+    request<Record<string, unknown>>(`/admin/users/${userId}/ban`, { method: "DELETE", token, adminKey }),
+  adminDeleteUser: (token: string, userId: string | number, adminKey?: string | null) =>
+    request<Record<string, unknown>>(`/admin/users/${userId}`, { method: "DELETE", token, adminKey }),
   adminLogins: (token: string, adminKey?: string | null, limit = 200) =>
     request<{ items: Record<string, unknown>[] }>(`/admin/logins?limit=${limit}`, { token, adminKey }),
   adminVisits: (token: string, adminKey?: string | null, limit = 300) =>
