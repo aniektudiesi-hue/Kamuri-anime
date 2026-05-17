@@ -84,6 +84,8 @@ export default function WatchPage({
   const [known, setKnown] = useState<Anime | undefined>();
   const [localResumeItem, setLocalResumeItem] = useState<Record<string, unknown> | undefined>();
   const [playedEps, setPlayedEps] = useState<number[]>([]);
+  const [backupStreamsEnabled, setBackupStreamsEnabled] = useState(false);
+  const [secondaryDataEnabled, setSecondaryDataEnabled] = useState(false);
   const { token } = useAuth();
   const settings = useSettings();
   const queryClient = useQueryClient();
@@ -107,11 +109,27 @@ export default function WatchPage({
     return () => window.clearTimeout(id);
   }, [episodeNum, malId]);
 
+  useEffect(() => {
+    setBackupStreamsEnabled(false);
+    const id = window.setTimeout(() => setBackupStreamsEnabled(true), 4500);
+    return () => window.clearTimeout(id);
+  }, [episode, malId, type]);
+
+  useEffect(() => {
+    setSecondaryDataEnabled(false);
+    const id = window.setTimeout(() => setSecondaryDataEnabled(true), 3000);
+    return () => window.clearTimeout(id);
+  }, [episode, malId]);
+
   const streamQueries = useQueries({
     queries: STREAM_PROVIDERS.map((provider) => ({
       queryKey: streamProviderQueryKey(provider, malId, episode, type),
       queryFn: () => fetchStreamProvider(provider, { malId, episode, type }),
-      enabled: Boolean(malId) && Number.isFinite(episodeNum),
+      enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
+        provider.id === DEFAULT_STREAM_PROVIDER_ID ||
+        backupStreamsEnabled ||
+        serverMenuOpen
+      ),
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,
       gcTime: 1000 * 60 * 120,
@@ -143,6 +161,7 @@ export default function WatchPage({
   const episodes = useQuery({
     queryKey: ["episodes", malId, 0],
     queryFn: () => api.episodes(malId),
+    enabled: Boolean(selectedStream || secondaryDataEnabled),
     staleTime: 1000 * 60 * 20,
   });
 
@@ -150,7 +169,7 @@ export default function WatchPage({
   const metadataFallback = useQuery({
     queryKey: ["anime-metadata", malId],
     queryFn: () => fetchAnimeMetadataByMalId(malId),
-    enabled: needsMetadataFallback && Number.isFinite(Number(malId)),
+    enabled: needsMetadataFallback && Number.isFinite(Number(malId)) && Boolean(selectedStream || secondaryDataEnabled),
     staleTime: 1000 * 60 * 60 * 12,
     gcTime: 1000 * 60 * 60 * 24,
   });
@@ -163,10 +182,11 @@ export default function WatchPage({
     [known, malId, metadataFallback.data],
   );
 
+  const explicitResumeTime = Number(t || 0);
   const history = useQuery({
     queryKey: ["history", token],
     queryFn: () => api.history(token!),
-    enabled: Boolean(token && malId && settings.autoResume),
+    enabled: Boolean(token && malId && settings.autoResume && explicitResumeTime <= 0 && selectedStream),
     staleTime: 1000 * 20,
   });
 
@@ -184,7 +204,6 @@ export default function WatchPage({
       rememberAnime(displayAnime);
     }
   }, [displayAnime, malId]);
-  const explicitResumeTime = Number(t || 0);
   const serverResumeItem = useMemo(
     () => history.data?.find(
       (item) =>
@@ -541,7 +560,10 @@ export default function WatchPage({
                     <button
                       type="button"
                       aria-expanded={serverMenuOpen}
-                      onClick={() => setServerMenuOpen((value) => !value)}
+                      onClick={() => {
+                        setBackupStreamsEnabled(true);
+                        setServerMenuOpen((value) => !value);
+                      }}
                       className="flex h-12 w-full items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#141828] px-3.5 text-left transition hover:border-white/[0.13] hover:bg-[#1b2036]"
                     >
                       <span className="min-w-0">
