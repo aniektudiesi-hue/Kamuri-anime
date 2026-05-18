@@ -45,6 +45,10 @@ const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
   opacity: 1,
   boxOpacity: 0.22,
 };
+const FAST_START_BUFFER_SECONDS = 18;
+const MOON_FAST_START_BUFFER_SECONDS = 12;
+const DEEP_BUFFER_SECONDS = 300;
+const NORMAL_BUFFER_SECONDS = 90;
 
 export function VideoPlayer({
   stream,
@@ -354,8 +358,8 @@ export function VideoPlayer({
     deepBufferArmedRef.current = false;
     lastTimeRef.current = startupTime;
     let playRequested = false;
-    const targetForwardBuffer = shouldDeepBuffer ? 120 : 60;
-    const initialForwardBuffer = isMoonStream ? 12 : 18;
+    const targetForwardBuffer = shouldDeepBuffer ? DEEP_BUFFER_SECONDS : NORMAL_BUFFER_SECONDS;
+    const initialForwardBuffer = isMoonStream ? MOON_FAST_START_BUFFER_SECONDS : FAST_START_BUFFER_SECONDS;
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
@@ -366,9 +370,10 @@ export function VideoPlayer({
         backBufferLength: number;
       };
       config.maxBufferLength = targetForwardBuffer;
-      config.maxMaxBufferLength = Math.max(targetForwardBuffer, targetForwardBuffer + 120);
-      config.maxBufferSize = isMoonStream ? 128 * 1000 * 1000 : shouldDeepBuffer ? 384 * 1000 * 1000 : 96 * 1000 * 1000;
+      config.maxMaxBufferLength = Math.max(targetForwardBuffer, targetForwardBuffer + 180);
+      config.maxBufferSize = shouldDeepBuffer ? 512 * 1000 * 1000 : 128 * 1000 * 1000;
       config.backBufferLength = isMoonStream ? 12 : 20;
+      hls.startLoad(Math.max(0, video.currentTime || lastTimeRef.current || 0));
     };
     let lastBufferUiAt = 0;
     const updateBuffered = (force = false) => {
@@ -478,7 +483,7 @@ export function VideoPlayer({
           abrEwmaFastVoD: 3,
           abrEwmaSlowVoD: 9,
           maxBufferLength: initialForwardBuffer,
-          maxMaxBufferLength: 120,
+          maxMaxBufferLength: DEEP_BUFFER_SECONDS,
           maxBufferSize: 120 * 1024 * 1024,
           maxBufferHole: 0.35,
           backBufferLength: 30,
