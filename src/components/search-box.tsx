@@ -52,10 +52,12 @@ export function SearchBox() {
   }, [suggestions.isFetching, suggestions.data]);
 
   const instantItems = useMemo(() => localSearchAnime(trimmed, 7), [trimmed]);
+  const hasInstantPosters = useMemo(() => instantItems.some((anime) => Boolean(posterOf(anime, "poster-xs"))), [instantItems]);
   const items = useMemo(() => {
     if (suggestions.data?.length) return mergeSearchResults(trimmed, instantItems, suggestions.data).slice(0, 7);
-    return rankAnimeForSearch(instantItems, trimmed).slice(0, 7);
-  }, [instantItems, suggestions.data, trimmed]);
+    if (hasInstantPosters) return rankAnimeForSearch(instantItems, trimmed).slice(0, 7);
+    return [];
+  }, [hasInstantPosters, instantItems, suggestions.data, trimmed]);
 
   useEffect(() => {
     if (suggestions.data?.length) rememberSearchCatalog(suggestions.data);
@@ -156,7 +158,7 @@ export function SearchBox() {
           autoComplete="off"
           spellCheck={false}
         />
-        {suggestions.isFetching && !instantItems.length ? (
+        {suggestions.isFetching && !items.length ? (
           <Loader2 size={13} className="shrink-0 animate-spin text-white/25" />
         ) : value ? (
           <button
@@ -208,7 +210,7 @@ export function SearchBox() {
                 </div>
               </div>
             </div>
-          ) : suggestions.isLoading && !suggestions.data && !instantItems.length ? (
+          ) : suggestions.isLoading && !suggestions.data && !items.length ? (
             <div className="flex items-center gap-2.5 px-4 py-4 text-sm text-white/30">
               <Loader2 size={14} className="animate-spin" />
               Searching...

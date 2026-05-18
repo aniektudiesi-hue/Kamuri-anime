@@ -18,7 +18,7 @@ import {
 } from "@/lib/anime-discovery";
 import { localSearchAnime, mergeSearchResults, rememberSearchCatalog } from "@/lib/search-index";
 import type { Anime } from "@/lib/types";
-import { animeId } from "@/lib/utils";
+import { animeId, posterOf } from "@/lib/utils";
 
 const GENRE_LINKS = new Set([
   "Action",
@@ -142,13 +142,32 @@ function SearchContent() {
   const visibleMerged = merged.slice(0, visibleCount);
   const hasMore = Boolean(anilistQ.data?.hasNextPage || jikanQ.data?.hasNextPage);
   const isTimeout = results.error instanceof Error && results.error.message === "timeout";
-  const isLoading = (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1 && instantResults.length === 0;
+  const hasInstantPosters = instantResults.some((anime) => Boolean(posterOf(anime, "poster-sm")));
+  const isLoading = (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1 && !hasInstantPosters;
   const isLoadingMore = discoveryPage > 1 && (anilistQ.isLoading || jikanQ.isLoading);
 
   useEffect(() => {
     const items = [...backendResults, ...allAnilist, ...allJikan];
     if (items.length) rememberSearchCatalog(items);
   }, [backendResults, allAnilist, allJikan]);
+
+  useEffect(() => {
+    if (!visibleMerged.length) return;
+    const links: HTMLLinkElement[] = [];
+    for (const anime of visibleMerged.slice(0, 4)) {
+      const poster = posterOf(anime, "poster-md");
+      if (!poster) continue;
+      const link = document.createElement("link");
+      link.rel = "prefetch";
+      link.as = "image";
+      link.href = poster;
+      document.head.appendChild(link);
+      links.push(link);
+    }
+    return () => {
+      links.forEach((link) => link.remove());
+    };
+  }, [visibleMerged]);
 
   return (
     <AppShell>

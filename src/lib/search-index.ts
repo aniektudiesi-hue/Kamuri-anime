@@ -8,23 +8,26 @@ const SEARCH_CATALOG_LIMIT = 1200;
 export function localSearchAnime(query: string, limit = 12): Anime[] {
   const normalized = query.trim();
   if (normalized.length < 1) return [];
-  return rankAnimeForSearch([...readSearchCatalog(), ...FAMOUS_ANIME], normalized)
+  return rankAnimeForSearch(mergeSearchResults(normalized, readSearchCatalog(), FAMOUS_ANIME), normalized)
     .filter((anime) => matchesAnime(anime, normalized))
     .slice(0, limit);
 }
 
 export function mergeSearchResults(query: string, ...sources: Anime[][]) {
-  const seen = new Set<string>();
+  const byKey = new Map<string, Anime>();
   const merged: Anime[] = [];
   for (const source of sources) {
     for (const anime of source) {
       const id = String(anime.mal_id || anime.anime_id || anime.id || "");
       const key = id || `${anime.title || anime.name || ""}`.toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      merged.push(anime);
+      if (!key) continue;
+
+      const existing = byKey.get(key);
+      const next = existing ? mergeAnimeResult(existing, anime) : anime;
+      byKey.set(key, next);
     }
   }
+  for (const item of byKey.values()) merged.push(item);
   return rankAnimeForSearch(merged, query);
 }
 
@@ -67,4 +70,44 @@ function matchesAnime(anime: Anime, query: string) {
 
 function normalize(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function mergeAnimeResult(base: Anime, incoming: Anime): Anime {
+  const next: Anime = { ...base, ...incoming };
+  const basePoster = firstPoster(base);
+  const incomingPoster = firstPoster(incoming);
+
+  if (!basePoster && incomingPoster) {
+    next.poster = incomingPoster;
+    next.image = incomingPoster;
+    next.thumbnail = incomingPoster;
+  }
+
+  if (!base.title_en && incoming.title_en) next.title_en = incoming.title_en;
+  if (!base.title_jp && incoming.title_jp) next.title_jp = incoming.title_jp;
+  if (!base.status && incoming.status) next.status = incoming.status;
+  if (!Number(base.score || 0) && Number(incoming.score || 0)) next.score = incoming.score;
+  if (!Number(base.episodes || base.num_episodes || base.episode_count || 0)) {
+    next.episodes = incoming.episodes;
+    next.num_episodes = incoming.num_episodes;
+    next.episode_count = incoming.episode_count;
+  }
+
+  return next;
+}
+
+function firstPoster(anime: Anime) {
+  return (
+    anime.poster ||
+    anime.image ||
+    anime.thumbnail ||
+    anime.cover ||
+    anime.image_url ||
+    anime.img_url ||
+    anime.images?.webp?.large_image_url ||
+    anime.images?.jpg?.large_image_url ||
+    anime.images?.webp?.image_url ||
+    anime.images?.jpg?.image_url ||
+    ""
+  );
 }
