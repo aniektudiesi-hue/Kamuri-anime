@@ -7,6 +7,7 @@ import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { localSearchAnime, mergeSearchResults } from "@/lib/search-index";
 import { animeId, animePath, episodeLabel, posterOf, rankAnimeForSearch, rememberAnime, titleOf } from "@/lib/utils";
 
 export function SearchBox() {
@@ -22,7 +23,7 @@ export function SearchBox() {
   const trimmed = value.trim();
 
   useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(trimmed), 200);
+    const t = window.setTimeout(() => setDebounced(trimmed), 90);
     return () => window.clearTimeout(t);
   }, [trimmed]);
 
@@ -50,10 +51,11 @@ export function SearchBox() {
     };
   }, [suggestions.isFetching, suggestions.data]);
 
-  const items = useMemo(
-    () => rankAnimeForSearch(suggestions.data ?? [], debounced).slice(0, 7),
-    [debounced, suggestions.data],
-  );
+  const instantItems = useMemo(() => localSearchAnime(trimmed, 7), [trimmed]);
+  const items = useMemo(() => {
+    if (suggestions.data?.length) return mergeSearchResults(trimmed, instantItems, suggestions.data).slice(0, 7);
+    return rankAnimeForSearch(instantItems, trimmed).slice(0, 7);
+  }, [instantItems, suggestions.data, trimmed]);
 
   const showDropdown = focused && trimmed.length >= 2;
   const isTimeout = suggestions.error instanceof Error && suggestions.error.message === "timeout";
@@ -150,7 +152,7 @@ export function SearchBox() {
           autoComplete="off"
           spellCheck={false}
         />
-        {suggestions.isFetching ? (
+        {suggestions.isFetching && !instantItems.length ? (
           <Loader2 size={13} className="shrink-0 animate-spin text-white/25" />
         ) : value ? (
           <button
@@ -202,7 +204,7 @@ export function SearchBox() {
                 </div>
               </div>
             </div>
-          ) : suggestions.isLoading && !suggestions.data ? (
+          ) : suggestions.isLoading && !suggestions.data && !instantItems.length ? (
             <div className="flex items-center gap-2.5 px-4 py-4 text-sm text-white/30">
               <Loader2 size={14} className="animate-spin" />
               Searching...

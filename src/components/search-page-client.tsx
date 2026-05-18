@@ -16,8 +16,9 @@ import {
   mergeAnimeSources,
   resolveDiscoveryIntent,
 } from "@/lib/anime-discovery";
+import { localSearchAnime, mergeSearchResults } from "@/lib/search-index";
 import type { Anime } from "@/lib/types";
-import { animeId, rankAnimeForSearch } from "@/lib/utils";
+import { animeId } from "@/lib/utils";
 
 const GENRE_LINKS = new Set([
   "Action",
@@ -60,6 +61,7 @@ function SearchContent() {
   const params = useSearchParams();
   const q = params.get("q")?.trim() ?? "";
   const intent = useMemo(() => resolveDiscoveryIntent(q), [q]);
+  const instantResults = useMemo(() => localSearchAnime(q, 30), [q]);
   const slowTimer = useRef<number | undefined>(undefined);
   const [isSlow, setIsSlow] = useState(false);
   const [discoveryPage, setDiscoveryPage] = useState(1);
@@ -87,7 +89,7 @@ function SearchContent() {
   const anilistQ = useQuery({
     queryKey: ["anilist-discovery", intent.key, discoveryPage],
     queryFn: () => fetchAniListDiscovery(intent, discoveryPage),
-    enabled: q.length > 0,
+    enabled: q.length > 0 && !intent.useBackend,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
   });
@@ -95,7 +97,7 @@ function SearchContent() {
   const jikanQ = useQuery({
     queryKey: ["jikan-discovery", intent.key, discoveryPage],
     queryFn: () => fetchJikanDiscovery(intent, discoveryPage),
-    enabled: q.length > 0,
+    enabled: q.length > 0 && !intent.useBackend && discoveryPage > 1,
     staleTime: 1000 * 60 * 45,
     gcTime: 1000 * 60 * 120,
   });
@@ -133,12 +135,14 @@ function SearchContent() {
   }, [results.isLoading, anilistQ.isLoading]);
 
   const backendResults = intent.useBackend ? (results.data ?? []) : [];
-  const mergedRaw = mergeAnimeSources(backendResults, allAnilist, allJikan);
-  const merged = intent.useBackend ? rankAnimeForSearch(mergedRaw, q) : mergedRaw;
+  const mergedRaw = intent.useBackend
+    ? mergeSearchResults(q, instantResults, backendResults)
+    : mergeAnimeSources(instantResults, allAnilist, allJikan);
+  const merged = intent.useBackend ? mergedRaw : mergedRaw;
   const visibleMerged = merged.slice(0, visibleCount);
   const hasMore = Boolean(anilistQ.data?.hasNextPage || jikanQ.data?.hasNextPage);
   const isTimeout = results.error instanceof Error && results.error.message === "timeout";
-  const isLoading = (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1;
+  const isLoading = (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1 && instantResults.length === 0;
   const isLoadingMore = discoveryPage > 1 && (anilistQ.isLoading || jikanQ.isLoading);
 
   return (
