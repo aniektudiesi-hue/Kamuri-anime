@@ -1,5 +1,5 @@
 import type { Anime } from "@/lib/types";
-import { animePath, watchPath } from "@/lib/utils";
+import { animePath, slugifyTitle, watchPath } from "@/lib/utils";
 
 export type FamousAnime = Anime & {
   mal_id: string;
@@ -42,9 +42,31 @@ export const FAMOUS_ANIME: FamousAnime[] = [
   { mal_id: "4181", title: "Clannad: After Story", episodes: 24, score: 8.93, keywords: ["watch clannad after story", "clannad episodes"] },
   { mal_id: "42249", title: "Tokyo Revengers", episodes: 24, score: 7.86, keywords: ["watch tokyo revengers", "tokyo revengers episodes"] },
   { mal_id: "52299", title: "Solo Leveling", episodes: 12, score: 8.30, keywords: ["watch solo leveling", "solo leveling episodes"] },
+  { mal_id: "1575", title: "Code Geass", episodes: 25, score: 8.70, keywords: ["watch code geass", "code geass episodes", "code geass anime online"] },
+  { mal_id: "1", title: "Cowboy Bebop", episodes: 26, score: 8.75, keywords: ["watch cowboy bebop", "cowboy bebop episodes", "cowboy bebop anime"] },
+  { mal_id: "9253", title: "Steins;Gate", episodes: 24, score: 9.07, keywords: ["watch steins gate", "steins gate episodes", "steins gate anime"] },
+  { mal_id: "19815", title: "No Game No Life", episodes: 12, score: 8.05, keywords: ["watch no game no life", "no game no life episodes", "no game no life anime"] },
+  { mal_id: "31240", title: "Re:ZERO -Starting Life in Another World-", episodes: 25, score: 8.23, keywords: ["watch re zero", "rezero episodes", "re zero anime online"] },
+  { mal_id: "29803", title: "Overlord", episodes: 13, score: 7.90, keywords: ["watch overlord anime", "overlord episodes", "overlord anime online"] },
+  { mal_id: "30831", title: "Konosuba", episodes: 10, score: 8.10, keywords: ["watch konosuba", "konosuba episodes", "konosuba anime"] },
+  { mal_id: "37430", title: "That Time I Got Reincarnated as a Slime", episodes: 24, score: 8.14, keywords: ["watch slime anime", "that time i got reincarnated as a slime episodes", "tensei shitara slime anime"] },
+  { mal_id: "39535", title: "Mushoku Tensei", episodes: 11, score: 8.34, keywords: ["watch mushoku tensei", "mushoku tensei episodes", "jobless reincarnation anime"] },
+  { mal_id: "35790", title: "The Rising of the Shield Hero", episodes: 25, score: 7.93, keywords: ["watch shield hero", "rising of the shield hero episodes", "shield hero anime"] },
+  { mal_id: "17265", title: "Log Horizon", episodes: 25, score: 7.92, keywords: ["watch log horizon", "log horizon episodes", "log horizon anime"] },
+  { mal_id: "20583", title: "Haikyuu!!", episodes: 25, score: 8.44, keywords: ["watch haikyuu", "haikyuu episodes", "haikyuu anime online"] },
+  { mal_id: "11771", title: "Kuroko's Basketball", episodes: 25, score: 8.05, keywords: ["watch kuroko basketball", "kuroko no basket episodes", "basketball anime online"] },
+  { mal_id: "11061", title: "Hunter x Hunter", episodes: 148, score: 9.03, keywords: ["watch hunter x hunter", "hunter x hunter episodes", "hxh anime online"] },
+  { mal_id: "19", title: "Monster", episodes: 74, score: 8.88, keywords: ["watch monster anime", "monster anime episodes", "monster anime online"] },
+  { mal_id: "30", title: "Neon Genesis Evangelion", episodes: 26, score: 8.35, keywords: ["watch evangelion", "neon genesis evangelion episodes", "evangelion anime"] },
+  { mal_id: "13601", title: "Psycho-Pass", episodes: 22, score: 8.33, keywords: ["watch psycho pass", "psycho pass episodes", "psycho pass anime"] },
+  { mal_id: "22199", title: "Akame ga Kill!", episodes: 24, score: 7.46, keywords: ["watch akame ga kill", "akame ga kill episodes", "akame ga kill anime"] },
+  { mal_id: "23273", title: "Your Lie in April", episodes: 22, score: 8.64, keywords: ["watch your lie in april", "your lie in april episodes", "romance anime online"] },
+  { mal_id: "42897", title: "Horimiya", episodes: 13, score: 8.20, keywords: ["watch horimiya", "horimiya episodes", "school romance anime"] },
+  { mal_id: "37999", title: "Kaguya-sama: Love is War", episodes: 12, score: 8.40, keywords: ["watch kaguya sama", "kaguya sama episodes", "love is war anime"] },
+  { mal_id: "38680", title: "Fruits Basket", episodes: 25, score: 8.21, keywords: ["watch fruits basket", "fruits basket episodes", "romance drama anime"] },
 ];
 
-export const SEO_KEYWORD_PAGES: SeoKeywordPage[] = [
+const CORE_SEO_KEYWORD_PAGES: SeoKeywordPage[] = [
   animeIntent("watch-one-piece-episodes", "One Piece Episode Watch", "Watch One Piece Episodes Online", "One Piece"),
   animeIntent("watch-naruto-episodes", "Watch Naruto Episodes", "Watch Naruto Episodes Online", "Naruto"),
   animeIntent("watch-demon-slayer-online", "Watch Demon Slayer Online", "Watch Demon Slayer Episodes Online", "Demon Slayer"),
@@ -132,6 +154,78 @@ export const SEO_KEYWORD_PAGES: SeoKeywordPage[] = [
   },
 ];
 
+const TITLE_SEO_KEYWORD_PAGES: SeoKeywordPage[] = FAMOUS_ANIME.flatMap((anime) => {
+  const titleSlug = slugifyTitle(anime.title);
+  const episodeCountText = anime.episodes ? `${anime.episodes} episodes` : "episode list";
+  return [
+    {
+      slug: `watch-${titleSlug}-online`,
+      title: `Watch ${anime.title} Online`,
+      h1: `Watch ${anime.title} Online`,
+      description: `Watch ${anime.title} online on animeTVplus with a direct anime page, ${episodeCountText}, episode 1 link, and related anime discovery.`,
+      intro: `This crawlable animeTVplus page is built for ${anime.title} watch intent: title search, episode search, HD anime discovery, and quick links into the ${anime.title} anime page.`,
+      intent: "anime",
+      keywords: [
+        `watch ${anime.title} online`,
+        `${anime.title} anime online`,
+        `${anime.title} episode watch`,
+        `${anime.title} episodes`,
+        `free watch ${anime.title}`,
+        ...anime.keywords,
+      ],
+      animeTitles: [anime.title],
+    },
+    {
+      slug: `watch-${titleSlug}-episode-1`,
+      title: `Watch ${anime.title} Episode 1`,
+      h1: `Watch ${anime.title} Episode 1`,
+      description: `Open ${anime.title} episode 1 on animeTVplus, plus the full anime detail page, episode list, watch history, and related anime searches.`,
+      intro: `Start ${anime.title} from episode 1 or open the full title page. This page targets direct episode-start searches and helps Google discover the watch route cleanly.`,
+      intent: "episodes",
+      keywords: [
+        `${anime.title} episode 1`,
+        `watch ${anime.title} episode 1`,
+        `${anime.title} ep 1`,
+        `${anime.title} first episode`,
+        `${anime.title} watch episode`,
+      ],
+      animeTitles: [anime.title],
+    },
+    {
+      slug: `${titleSlug}-episodes-list`,
+      title: `${anime.title} Episodes List`,
+      h1: `${anime.title} Episodes List`,
+      description: `Find the ${anime.title} episodes list on animeTVplus with direct links to the anime page and first watch page.`,
+      intro: `Use this index for ${anime.title} episode-list searches, full anime title discovery, and quick watch navigation on animeTVplus.`,
+      intent: "episodes",
+      keywords: [
+        `${anime.title} episodes list`,
+        `${anime.title} all episodes`,
+        `${anime.title} anime episodes`,
+        `watch all ${anime.title} episodes`,
+      ],
+      animeTitles: [anime.title],
+    },
+  ];
+});
+
+const POWER_SEO_KEYWORD_PAGES: SeoKeywordPage[] = [
+  keywordCluster("watch-action-anime-online", "Watch Action Anime Online", "Action", ["One Piece", "Jujutsu Kaisen", "Demon Slayer", "Attack on Titan", "Chainsaw Man", "Black Clover", "Bleach", "Dragon Ball Z"]),
+  keywordCluster("watch-fantasy-anime-online", "Watch Fantasy Anime Online", "Fantasy", ["Solo Leveling", "Sword Art Online", "Re:ZERO -Starting Life in Another World-", "Overlord", "Mushoku Tensei", "That Time I Got Reincarnated as a Slime"]),
+  keywordCluster("watch-supernatural-anime-online", "Watch Supernatural Anime Online", "Supernatural", ["Jujutsu Kaisen", "Death Note", "Tokyo Ghoul", "Chainsaw Man", "Bleach", "Demon Slayer"]),
+  keywordCluster("watch-sports-anime-online", "Watch Sports Anime Online", "Sports", ["Haikyuu!!", "Kuroko's Basketball"]),
+  keywordCluster("watch-school-romance-anime-online", "Watch School Romance Anime Online", "Romance", ["Horimiya", "Kaguya-sama: Love is War", "Your Lie in April", "Fruits Basket", "Clannad: After Story"]),
+  keywordCluster("best-anime-to-watch-online", "Best Anime to Watch Online", "Popular", ["One Piece", "Death Note", "Attack on Titan", "Fullmetal Alchemist: Brotherhood", "Steins;Gate", "Hunter x Hunter", "Demon Slayer", "Jujutsu Kaisen"]),
+  keywordCluster("popular-anime-episodes-online", "Popular Anime Episodes Online", "Popular", ["One Piece", "Naruto: Shippuden", "Bleach", "Black Clover", "Dragon Ball Z", "Hunter x Hunter"]),
+  keywordCluster("free-anime-streaming-site", "Free Anime Streaming Site", "Free Anime", ["One Piece", "Naruto", "Demon Slayer", "Solo Leveling", "Death Note", "Spy x Family"]),
+];
+
+export const SEO_KEYWORD_PAGES: SeoKeywordPage[] = uniqueKeywordPages([
+  ...CORE_SEO_KEYWORD_PAGES,
+  ...POWER_SEO_KEYWORD_PAGES,
+  ...TITLE_SEO_KEYWORD_PAGES,
+]);
+
 function animeIntent(slug: string, title: string, h1: string, animeTitle: string): SeoKeywordPage {
   return {
     slug,
@@ -143,6 +237,37 @@ function animeIntent(slug: string, title: string, h1: string, animeTitle: string
     keywords: [`${animeTitle} episode watch`, `watch ${animeTitle} online`, `${animeTitle} episodes`, `${animeTitle} anime streaming`, `free watch ${animeTitle}`],
     animeTitles: [animeTitle],
   };
+}
+
+function keywordCluster(slug: string, title: string, genre: string, animeTitles: string[]): SeoKeywordPage {
+  return {
+    slug,
+    title,
+    h1: title,
+    description: `${title} on animeTVplus with direct anime pages, episode links, ${genre.toLowerCase()} anime discovery, and famous title searches.`,
+    intro: `${title} is a crawlable animeTVplus discovery page for viewers searching ${genre.toLowerCase()} anime, famous anime titles, top lists, and direct episode routes.`,
+    intent: genre === "Popular" || genre === "Free Anime" ? "top-list" : "genre",
+    keywords: [
+      title.toLowerCase(),
+      `watch ${genre.toLowerCase()} anime`,
+      `${genre.toLowerCase()} anime episodes`,
+      `best ${genre.toLowerCase()} anime`,
+      `free ${genre.toLowerCase()} anime online`,
+      "watch anime online",
+      "animeTVplus",
+    ],
+    animeTitles,
+    genreLinks: genre === "Popular" || genre === "Free Anime" ? ["Action", "Adventure", "Fantasy", "Isekai"] : [genre],
+  };
+}
+
+function uniqueKeywordPages(pages: SeoKeywordPage[]) {
+  const seen = new Set<string>();
+  return pages.filter((page) => {
+    if (seen.has(page.slug)) return false;
+    seen.add(page.slug);
+    return true;
+  });
 }
 
 export function keywordPath(slug: string) {
