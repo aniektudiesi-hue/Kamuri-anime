@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { getEpisodeMetadata, getKnownAnimeById } from "@/lib/server-anime";
+import { getKnownAnimeById } from "@/lib/server-anime";
 import { animeKeywords, breadcrumbJsonLd, buildPageMetadata, episodeJsonLd, safeJsonLd, watchDescription, watchPageTitle } from "@/lib/seo";
-import { animePath, episodeCount, episodeNumberFromSlug, idFromSlug, posterOf, titleOf, watchPath } from "@/lib/utils";
+import { animePath, episodeNumberFromSlug, idFromSlug, posterOf, titleOf, watchPath } from "@/lib/utils";
 
 type WatchLayoutProps = {
   children: React.ReactNode;
@@ -10,11 +10,9 @@ type WatchLayoutProps = {
 
 async function getWatchInfo(malId: string, episode: string) {
   const anime = await getKnownAnimeById(malId);
-  const episodes = await getEpisodeMetadata(malId, episodeCount(anime));
   const episodeNumber = Number(episode);
-  const episodeInfo = episodes?.episodes?.find((item) => item.episode_number === episodeNumber);
   const animeTitle = titleOf(anime) === "Untitled" ? `Anime ${malId}` : titleOf(anime);
-  const episodeTitle = episodeInfo?.title || `${animeTitle} Episode ${episode}`;
+  const episodeTitle = `${animeTitle} Episode ${episode}`;
   return { anime, animeTitle, episodeTitle, episodeNumber };
 }
 
@@ -68,6 +66,7 @@ export default async function WatchLayout({ children, params }: WatchLayoutProps
   const episode = episodeNumberFromSlug(rawEpisode);
   const { anime, animeTitle, episodeTitle } = await getWatchInfo(malId, episode);
   const path = watchPath(anime, malId, episode);
+  const embedPath = `/embed/${malId}/${episode}`;
 
   const jsonLd = [
     ...episodeJsonLd({
@@ -90,6 +89,17 @@ export default async function WatchLayout({ children, params }: WatchLayoutProps
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
+      <link rel="alternate" type="text/html" href={embedPath} title={`${episodeTitle} embedded player`} />
+      <noscript>
+        <iframe
+          title={`${episodeTitle} player`}
+          src={embedPath}
+          width="1280"
+          height="720"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowFullScreen
+        />
+      </noscript>
       {children}
     </>
   );

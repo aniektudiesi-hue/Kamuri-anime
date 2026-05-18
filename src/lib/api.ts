@@ -6,6 +6,8 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-s
 const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
 const HISTORY_CACHE_PREFIX = "anime-tv-server-history:";
 const HISTORY_CACHE_TTL = 1000 * 60 * 15;
+const EPISODE_CACHE_PREFIX = "anime-tv-episodes:";
+const EPISODE_CACHE_TTL = 1000 * 60 * 60 * 6;
 
 type RequestOptions = RequestInit & { token?: string | null; adminKey?: string | null };
 
@@ -133,6 +135,50 @@ function writeCachedHistory(token: string, value: LibraryItem[]) {
   }
 }
 
+function episodeCacheKey(malId: string, hint = 0) {
+  return `${EPISODE_CACHE_PREFIX}${malId}:${hint}`;
+}
+
+function readCachedEpisodes(malId: string, hint = 0) {
+  try {
+    const raw = window.localStorage.getItem(episodeCacheKey(malId, hint));
+    if (!raw) return undefined;
+    const cached = JSON.parse(raw) as { expiresAt: number; value: EpisodeResponse };
+    if (!cached.value || cached.expiresAt < Date.now()) {
+      window.localStorage.removeItem(episodeCacheKey(malId, hint));
+      return undefined;
+    }
+    return cached.value;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCachedEpisodes(malId: string, hint: number, value: EpisodeResponse) {
+  try {
+    window.localStorage.setItem(
+      episodeCacheKey(malId, hint),
+      JSON.stringify({ expiresAt: Date.now() + EPISODE_CACHE_TTL, value }),
+    );
+  } catch {
+    // Best-effort cache.
+  }
+}
+
+async function cachedEpisodesRequest(malId: string, hint = 0) {
+  const cached = readCachedEpisodes(malId, hint);
+  const path = `/anime/episode/${malId}?hint=${hint}`;
+  if (cached) {
+    void request<EpisodeResponse>(path)
+      .then((fresh) => writeCachedEpisodes(malId, hint, fresh))
+      .catch(() => undefined);
+    return cached;
+  }
+  const fresh = await request<EpisodeResponse>(path);
+  writeCachedEpisodes(malId, hint, fresh);
+  return fresh;
+}
+
 function mergeCachedHistory(token: string, body: Record<string, unknown>) {
   const normalized = normalizeHistoryBody(body) as LibraryItem;
   const id = String(normalized.mal_id || normalized.anime_id || "");
@@ -150,7 +196,7 @@ export const api = {
   topRated: async () => listFromPayload<Anime>(await request("/home/top-rated")),
   search: async (query: string) => listFromPayload<Anime>(await request(`/search/${encodeURIComponent(query)}`)),
   suggest: async (query: string) => listFromPayload<Anime>(await request(`/suggest/${encodeURIComponent(query)}`)),
-  episodes: (malId: string, hint = 0) => request<EpisodeResponse>(`/anime/episode/${malId}?hint=${hint}`),
+  episodes: (malId: string, hint = 0) => cachedEpisodesRequest(malId, hint),
   stream: (malId: string, episode: string | number, type: "sub" | "dub") =>
     cachedStreamRequest(`mega:${malId}:${episode}:${type}`, `/api/stream/${malId}/${episode}?type=${type}&embed=false`),
   moon: (malId: string, episode: string | number) =>

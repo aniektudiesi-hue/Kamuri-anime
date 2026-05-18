@@ -14,10 +14,10 @@ import {
   parseEpisodeKeywordSlug,
 } from "@/lib/seo-keywords";
 
-type PageProps = { params: Promise<{ anime: string; episode: string }> };
+type PageProps = { params: Promise<{ slug: string; episode: string }> };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { anime: animeSlug, episode: episodeSlug } = await params;
+  const { slug: animeSlug, episode: episodeSlug } = await params;
   const anime = famousAnimeBySlug(animeSlug);
   const episode = parseEpisodeKeywordSlug(episodeSlug);
   if (!anime || !episode) return {};
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function EpisodeKeywordPage({ params }: PageProps) {
-  const { anime: animeSlug, episode: episodeSlug } = await params;
+  const { slug: animeSlug, episode: episodeSlug } = await params;
   const anime = famousAnimeBySlug(animeSlug);
   const episode = parseEpisodeKeywordSlug(episodeSlug);
   if (!anime || !episode || (anime.episodes && episode > anime.episodes)) notFound();

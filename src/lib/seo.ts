@@ -176,6 +176,7 @@ export function episodeJsonLd({
   const title = titleOf(anime) === "Untitled" ? `Anime ${malId}` : titleOf(anime);
   const poster = posterOf(anime);
   const path = watchPath(anime, malId, episode);
+  const embedPath = `/embed/${malId}/${episode}`;
 
   return [
     {
@@ -186,7 +187,7 @@ export function episodeJsonLd({
       thumbnailUrl: poster ? [poster] : [absoluteUrl("/opengraph-image")],
       uploadDate,
       url: absoluteUrl(path),
-      embedUrl: absoluteUrl(path),
+      embedUrl: absoluteUrl(embedPath),
       isFamilyFriendly: true,
       inLanguage: ["ja", "en"],
       potentialAction: [
