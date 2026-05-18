@@ -178,6 +178,25 @@ const faqJsonLd = {
   ],
 };
 
+const siteNavigationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "@id": `${SITE_URL}/#sitelinks`,
+  name: "animeTVplus official sitelinks",
+  itemListElement: [
+    { "@type": "SiteNavigationElement", position: 1, name: "animeTVplus Official", url: SITE_URL },
+    { "@type": "SiteNavigationElement", position: 2, name: "Search Anime on animeTVplus", url: absoluteUrl("/search") },
+    { "@type": "SiteNavigationElement", position: 3, name: "Popular Anime", url: absoluteUrl("/popular") },
+    { "@type": "SiteNavigationElement", position: 4, name: "New Anime Releases", url: absoluteUrl("/new-releases") },
+    { "@type": "SiteNavigationElement", position: 5, name: "Top Rated Anime", url: absoluteUrl("/top-rated") },
+    { "@type": "SiteNavigationElement", position: 6, name: "Anime Schedule", url: absoluteUrl("/schedule") },
+    { "@type": "SiteNavigationElement", position: 7, name: "Anime Keyword Index", url: absoluteUrl("/anime-keywords") },
+    { "@type": "SiteNavigationElement", position: 8, name: "Watch Free Anime", url: absoluteUrl("/free-anime") },
+    { "@type": "SiteNavigationElement", position: 9, name: "animeTVplus Licensing", url: absoluteUrl("/licensing") },
+    { "@type": "SiteNavigationElement", position: 10, name: "animeTVplus Login", url: absoluteUrl("/login") },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -200,7 +219,7 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify([websiteJsonLd, organizationJsonLd, webApplicationJsonLd, faqJsonLd]).replace(/</g, "\\u003c"),
+            __html: JSON.stringify([websiteJsonLd, organizationJsonLd, webApplicationJsonLd, faqJsonLd, siteNavigationJsonLd]).replace(/</g, "\\u003c"),
           }}
         />
         <Providers>{children}</Providers>

@@ -58,6 +58,7 @@ function Footer() {
             <ul className="space-y-2">
               {[
                 { label: "New Releases", href: "/new-releases" },
+                { label: "animeTVplus Official", href: "/animetvplus" },
                 { label: "Popular", href: "/popular" },
                 { label: "Top Rated", href: "/top-rated" },
                 { label: "Currently Airing", href: "/airing" },
@@ -140,6 +141,7 @@ function Footer() {
               { label: "Top Rated Anime", href: "/top-rated" },
               { label: "Watch Free Anime", href: "/free-anime" },
               { label: "Anime Keyword Index", href: "/anime-keywords" },
+              { label: "animeTVplus Official", href: "/animetvplus" },
               { label: "One Piece Episodes", href: "/watch-anime/watch-one-piece-episodes" },
               { label: "Watch Isekai Anime", href: "/watch-anime/watch-isekai-anime" },
               { label: "Top 10 Action Anime", href: "/watch-anime/top-10-action-anime" },

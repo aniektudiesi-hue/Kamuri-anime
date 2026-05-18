@@ -48,6 +48,12 @@ export function staticSitemapRoutes(now = new Date()): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 0.8,
     },
+    {
+      url: absoluteUrl("/animetvplus"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.92,
+    },
     ...SEO_KEYWORD_PAGES.map((page) => ({
       url: absoluteUrl(keywordPath(page.slug)),
       lastModified: now,
