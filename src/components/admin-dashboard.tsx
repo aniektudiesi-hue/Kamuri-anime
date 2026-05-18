@@ -24,7 +24,6 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ButtonLink } from "@/components/button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
@@ -166,21 +165,20 @@ function onlineRows(users: Row[], visits: Row[], nowMs: number) {
 export function AdminDashboard() {
   const { token, user } = useAuth();
   const queryClient = useQueryClient();
-  const [adminKey, setAdminKey] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(0);
   const [userSearch, setUserSearch] = useState("");
 
   useEffect(() => {
-    setAdminKey(localStorage.getItem("animetv_admin_key") || "");
+    localStorage.removeItem("animetv_admin_key");
     setNowMs(Date.now());
     const interval = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(interval);
   }, []);
 
   const overview = useQuery({
-    queryKey: ["admin", "overview", token, adminKey],
-    queryFn: () => api.adminOverview(token!, adminKey),
+    queryKey: ["admin", "overview", token],
+    queryFn: () => api.adminOverview(token!),
     enabled: Boolean(token),
     staleTime: 1000 * 20,
     refetchInterval: 30_000,
@@ -188,8 +186,8 @@ export function AdminDashboard() {
     retry: false,
   });
   const users = useQuery({
-    queryKey: ["admin", "users", token, adminKey],
-    queryFn: () => api.adminUsers(token!, adminKey, 250),
+    queryKey: ["admin", "users", token],
+    queryFn: () => api.adminUsers(token!, undefined, 250),
     enabled: Boolean(token),
     staleTime: 1000 * 20,
     refetchInterval: 30_000,
@@ -197,15 +195,15 @@ export function AdminDashboard() {
     retry: false,
   });
   const logins = useQuery({
-    queryKey: ["admin", "logins", token, adminKey],
-    queryFn: () => api.adminLogins(token!, adminKey, 80),
+    queryKey: ["admin", "logins", token],
+    queryFn: () => api.adminLogins(token!, undefined, 80),
     enabled: Boolean(token),
     staleTime: 1000 * 20,
     retry: false,
   });
   const visits = useQuery({
-    queryKey: ["admin", "visits", token, adminKey],
-    queryFn: () => api.adminVisits(token!, adminKey, 120),
+    queryKey: ["admin", "visits", token],
+    queryFn: () => api.adminVisits(token!, undefined, 120),
     enabled: Boolean(token),
     staleTime: 1000 * 20,
     refetchInterval: 30_000,
@@ -213,14 +211,14 @@ export function AdminDashboard() {
     retry: false,
   });
   const visibility = useQuery({
-    queryKey: ["admin", "search-visibility", token, adminKey],
-    queryFn: () => api.adminSearchVisibility(token!, adminKey),
+    queryKey: ["admin", "search-visibility", token],
+    queryFn: () => api.adminSearchVisibility(token!),
     enabled: Boolean(token),
     retry: false,
   });
   const activity = useQuery({
-    queryKey: ["admin", "user-activity", token, adminKey, selectedUserId],
-    queryFn: () => api.adminUserActivity(token!, selectedUserId!, adminKey, 120),
+    queryKey: ["admin", "user-activity", token, selectedUserId],
+    queryFn: () => api.adminUserActivity(token!, selectedUserId!, undefined, 120),
     enabled: Boolean(token && selectedUserId),
     staleTime: 1000 * 15,
     retry: false,
@@ -243,7 +241,7 @@ export function AdminDashboard() {
       const id = number(row, "id");
       if (!id || !token) throw new Error("User id missing");
       const reason = window.prompt(`Ban ${text(row, "username")}? Reason:`, "Banned by admin") || "Banned by admin";
-      return api.adminBanUser(token, id, adminKey, reason);
+      return api.adminBanUser(token, id, undefined, reason);
     },
     onSuccess: refreshAdmin,
   });
@@ -251,7 +249,7 @@ export function AdminDashboard() {
     mutationFn: async (row: Row) => {
       const id = number(row, "id");
       if (!id || !token) throw new Error("User id missing");
-      return api.adminUnbanUser(token, id, adminKey);
+      return api.adminUnbanUser(token, id);
     },
     onSuccess: refreshAdmin,
   });
@@ -263,7 +261,7 @@ export function AdminDashboard() {
       if (!window.confirm(`Delete ${username}? This removes account, history, watchlist, downloads metadata, visits, logins, follows, and chat messages.`)) {
         throw new Error("cancelled");
       }
-      return api.adminDeleteUser(token, id, adminKey);
+      return api.adminDeleteUser(token, id);
     },
     onSuccess: refreshAdmin,
   });
@@ -296,22 +294,7 @@ export function AdminDashboard() {
                   <p className="mb-2 text-xs font-bold text-white/38">
                     Logged in as <span className="text-white">{user.username}</span>
                   </p>
-                  <div className="flex gap-2">
-                    <Input
-                      value={adminKey}
-                      onChange={(event) => setAdminKey(event.target.value)}
-                      placeholder="Optional admin key"
-                      type="password"
-                      className="h-9 border-white/[0.08] bg-black/25 text-sm text-white"
-                    />
-                    <Button
-                      type="button"
-                      className="h-9 rounded-xl bg-[#cf2442] px-3 text-xs font-black text-white hover:bg-[#dc2d4b]"
-                      onClick={() => localStorage.setItem("animetv_admin_key", adminKey)}
-                    >
-                      Save
-                    </Button>
-                  </div>
+                  <p className="text-xs font-semibold text-white/45">Owner access is locked to the backend username kali.</p>
                 </div>
               ) : null}
             </div>
