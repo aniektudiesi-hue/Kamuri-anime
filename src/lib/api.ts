@@ -135,6 +135,14 @@ function writeCachedHistory(token: string, value: LibraryItem[]) {
   }
 }
 
+function clearCachedHistory(token: string) {
+  try {
+    window.localStorage.removeItem(historyCacheKey(token));
+  } catch {
+    // Best-effort cache cleanup.
+  }
+}
+
 function episodeCacheKey(malId: string, hint = 0) {
   return `${EPISODE_CACHE_PREFIX}${malId}:${hint}`;
 }
@@ -236,7 +244,21 @@ export const api = {
     writeCachedHistory(token, value);
     return value;
   },
-  clearHistory: (token: string) => request("/user/history", { method: "DELETE", token }),
+  syncHistory: async (token: string, items: LibraryItem[]) => {
+    const queue = [...items]
+      .filter((item) => item && (item.mal_id || item.anime_id))
+      .sort((a, b) => Number(a.watched_at || a.created_at || 0) - Number(b.watched_at || b.created_at || 0));
+    for (const item of queue) {
+      await api.addHistory(token, item as Record<string, unknown>).catch(() => undefined);
+    }
+    const fresh = listFromPayload<LibraryItem>(await request("/user/history", { token }));
+    writeCachedHistory(token, fresh);
+    return fresh;
+  },
+  clearHistory: (token: string) => {
+    clearCachedHistory(token);
+    return request("/user/history", { method: "DELETE", token });
+  },
   addWatchlist: (token: string, body: Record<string, unknown>) =>
     request("/user/watchlist", { method: "POST", token, body: JSON.stringify(normalizeWatchlistBody(body)) }),
   watchlist: async (token: string) => listFromPayload<LibraryItem>(await request("/user/watchlist", { token })),
