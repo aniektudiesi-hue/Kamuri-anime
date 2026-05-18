@@ -139,6 +139,10 @@ function Footer() {
               { label: "Currently Airing Anime", href: "/airing" },
               { label: "Top Rated Anime", href: "/top-rated" },
               { label: "Watch Free Anime", href: "/free-anime" },
+              { label: "Anime Keyword Index", href: "/anime-keywords" },
+              { label: "One Piece Episodes", href: "/watch-anime/watch-one-piece-episodes" },
+              { label: "Watch Isekai Anime", href: "/watch-anime/watch-isekai-anime" },
+              { label: "Top 10 Action Anime", href: "/watch-anime/top-10-action-anime" },
               { label: "Anime Schedule", href: "/schedule" },
               { label: "Licensed Anime Access", href: "/licensing" },
             ].map((link) => (

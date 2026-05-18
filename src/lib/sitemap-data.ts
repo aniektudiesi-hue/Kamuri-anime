@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getEpisodeMetadata, getHomeAnimeCatalog } from "@/lib/server-anime";
 import { SEO_CATEGORIES } from "@/lib/seo-categories";
+import { SEO_KEYWORD_PAGES, keywordPath } from "@/lib/seo-keywords";
 import { absoluteUrl } from "@/lib/site";
 import { animeId, animePath, episodeCount, watchPath } from "@/lib/utils";
 
@@ -41,6 +42,18 @@ export function staticSitemapRoutes(now = new Date()): MetadataRoute.Sitemap {
       changeFrequency: "hourly",
       priority: 0.82,
     },
+    {
+      url: absoluteUrl("/anime-keywords"),
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
+    ...SEO_KEYWORD_PAGES.map((page) => ({
+      url: absoluteUrl(keywordPath(page.slug)),
+      lastModified: now,
+      changeFrequency: "daily" as const,
+      priority: page.intent === "anime" ? 0.82 : 0.78,
+    })),
     ...["privacy", "terms", "dmca", "licensing"].map((path) => ({
       url: absoluteUrl(`/${path}`),
       lastModified: now,
