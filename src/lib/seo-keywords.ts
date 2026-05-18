@@ -64,6 +64,22 @@ export const FAMOUS_ANIME: FamousAnime[] = [
   { mal_id: "42897", title: "Horimiya", episodes: 13, score: 8.20, keywords: ["watch horimiya", "horimiya episodes", "school romance anime"] },
   { mal_id: "37999", title: "Kaguya-sama: Love is War", episodes: 12, score: 8.40, keywords: ["watch kaguya sama", "kaguya sama episodes", "love is war anime"] },
   { mal_id: "38680", title: "Fruits Basket", episodes: 25, score: 8.21, keywords: ["watch fruits basket", "fruits basket episodes", "romance drama anime"] },
+  { mal_id: "6702", title: "Fairy Tail", episodes: 175, score: 7.57, keywords: ["watch fairy tail", "fairy tail episodes", "fairy tail anime online"] },
+  { mal_id: "918", title: "Gintama", episodes: 201, score: 8.94, keywords: ["watch gintama", "gintama episodes", "gintama anime online"] },
+  { mal_id: "34566", title: "Boruto: Naruto Next Generations", episodes: 293, score: 6.03, keywords: ["watch boruto", "boruto episodes", "boruto anime online"] },
+  { mal_id: "14719", title: "JoJo's Bizarre Adventure", episodes: 26, score: 7.86, keywords: ["watch jojo", "jojo episodes", "jojo anime online"] },
+  { mal_id: "23755", title: "The Seven Deadly Sins", episodes: 24, score: 7.60, keywords: ["watch seven deadly sins", "seven deadly sins episodes", "nanatsu no taizai anime"] },
+  { mal_id: "38691", title: "Dr. Stone", episodes: 24, score: 8.27, keywords: ["watch dr stone", "dr stone episodes", "dr stone anime online"] },
+  { mal_id: "37520", title: "Dororo", episodes: 24, score: 8.25, keywords: ["watch dororo", "dororo episodes", "dororo anime online"] },
+  { mal_id: "37521", title: "Vinland Saga", episodes: 24, score: 8.75, keywords: ["watch vinland saga", "vinland saga episodes", "vinland saga anime"] },
+  { mal_id: "40750", title: "Kaiju No. 8", episodes: 12, score: 8.30, keywords: ["watch kaiju no 8", "kaiju no 8 episodes", "kaiju anime online"] },
+  { mal_id: "49596", title: "Blue Lock", episodes: 24, score: 8.25, keywords: ["watch blue lock", "blue lock episodes", "football anime online"] },
+  { mal_id: "32182", title: "Mob Psycho 100", episodes: 12, score: 8.49, keywords: ["watch mob psycho 100", "mob psycho episodes", "mob psycho anime"] },
+  { mal_id: "24833", title: "Assassination Classroom", episodes: 22, score: 8.08, keywords: ["watch assassination classroom", "assassination classroom episodes", "ansatsu kyoushitsu anime"] },
+  { mal_id: "35507", title: "Classroom of the Elite", episodes: 12, score: 7.85, keywords: ["watch classroom of the elite", "classroom of the elite episodes", "youkoso jitsuryoku anime"] },
+  { mal_id: "52991", title: "Frieren: Beyond Journey's End", episodes: 28, score: 9.31, keywords: ["watch frieren", "frieren episodes", "sousou no frieren anime"] },
+  { mal_id: "52034", title: "Oshi no Ko", episodes: 11, score: 8.60, keywords: ["watch oshi no ko", "oshi no ko episodes", "oshi no ko anime"] },
+  { mal_id: "52211", title: "Mashle: Magic and Muscles", episodes: 12, score: 7.60, keywords: ["watch mashle", "mashle episodes", "magic and muscles anime"] },
 ];
 
 const CORE_SEO_KEYWORD_PAGES: SeoKeywordPage[] = [
@@ -308,6 +324,16 @@ export function allEpisodeKeywordRoutes() {
       path: episodeKeywordPath(anime, index + 1),
     }));
   });
+}
+
+export function episodeKeywordRoutesForSitemapPart(part: number, chunkSize = 2000) {
+  const safePart = Math.max(1, Math.floor(part || 1));
+  const start = (safePart - 1) * chunkSize;
+  return allEpisodeKeywordRoutes().slice(start, start + chunkSize);
+}
+
+export function episodeKeywordSitemapParts(chunkSize = 2000) {
+  return Math.max(1, Math.ceil(allEpisodeKeywordRoutes().length / chunkSize));
 }
 
 export function parseEpisodeKeywordSlug(value: string) {

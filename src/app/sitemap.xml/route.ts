@@ -8,6 +8,9 @@ const SITEMAPS = [
   "/watch-sitemap.xml",
   "/video-sitemap.xml",
   "/episode-keyword-sitemap.xml",
+  "/episode-keyword-sitemap-1.xml",
+  "/episode-keyword-sitemap-2.xml",
+  "/episode-keyword-sitemap-3.xml",
 ];
 
 export async function GET() {

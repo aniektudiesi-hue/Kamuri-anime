@@ -26,6 +26,9 @@ export default function robots(): MetadataRoute.Robots {
       `${SITE_URL}/watch-sitemap.xml`,
       `${SITE_URL}/video-sitemap.xml`,
       `${SITE_URL}/episode-keyword-sitemap.xml`,
+      `${SITE_URL}/episode-keyword-sitemap-1.xml`,
+      `${SITE_URL}/episode-keyword-sitemap-2.xml`,
+      `${SITE_URL}/episode-keyword-sitemap-3.xml`,
     ],
     host: SITE_URL,
   };
