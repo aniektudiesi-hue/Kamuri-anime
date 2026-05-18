@@ -7,7 +7,7 @@ import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { localSearchAnime, mergeSearchResults } from "@/lib/search-index";
+import { localSearchAnime, mergeSearchResults, rememberSearchCatalog } from "@/lib/search-index";
 import { animeId, animePath, episodeLabel, posterOf, rankAnimeForSearch, rememberAnime, titleOf } from "@/lib/utils";
 
 export function SearchBox() {
@@ -56,6 +56,10 @@ export function SearchBox() {
     if (suggestions.data?.length) return mergeSearchResults(trimmed, instantItems, suggestions.data).slice(0, 7);
     return rankAnimeForSearch(instantItems, trimmed).slice(0, 7);
   }, [instantItems, suggestions.data, trimmed]);
+
+  useEffect(() => {
+    if (suggestions.data?.length) rememberSearchCatalog(suggestions.data);
+  }, [suggestions.data]);
 
   const showDropdown = focused && trimmed.length >= 2;
   const isTimeout = suggestions.error instanceof Error && suggestions.error.message === "timeout";

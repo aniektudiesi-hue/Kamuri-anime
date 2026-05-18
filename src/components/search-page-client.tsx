@@ -16,7 +16,7 @@ import {
   mergeAnimeSources,
   resolveDiscoveryIntent,
 } from "@/lib/anime-discovery";
-import { localSearchAnime, mergeSearchResults } from "@/lib/search-index";
+import { localSearchAnime, mergeSearchResults, rememberSearchCatalog } from "@/lib/search-index";
 import type { Anime } from "@/lib/types";
 import { animeId } from "@/lib/utils";
 
@@ -134,7 +134,7 @@ function SearchContent() {
     };
   }, [results.isLoading, anilistQ.isLoading]);
 
-  const backendResults = intent.useBackend ? (results.data ?? []) : [];
+  const backendResults = useMemo(() => intent.useBackend ? (results.data ?? []) : [], [intent.useBackend, results.data]);
   const mergedRaw = intent.useBackend
     ? mergeSearchResults(q, instantResults, backendResults)
     : mergeAnimeSources(instantResults, allAnilist, allJikan);
@@ -144,6 +144,11 @@ function SearchContent() {
   const isTimeout = results.error instanceof Error && results.error.message === "timeout";
   const isLoading = (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1 && instantResults.length === 0;
   const isLoadingMore = discoveryPage > 1 && (anilistQ.isLoading || jikanQ.isLoading);
+
+  useEffect(() => {
+    const items = [...backendResults, ...allAnilist, ...allJikan];
+    if (items.length) rememberSearchCatalog(items);
+  }, [backendResults, allAnilist, allJikan]);
 
   return (
     <AppShell>

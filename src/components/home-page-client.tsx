@@ -1,13 +1,27 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, ChevronRight, Flame, Play, Radio, Star, Trophy } from "lucide-react";
+import { useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { HeroCarousel, MobileHeroBanner } from "@/components/hero-carousel";
 import { SidebarLayout } from "@/components/sidebar";
+import { rememberSearchCatalog } from "@/lib/search-index";
 import type { AiringScheduleItem, Anime, HomeInitialData } from "@/lib/types";
 import { animeId, animePath, episodeCount, episodeLabel, posterOf, titleOf } from "@/lib/utils";
 
 export function HomePageClient({ initialData }: { initialData: HomeInitialData }) {
+  useEffect(() => {
+    rememberSearchCatalog([
+      ...initialData.banners,
+      ...initialData.thumbnails,
+      ...initialData.recent,
+      ...initialData.topRated,
+      ...initialData.schedule.map((item) => item.anime),
+    ]);
+  }, [initialData]);
+
   return (
     <AppShell>
       <div className="hidden sm:block">
