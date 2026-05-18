@@ -283,12 +283,37 @@ export function famousAnimeByTitle(title: string) {
   return FAMOUS_ANIME.find((anime) => normalizeTitle(anime.title) === normalized);
 }
 
+export function famousAnimeBySlug(slug: string) {
+  return FAMOUS_ANIME.find((anime) => slugifyTitle(anime.title) === slug);
+}
+
 export function animeLink(anime: FamousAnime) {
   return animePath(anime, anime.mal_id);
 }
 
 export function animeWatchLink(anime: FamousAnime, episode = anime.primaryEpisode ?? 1) {
   return watchPath(anime, anime.mal_id, episode);
+}
+
+export function episodeKeywordPath(anime: FamousAnime, episode: number) {
+  return `/watch-anime/${slugifyTitle(anime.title)}/episode-${episode}-free`;
+}
+
+export function allEpisodeKeywordRoutes() {
+  return FAMOUS_ANIME.flatMap((anime) => {
+    const total = Math.max(1, Math.min(Number(anime.episodes ?? 24), 1300));
+    return Array.from({ length: total }, (_, index) => ({
+      anime,
+      episode: index + 1,
+      path: episodeKeywordPath(anime, index + 1),
+    }));
+  });
+}
+
+export function parseEpisodeKeywordSlug(value: string) {
+  const match = value.match(/^episode-(\d+)(?:-free)?$/i);
+  const episode = Number(match?.[1] ?? 0);
+  return Number.isFinite(episode) && episode > 0 ? episode : null;
 }
 
 function normalizeTitle(title: string) {

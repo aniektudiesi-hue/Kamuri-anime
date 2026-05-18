@@ -7,6 +7,7 @@ const SITEMAPS = [
   "/anime-sitemap.xml",
   "/watch-sitemap.xml",
   "/video-sitemap.xml",
+  "/episode-keyword-sitemap.xml",
 ];
 
 export async function GET() {
