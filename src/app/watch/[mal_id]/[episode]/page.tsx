@@ -468,7 +468,6 @@ export default function WatchPage({
               </div>
             ) : (
               <VideoPlayer
-                key={`${activeServerId}-${type}-${selectedStreamForPlayer?.m3u8_url || selectedStreamForPlayer?.url || selectedStreamForPlayer?.stream_url}`}
                 stream={selectedStreamForPlayer}
                 poster={undefined}
                 serverId={activeServerId}

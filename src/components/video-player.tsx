@@ -85,6 +85,10 @@ export function VideoPlayer({
   // Stable refs so callbacks never cause the HLS effect to re-run
   const onProgressRef = useRef(onProgress);
   const onFatalErrorRef = useRef(onFatalError);
+  const autoPlayRef = useRef(autoPlay);
+  const deepBufferRef = useRef(deepBuffer);
+  const initialTimeRef = useRef(initialTime);
+  const nextHrefRef = useRef(nextHref);
 
   const [activeCaption, setActiveCaption] = useState("");
   const [isBuffering, setIsBuffering] = useState(true);
@@ -172,6 +176,22 @@ export function VideoPlayer({
   useEffect(() => {
     onFatalErrorRef.current = onFatalError;
   }, [onFatalError]);
+
+  useEffect(() => {
+    autoPlayRef.current = autoPlay;
+  }, [autoPlay]);
+
+  useEffect(() => {
+    deepBufferRef.current = deepBuffer;
+  }, [deepBuffer]);
+
+  useEffect(() => {
+    initialTimeRef.current = initialTime;
+  }, [initialTime]);
+
+  useEffect(() => {
+    nextHrefRef.current = nextHref;
+  }, [nextHref]);
 
   useEffect(() => {
     try {
@@ -327,11 +347,14 @@ export function VideoPlayer({
     setSelectedQuality(-1);
     setShowQualityMenu(false);
     restoredRef.current = false;
-    playIntentRef.current = autoPlay;
+    const startupTime = Math.max(0, Number(initialTimeRef.current || 0));
+    const shouldAutoPlay = autoPlayRef.current;
+    const shouldDeepBuffer = deepBufferRef.current;
+    playIntentRef.current = shouldAutoPlay;
     deepBufferArmedRef.current = false;
-    lastTimeRef.current = initialTime;
+    lastTimeRef.current = startupTime;
     let playRequested = false;
-    const targetForwardBuffer = deepBuffer ? 120 : 60;
+    const targetForwardBuffer = shouldDeepBuffer ? 120 : 60;
     const initialForwardBuffer = isMoonStream ? 12 : 18;
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
@@ -344,7 +367,7 @@ export function VideoPlayer({
       };
       config.maxBufferLength = targetForwardBuffer;
       config.maxMaxBufferLength = Math.max(targetForwardBuffer, targetForwardBuffer + 120);
-      config.maxBufferSize = isMoonStream ? 128 * 1000 * 1000 : deepBuffer ? 384 * 1000 * 1000 : 96 * 1000 * 1000;
+      config.maxBufferSize = isMoonStream ? 128 * 1000 * 1000 : shouldDeepBuffer ? 384 * 1000 * 1000 : 96 * 1000 * 1000;
       config.backBufferLength = isMoonStream ? 12 : 20;
     };
     let lastBufferUiAt = 0;
@@ -383,7 +406,7 @@ export function VideoPlayer({
     const playWhenReady = async () => {
       restoreTime();
       setIsBuffering(false);
-      if (!autoPlay) return;
+      if (!shouldAutoPlay) return;
       if (playRequested) return;
       playRequested = true;
       playIntentRef.current = true;
@@ -447,7 +470,7 @@ export function VideoPlayer({
           lowLatencyMode: false,
           autoStartLoad: true,
           startFragPrefetch: true,
-          startPosition: initialTime > 2 ? initialTime : 0,
+          startPosition: startupTime > 2 ? startupTime : 0,
           testBandwidth: false,
           capLevelToPlayerSize: true,
           startLevel: -1,
@@ -472,7 +495,7 @@ export function VideoPlayer({
         hls.loadSource(src);
         hls.attachMedia(video);
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-          hls?.startLoad(initialTime > 2 ? initialTime : 0);
+          hls?.startLoad(startupTime > 2 ? startupTime : 0);
         });
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
           if (isMoonStream) {
@@ -500,13 +523,14 @@ export function VideoPlayer({
           playWhenReady();
         });
         hls.on(Hls.Events.FRAG_CHANGED, () => {
-          if (!nextHref || !video.duration || video.duration - video.currentTime > 90) return;
-          const existing = document.head.querySelector(`link[data-next-watch="${nextHref}"]`);
+          const href = nextHrefRef.current;
+          if (!href || !video.duration || video.duration - video.currentTime > 90) return;
+          const existing = document.head.querySelector(`link[data-next-watch="${href}"]`);
           if (existing) return;
           const link = document.createElement("link");
           link.rel = "prefetch";
-          link.href = nextHref;
-          link.dataset.nextWatch = nextHref;
+          link.href = href;
+          link.dataset.nextWatch = href;
           document.head.appendChild(link);
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
@@ -560,7 +584,7 @@ export function VideoPlayer({
       video.removeEventListener("stalled", markWaiting);
       video.removeEventListener("progress", updateBufferedFromEvent);
     };
-  }, [autoPlay, deepBuffer, hideControlsSoon, initialTime, isHlsStream, isMoonStream, nextHref, src, syncCaptionAt]);
+  }, [hideControlsSoon, isHlsStream, isMoonStream, src, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
