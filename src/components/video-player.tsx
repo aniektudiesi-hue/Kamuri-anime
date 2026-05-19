@@ -47,7 +47,8 @@ const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
 };
 const FAST_START_BUFFER_SECONDS = 18;
 const MOON_FAST_START_BUFFER_SECONDS = 12;
-const DEEP_BUFFER_SECONDS = 300;
+const DEEP_BUFFER_SECONDS = 600;
+const MAX_BUFFER_WINDOW_SECONDS = 1000;
 const NORMAL_BUFFER_SECONDS = 90;
 
 export function VideoPlayer({
@@ -370,8 +371,8 @@ export function VideoPlayer({
         backBufferLength: number;
       };
       config.maxBufferLength = targetForwardBuffer;
-      config.maxMaxBufferLength = Math.max(targetForwardBuffer, targetForwardBuffer + 180);
-      config.maxBufferSize = shouldDeepBuffer ? 512 * 1000 * 1000 : 128 * 1000 * 1000;
+      config.maxMaxBufferLength = shouldDeepBuffer ? MAX_BUFFER_WINDOW_SECONDS : Math.max(targetForwardBuffer, targetForwardBuffer + 180);
+      config.maxBufferSize = shouldDeepBuffer ? 768 * 1000 * 1000 : 128 * 1000 * 1000;
       config.backBufferLength = isMoonStream ? 12 : 20;
       hls.startLoad(Math.max(0, video.currentTime || lastTimeRef.current || 0));
     };
@@ -483,7 +484,7 @@ export function VideoPlayer({
           abrEwmaFastVoD: 3,
           abrEwmaSlowVoD: 9,
           maxBufferLength: initialForwardBuffer,
-          maxMaxBufferLength: DEEP_BUFFER_SECONDS,
+          maxMaxBufferLength: MAX_BUFFER_WINDOW_SECONDS,
           maxBufferSize: 120 * 1024 * 1024,
           maxBufferHole: 0.35,
           backBufferLength: 30,
