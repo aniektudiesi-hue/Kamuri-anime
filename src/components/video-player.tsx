@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Settings2, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StreamResponse, Subtitle } from "@/lib/types";
+import { createHlsSegmentCacheLoader, createHlsSegmentCacheSession, isHlsSegmentCacheDebugEnabled } from "@/lib/hls-segment-cache";
 
 type CaptionCue = {
   start: number;
@@ -47,10 +48,10 @@ const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
 };
 const FAST_START_BUFFER_SECONDS = 18;
 const MOON_FAST_START_BUFFER_SECONDS = 12;
-const DEEP_BUFFER_SECONDS = 600;
-const MAX_BUFFER_WINDOW_SECONDS = 7200;
+const DEEP_BUFFER_SECONDS = 180;
+const MAX_BUFFER_WINDOW_SECONDS = 600;
 const NORMAL_BUFFER_SECONDS = 90;
-const DEEP_BUFFER_BYTES = 4096 * 1000 * 1000;
+const DEEP_BUFFER_BYTES = 512 * 1024 * 1024;
 
 export function VideoPlayer({
   stream,
@@ -356,6 +357,17 @@ export function VideoPlayer({
     const startupTime = Math.max(0, Number(initialTimeRef.current || 0));
     const shouldAutoPlay = autoPlayRef.current;
     const shouldDeepBuffer = deepBufferRef.current;
+    const segmentCache = createHlsSegmentCacheSession({
+      enabled: shouldDeepBuffer,
+      namespace: `${serverId ?? stream?.server ?? "stream"}:${src}`,
+      concurrency: isMoonStream ? 8 : 6,
+      immediateAheadSeconds: 300,
+    });
+    const HlsCacheLoader = createHlsSegmentCacheLoader(segmentCache);
+    const hlsCacheDebug = isHlsSegmentCacheDebugEnabled();
+    const logHlsCache = (message: string, details?: Record<string, unknown>) => {
+      if (hlsCacheDebug) console.debug(`[hls-cache] ${message}`, details ?? "");
+    };
     playIntentRef.current = shouldAutoPlay;
     deepBufferArmedRef.current = false;
     lastTimeRef.current = startupTime;
@@ -424,6 +436,7 @@ export function VideoPlayer({
         lastTimeRef.current = video.currentTime;
       }
       setCurrentTime(video.currentTime || 0);
+      segmentCache.setCurrentTime(video.currentTime || 0);
       updateBuffered();
       syncCaptionAt(video.currentTime || 0);
       onProgressRef.current?.({ currentTime: video.currentTime || 0, duration: video.duration || 0 });
@@ -480,6 +493,7 @@ export function VideoPlayer({
     const markDuration = () => {
       setDuration(Number.isFinite(video.duration) ? video.duration : 0);
       applyDeepBufferConfig();
+      segmentCache.setCurrentTime(video.currentTime || lastTimeRef.current || 0);
       chaseForwardBuffer();
     };
 
@@ -499,6 +513,7 @@ export function VideoPlayer({
     if (isHlsStream) {
       if (Hls.isSupported()) {
         hls = new Hls({
+          loader: HlsCacheLoader,
           enableWorker: true,
           progressive: true,
           lowLatencyMode: false,
@@ -557,7 +572,20 @@ export function VideoPlayer({
           armDeepBuffer();
           playWhenReady();
         });
+        hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
+          segmentCache.updateLevel(data.details, video.currentTime || lastTimeRef.current || 0);
+          logHlsCache("level loaded", { fragments: data.details?.fragments?.length ?? 0 });
+        });
+        hls.on(Hls.Events.FRAG_LOADING, (_, data) => {
+          segmentCache.noteFragment(data.frag);
+          logHlsCache("frag loading", { url: data.frag?.url });
+        });
+        hls.on(Hls.Events.FRAG_LOADED, (_, data) => {
+          segmentCache.noteFragment(data.frag);
+          logHlsCache("frag loaded", { url: data.frag?.url });
+        });
         hls.on(Hls.Events.FRAG_CHANGED, () => {
+          segmentCache.setCurrentTime(video.currentTime || lastTimeRef.current || 0);
           const href = nextHrefRef.current;
           if (!href || !video.duration || video.duration - video.currentTime > 90) return;
           const existing = document.head.querySelector(`link[data-next-watch="${href}"]`);
@@ -569,7 +597,18 @@ export function VideoPlayer({
           document.head.appendChild(link);
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
-          if (!data.fatal) return;
+          if (!data.fatal) {
+            if (
+              hlsCacheDebug &&
+              (data.details === Hls.ErrorDetails.BUFFER_FULL_ERROR ||
+                data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR ||
+                data.details === Hls.ErrorDetails.BUFFER_NUDGE_ON_STALL)
+            ) {
+              logHlsCache("nonfatal buffer event", { details: data.details, type: data.type });
+            }
+            if (data.details === Hls.ErrorDetails.BUFFER_FULL_ERROR) applyDeepBufferConfig();
+            return;
+          }
           rememberTime();
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             if (!video.paused && playIntentRef.current) setIsBuffering(true);
@@ -596,6 +635,7 @@ export function VideoPlayer({
 
     return () => {
       try {
+        segmentCache.stop();
         hls?.stopLoad();
         hls?.detachMedia();
         hls?.destroy();
@@ -620,7 +660,7 @@ export function VideoPlayer({
       video.removeEventListener("stalled", markWaiting);
       video.removeEventListener("progress", updateBufferedFromEvent);
     };
-  }, [hideControlsSoon, isHlsStream, isMoonStream, src, syncCaptionAt]);
+  }, [hideControlsSoon, isHlsStream, isMoonStream, serverId, src, stream?.server, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;

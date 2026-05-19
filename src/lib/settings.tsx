@@ -10,6 +10,10 @@ type AppSettings = {
   theme: ThemeMode;
 };
 
+type StoredSettings = Partial<AppSettings> & {
+  prefetchVersion?: number;
+};
+
 type SettingsContextValue = AppSettings & {
   setAutoFetchWhileWatching: (value: boolean) => void;
   setAutoResume: (value: boolean) => void;
@@ -17,9 +21,10 @@ type SettingsContextValue = AppSettings & {
 };
 
 const SETTINGS_KEY = "anime-tv-settings-v1";
+const PREFETCH_SETTINGS_VERSION = 2;
 
 const DEFAULT_SETTINGS: AppSettings = {
-  autoFetchWhileWatching: false,
+  autoFetchWhileWatching: true,
   autoResume: true,
   theme: "dark",
 };
@@ -32,7 +37,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(SETTINGS_KEY);
-      if (saved) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved), theme: "dark" });
+      if (saved) {
+        const parsed = JSON.parse(saved) as StoredSettings;
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          autoResume: parsed.autoResume ?? DEFAULT_SETTINGS.autoResume,
+          autoFetchWhileWatching:
+            parsed.prefetchVersion === PREFETCH_SETTINGS_VERSION
+              ? parsed.autoFetchWhileWatching ?? DEFAULT_SETTINGS.autoFetchWhileWatching
+              : true,
+          theme: "dark",
+        });
+      }
     } catch {
       setSettings(DEFAULT_SETTINGS);
     }
@@ -40,7 +56,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = "dark";
-    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, theme: "dark" }));
+    window.localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ ...settings, theme: "dark", prefetchVersion: PREFETCH_SETTINGS_VERSION }),
+    );
   }, [settings]);
 
   const value = useMemo<SettingsContextValue>(

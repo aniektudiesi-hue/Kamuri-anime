@@ -18,8 +18,8 @@ export type StreamProvider = {
 export const DEFAULT_STREAM_PROVIDER_ID = "mega" satisfies StreamProviderId;
 
 function warmMoonStream(stream: StreamResponse | undefined) {
-  if (!warmMoonPipeline(stream, 2)) {
-    warmStreamManifest(stream, { segments: 2, timeoutMs: 15_000 });
+  if (!warmMoonPipeline(stream, 12)) {
+    warmStreamManifest(stream, { segments: 8, timeoutMs: 15_000 });
   }
 }
 

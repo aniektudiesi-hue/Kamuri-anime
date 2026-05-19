@@ -81,7 +81,8 @@ export function warmMoonPipeline(stream: StreamResponse | undefined, segments = 
     }
   }
 
-  const warmUrl = `${match[1]}/proxy/moon/${match[2]}/warm?segments=${Math.max(1, Math.min(2, segments))}`;
+  const warmSegments = Math.max(1, Math.min(24, segments));
+  const warmUrl = `${match[1]}/proxy/moon/${match[2]}/warm?segments=${warmSegments}`;
   void fetch(warmUrl, {
     method: "GET",
     cache: "no-store",
