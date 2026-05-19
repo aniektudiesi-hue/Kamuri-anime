@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Settings2, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StreamResponse, Subtitle } from "@/lib/types";
-import { createHlsSegmentCacheLoader, createHlsSegmentCacheSession, isHlsSegmentCacheDebugEnabled } from "@/lib/hls-segment-cache";
+import { createHlsSegmentCacheSession, isHlsSegmentCacheDebugEnabled } from "@/lib/hls-segment-cache";
 
 type CaptionCue = {
   start: number;
@@ -360,10 +360,9 @@ export function VideoPlayer({
     const segmentCache = createHlsSegmentCacheSession({
       enabled: shouldDeepBuffer,
       namespace: `${serverId ?? stream?.server ?? "stream"}:${src}`,
-      concurrency: isMoonStream ? 8 : 6,
+      concurrency: isMoonStream ? 4 : 3,
       immediateAheadSeconds: 300,
     });
-    const HlsCacheLoader = createHlsSegmentCacheLoader(segmentCache, Hls.DefaultConfig.loader);
     const hlsCacheDebug = isHlsSegmentCacheDebugEnabled();
     const logHlsCache = (message: string, details?: Record<string, unknown>) => {
       if (hlsCacheDebug) console.debug(`[hls-cache] ${message}`, details ?? "");
@@ -374,6 +373,7 @@ export function VideoPlayer({
     let playRequested = false;
     let startupReady = false;
     let bufferChaseTimer: number | undefined;
+    let prefetchStartTimer: number | undefined;
     const initialForwardBuffer = isMoonStream ? MOON_FAST_START_BUFFER_SECONDS : FAST_START_BUFFER_SECONDS;
     const targetForwardBuffer = () => {
       if (!shouldDeepBuffer) return NORMAL_BUFFER_SECONDS;
@@ -384,7 +384,7 @@ export function VideoPlayer({
     };
     const applyDeepBufferConfig = () => {
       if (!hls) return;
-      const target = targetForwardBuffer();
+      const target = startupReady ? targetForwardBuffer() : initialForwardBuffer;
       const config = hls.config as Hls["config"] & {
         maxBufferLength: number;
         maxMaxBufferLength: number;
@@ -392,9 +392,16 @@ export function VideoPlayer({
         backBufferLength: number;
       };
       config.maxBufferLength = target;
-      config.maxMaxBufferLength = shouldDeepBuffer ? MAX_BUFFER_WINDOW_SECONDS : Math.max(target, target + 180);
-      config.maxBufferSize = shouldDeepBuffer ? DEEP_BUFFER_BYTES : 128 * 1000 * 1000;
+      config.maxMaxBufferLength = startupReady && shouldDeepBuffer ? MAX_BUFFER_WINDOW_SECONDS : Math.max(target, 60);
+      config.maxBufferSize = startupReady && shouldDeepBuffer ? DEEP_BUFFER_BYTES : 120 * 1024 * 1024;
       config.backBufferLength = isMoonStream ? 12 : 20;
+    };
+    const scheduleSegmentPrefetch = () => {
+      if (!shouldDeepBuffer || prefetchStartTimer || segmentCache.prefetching) return;
+      prefetchStartTimer = window.setTimeout(() => {
+        prefetchStartTimer = undefined;
+        segmentCache.startPrefetch();
+      }, 3500);
     };
     const chaseForwardBuffer = () => {
       if (!hls || !shouldDeepBuffer) return;
@@ -408,11 +415,9 @@ export function VideoPlayer({
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
-      segmentCache.startPrefetch();
       applyDeepBufferConfig();
-      hls.startLoad(Math.max(0, video.currentTime || lastTimeRef.current || 0));
       if (shouldDeepBuffer && !bufferChaseTimer) {
-        bufferChaseTimer = window.setInterval(chaseForwardBuffer, 2500);
+        bufferChaseTimer = window.setInterval(chaseForwardBuffer, 5000);
       }
     };
     let lastBufferUiAt = 0;
@@ -479,7 +484,7 @@ export function VideoPlayer({
       setPlaying(true);
       setControlsOpen(true);
       hideControlsSoon();
-      segmentCache.startPrefetch();
+      scheduleSegmentPrefetch();
       armDeepBuffer();
       rememberTime();
     };
@@ -487,6 +492,7 @@ export function VideoPlayer({
       startupReady = true;
       setHasVideoFrame(true);
       setIsBuffering(false);
+      scheduleSegmentPrefetch();
       playWhenReady();
     };
     const markPause = () => {
@@ -519,7 +525,6 @@ export function VideoPlayer({
     if (isHlsStream) {
       if (Hls.isSupported()) {
         hls = new Hls({
-          loader: HlsCacheLoader,
           enableWorker: true,
           progressive: true,
           lowLatencyMode: false,
@@ -533,8 +538,8 @@ export function VideoPlayer({
           abrEwmaFastVoD: 3,
           abrEwmaSlowVoD: 9,
           maxBufferLength: initialForwardBuffer,
-          maxMaxBufferLength: MAX_BUFFER_WINDOW_SECONDS,
-          maxBufferSize: shouldDeepBuffer ? DEEP_BUFFER_BYTES : 120 * 1024 * 1024,
+          maxMaxBufferLength: Math.max(initialForwardBuffer, 60),
+          maxBufferSize: 120 * 1024 * 1024,
           maxBufferHole: 0.35,
           backBufferLength: 30,
           fragLoadingTimeOut: 8000,
@@ -575,7 +580,7 @@ export function VideoPlayer({
           startupReady = true;
           setIsBuffering(false);
           updateBuffered(true);
-          segmentCache.startPrefetch();
+          scheduleSegmentPrefetch();
           armDeepBuffer();
           playWhenReady();
         });
@@ -650,6 +655,7 @@ export function VideoPlayer({
         // Best-effort shutdown; a new player instance will own the next source.
       }
       if (bufferChaseTimer) window.clearInterval(bufferChaseTimer);
+      if (prefetchStartTimer) window.clearTimeout(prefetchStartTimer);
       hlsRef.current = null;
       video.pause();
       video.removeAttribute("src");

@@ -192,6 +192,10 @@ export class HlsSegmentCacheSession {
     return this.enabled && !this.stopped;
   }
 
+  get prefetching() {
+    return this.prefetchStarted;
+  }
+
   startPrefetch() {
     if (!this.active || this.prefetchStarted) return;
     this.prefetchStarted = true;
