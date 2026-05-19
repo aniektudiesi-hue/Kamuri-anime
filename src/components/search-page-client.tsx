@@ -89,7 +89,7 @@ function SearchContent() {
   const anilistQ = useQuery({
     queryKey: ["anilist-discovery", intent.key, discoveryPage],
     queryFn: () => fetchAniListDiscovery(intent, discoveryPage),
-    enabled: q.length > 0 && !intent.useBackend,
+    enabled: q.length > 0,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
   });
@@ -97,7 +97,7 @@ function SearchContent() {
   const jikanQ = useQuery({
     queryKey: ["jikan-discovery", intent.key, discoveryPage],
     queryFn: () => fetchJikanDiscovery(intent, discoveryPage),
-    enabled: q.length > 0 && !intent.useBackend && discoveryPage > 1,
+    enabled: q.length > 0 && (intent.useBackend || discoveryPage > 1),
     staleTime: 1000 * 60 * 45,
     gcTime: 1000 * 60 * 120,
   });
@@ -136,7 +136,7 @@ function SearchContent() {
 
   const backendResults = useMemo(() => intent.useBackend ? (results.data ?? []) : [], [intent.useBackend, results.data]);
   const mergedRaw = intent.useBackend
-    ? mergeSearchResults(q, instantResults, backendResults)
+    ? mergeSearchResults(q, instantResults, backendResults, allAnilist, allJikan)
     : mergeAnimeSources(instantResults, allAnilist, allJikan);
   const merged = intent.useBackend ? mergedRaw : mergedRaw;
   const visibleMerged = merged.slice(0, visibleCount);
