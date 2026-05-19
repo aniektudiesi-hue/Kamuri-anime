@@ -186,6 +186,7 @@ export class HlsSegmentCacheSession {
   private readonly inflight = new Set<string>();
   private readonly queue: CacheJob[] = [];
   private readonly indexedUrls = new Set<string>();
+  private prefetchStarted = false;
   private stopped = false;
   private currentTime = 0;
   private indexFlushTimer: number | undefined;
@@ -201,12 +202,26 @@ export class HlsSegmentCacheSession {
     this.maxNamespaces = Math.max(1, options.maxNamespaces ?? DEFAULT_MAX_NAMESPACES);
     this.maxUrlsPerNamespace = Math.max(200, options.maxUrlsPerNamespace ?? DEFAULT_MAX_URLS_PER_NAMESPACE);
     if (this.enabled) {
+      const previous = readCacheIndex().namespaces.find((item) => item.namespace === this.namespace);
+      if (previous) {
+        previous.urls.forEach((url) => {
+          this.cachedUrls.add(url);
+          this.indexedUrls.add(url);
+        });
+        this.bytes = previous.bytes || 0;
+      }
       void this.pruneOldNamespaces();
     }
   }
 
   get active() {
     return this.enabled && !this.stopped;
+  }
+
+  startPrefetch() {
+    if (!this.active || this.prefetchStarted) return;
+    this.prefetchStarted = true;
+    this.pump();
   }
 
   updateLevel(details: LevelDetails | undefined, time: number) {
@@ -217,7 +232,7 @@ export class HlsSegmentCacheSession {
       this.knownUrls.add(job.url);
       this.enqueue(job);
     }
-    this.pump();
+    if (this.prefetchStarted) this.pump();
   }
 
   setCurrentTime(time: number) {
@@ -226,7 +241,7 @@ export class HlsSegmentCacheSession {
     if (this.queue.length > 1) {
       this.queue.sort((a, b) => a.priority - b.priority);
     }
-    this.pump();
+    if (this.prefetchStarted) this.pump();
   }
 
   noteFragment(fragment: HlsFragmentLike | undefined) {
@@ -237,7 +252,7 @@ export class HlsSegmentCacheSession {
       this.knownUrls.add(fragment.initSegment.url);
       this.enqueue({ url: fragment.initSegment.url, priority: 0 });
     }
-    this.pump();
+    if (this.prefetchStarted) this.pump();
   }
 
   shouldCache(context: LoaderContext) {
@@ -248,9 +263,12 @@ export class HlsSegmentCacheSession {
 
   async match(context: LoaderContext) {
     if (!this.shouldCache(context)) return undefined;
+    if (!this.cachedUrls.has(context.url)) return undefined;
     try {
       const cache = await caches.open(CACHE_NAME);
-      return (await cache.match(cacheRequest(this.namespace, context.url))) ?? undefined;
+      const cached = await cache.match(cacheRequest(this.namespace, context.url));
+      if (!cached) this.cachedUrls.delete(context.url);
+      return cached ?? undefined;
     } catch {
       return undefined;
     }
@@ -284,7 +302,7 @@ export class HlsSegmentCacheSession {
   }
 
   private pump() {
-    if (!this.active) return;
+    if (!this.active || !this.prefetchStarted) return;
     this.queue.sort((a, b) => a.priority - b.priority);
     while (this.inflight.size < this.concurrency && this.queue.length > 0) {
       const job = this.queue.shift();

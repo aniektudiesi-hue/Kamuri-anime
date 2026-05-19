@@ -372,6 +372,7 @@ export function VideoPlayer({
     deepBufferArmedRef.current = false;
     lastTimeRef.current = startupTime;
     let playRequested = false;
+    let startupReady = false;
     let bufferChaseTimer: number | undefined;
     const initialForwardBuffer = isMoonStream ? MOON_FAST_START_BUFFER_SECONDS : FAST_START_BUFFER_SECONDS;
     const targetForwardBuffer = () => {
@@ -397,6 +398,7 @@ export function VideoPlayer({
     };
     const chaseForwardBuffer = () => {
       if (!hls || !shouldDeepBuffer) return;
+      if (!startupReady) return;
       applyDeepBufferConfig();
       const ahead = updateBuffered(true);
       if (ahead >= targetForwardBuffer() - 8) return;
@@ -406,10 +408,11 @@ export function VideoPlayer({
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
+      segmentCache.startPrefetch();
       applyDeepBufferConfig();
       hls.startLoad(Math.max(0, video.currentTime || lastTimeRef.current || 0));
       if (shouldDeepBuffer && !bufferChaseTimer) {
-        bufferChaseTimer = window.setInterval(chaseForwardBuffer, 750);
+        bufferChaseTimer = window.setInterval(chaseForwardBuffer, 2500);
       }
     };
     let lastBufferUiAt = 0;
@@ -469,16 +472,19 @@ export function VideoPlayer({
       setIsBuffering(true);
     };
     const markPlaying = () => {
+      startupReady = true;
       setHasVideoFrame(true);
       playIntentRef.current = true;
       setIsBuffering(false);
       setPlaying(true);
       setControlsOpen(true);
       hideControlsSoon();
+      segmentCache.startPrefetch();
       armDeepBuffer();
       rememberTime();
     };
     const markCanPlay = () => {
+      startupReady = true;
       setHasVideoFrame(true);
       setIsBuffering(false);
       playWhenReady();
@@ -563,12 +569,13 @@ export function VideoPlayer({
             })
             .map((l) => ({ hlsIndex: l.hlsIndex, height: l.height, label: `${l.height}p` }));
           setQualityLevels(levels);
-          armDeepBuffer();
           playWhenReady();
         });
         hls.on(Hls.Events.FRAG_BUFFERED, () => {
+          startupReady = true;
           setIsBuffering(false);
           updateBuffered(true);
+          segmentCache.startPrefetch();
           armDeepBuffer();
           playWhenReady();
         });
