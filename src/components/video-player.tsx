@@ -50,6 +50,7 @@ const MOON_FAST_START_BUFFER_SECONDS = 12;
 const DEEP_BUFFER_SECONDS = 600;
 const MAX_BUFFER_WINDOW_SECONDS = 1000;
 const NORMAL_BUFFER_SECONDS = 90;
+const DEEP_BUFFER_BYTES = 1536 * 1000 * 1000;
 
 export function VideoPlayer({
   stream,
@@ -359,8 +360,16 @@ export function VideoPlayer({
     deepBufferArmedRef.current = false;
     lastTimeRef.current = startupTime;
     let playRequested = false;
+    let bufferChaseTimer: number | undefined;
     const targetForwardBuffer = shouldDeepBuffer ? DEEP_BUFFER_SECONDS : NORMAL_BUFFER_SECONDS;
     const initialForwardBuffer = isMoonStream ? MOON_FAST_START_BUFFER_SECONDS : FAST_START_BUFFER_SECONDS;
+    const chaseForwardBuffer = () => {
+      if (!hls || !shouldDeepBuffer) return;
+      const ahead = updateBuffered(true);
+      if (ahead >= targetForwardBuffer - 8) return;
+      if (video.ended || !playIntentRef.current) return;
+      hls.startLoad(Math.max(0, video.currentTime || lastTimeRef.current || 0));
+    };
     const armDeepBuffer = () => {
       if (!hls || deepBufferArmedRef.current) return;
       deepBufferArmedRef.current = true;
@@ -372,9 +381,12 @@ export function VideoPlayer({
       };
       config.maxBufferLength = targetForwardBuffer;
       config.maxMaxBufferLength = shouldDeepBuffer ? MAX_BUFFER_WINDOW_SECONDS : Math.max(targetForwardBuffer, targetForwardBuffer + 180);
-      config.maxBufferSize = shouldDeepBuffer ? 768 * 1000 * 1000 : 128 * 1000 * 1000;
+      config.maxBufferSize = shouldDeepBuffer ? DEEP_BUFFER_BYTES : 128 * 1000 * 1000;
       config.backBufferLength = isMoonStream ? 12 : 20;
       hls.startLoad(Math.max(0, video.currentTime || lastTimeRef.current || 0));
+      if (shouldDeepBuffer && !bufferChaseTimer) {
+        bufferChaseTimer = window.setInterval(chaseForwardBuffer, 1500);
+      }
     };
     let lastBufferUiAt = 0;
     const updateBuffered = (force = false) => {
@@ -485,7 +497,7 @@ export function VideoPlayer({
           abrEwmaSlowVoD: 9,
           maxBufferLength: initialForwardBuffer,
           maxMaxBufferLength: MAX_BUFFER_WINDOW_SECONDS,
-          maxBufferSize: 120 * 1024 * 1024,
+          maxBufferSize: shouldDeepBuffer ? DEEP_BUFFER_BYTES : 120 * 1024 * 1024,
           maxBufferHole: 0.35,
           backBufferLength: 30,
           fragLoadingTimeOut: 8000,
@@ -520,6 +532,7 @@ export function VideoPlayer({
             })
             .map((l) => ({ hlsIndex: l.hlsIndex, height: l.height, label: `${l.height}p` }));
           setQualityLevels(levels);
+          armDeepBuffer();
           playWhenReady();
         });
         hls.on(Hls.Events.FRAG_BUFFERED, () => {
@@ -573,6 +586,7 @@ export function VideoPlayer({
       } catch {
         // Best-effort shutdown; a new player instance will own the next source.
       }
+      if (bufferChaseTimer) window.clearInterval(bufferChaseTimer);
       hlsRef.current = null;
       video.pause();
       video.removeAttribute("src");
