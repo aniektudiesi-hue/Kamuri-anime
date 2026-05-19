@@ -363,7 +363,7 @@ export function VideoPlayer({
       concurrency: isMoonStream ? 8 : 6,
       immediateAheadSeconds: 300,
     });
-    const HlsCacheLoader = createHlsSegmentCacheLoader(segmentCache);
+    const HlsCacheLoader = createHlsSegmentCacheLoader(segmentCache, Hls.DefaultConfig.loader);
     const hlsCacheDebug = isHlsSegmentCacheDebugEnabled();
     const logHlsCache = (message: string, details?: Record<string, unknown>) => {
       if (hlsCacheDebug) console.debug(`[hls-cache] ${message}`, details ?? "");

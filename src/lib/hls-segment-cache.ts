@@ -1,4 +1,5 @@
 import type {
+  HlsConfig,
   LevelDetails,
   Loader,
   LoaderCallbacks,
@@ -37,6 +38,8 @@ type SegmentCacheSessionOptions = {
   maxUrlsPerNamespace?: number;
 };
 
+type HlsLoaderConstructor = new (config: HlsConfig) => Loader<LoaderContext>;
+
 const CACHE_NAME = "anime-tv-hls-segments-v1";
 const CACHE_INDEX_KEY = "anime-tv-hls-cache-index-v1";
 const DEBUG_KEY = "anime-tv-hls-cache-debug";
@@ -58,22 +61,27 @@ export function createHlsSegmentCacheSession(options: SegmentCacheSessionOptions
   return new HlsSegmentCacheSession(options);
 }
 
-export function createHlsSegmentCacheLoader(session: HlsSegmentCacheSession) {
+export function createHlsSegmentCacheLoader(session: HlsSegmentCacheSession, fallbackLoader: HlsLoaderConstructor) {
   return class AnimeTvHlsCacheLoader implements Loader<LoaderContext> {
     context: LoaderContext | null = null;
     stats: LoaderStats = createLoaderStats();
+    private readonly fallback: Loader<LoaderContext>;
     private controller: AbortController | null = null;
 
-    constructor() {}
+    constructor(config: HlsConfig) {
+      this.fallback = new fallbackLoader(config);
+    }
 
     destroy() {
       this.abort();
+      this.fallback.destroy();
       this.context = null;
     }
 
     abort() {
       this.stats.aborted = true;
       this.controller?.abort();
+      this.fallback.abort();
       this.controller = null;
     }
 
@@ -96,11 +104,11 @@ export function createHlsSegmentCacheLoader(session: HlsSegmentCacheSession) {
     }
 
     getCacheAge() {
-      return null;
+      return this.fallback.getCacheAge?.() ?? null;
     }
 
-    getResponseHeader() {
-      return null;
+    getResponseHeader(name: string) {
+      return this.fallback.getResponseHeader?.(name) ?? null;
     }
 
     private async loadInternal(
@@ -129,42 +137,8 @@ export function createHlsSegmentCacheLoader(session: HlsSegmentCacheSession) {
           return;
         }
 
-        const headers = new Headers(context.headers);
-        if (Number.isFinite(context.rangeStart) && Number.isFinite(context.rangeEnd)) {
-          headers.set("Range", `bytes=${context.rangeStart}-${Number(context.rangeEnd) - 1}`);
-        }
-
-        const response = await fetch(context.url, {
-          cache: session.shouldCache(context) ? "force-cache" : "default",
-          headers,
-          signal: controller.signal,
-        });
-        this.stats.loading.first = performance.now();
-        this.stats.loading.end = this.stats.loading.first;
-
-        if (!response.ok && response.status !== 206) {
-          callbacks.onError(
-            { code: response.status, text: response.statusText || `HTTP ${response.status}` },
-            context,
-            response,
-            this.stats,
-          );
-          return;
-        }
-
-        const cacheable = response.clone();
-        const data = await responseData(response, context);
-        markLoaded(this.stats, data, response.headers);
         session.noteCacheMiss(context.url);
-        if (response.status === 200) {
-          session.put(context, cacheable, byteLengthOf(data, response.headers));
-        }
-        callbacks.onSuccess(
-          { url: response.url || context.url, data, code: response.status, text: response.statusText },
-          this.stats,
-          context,
-          response,
-        );
+        this.fallback.load(context, config, callbacks);
       } finally {
         window.clearTimeout(timeout);
         if (didTimeout) return;

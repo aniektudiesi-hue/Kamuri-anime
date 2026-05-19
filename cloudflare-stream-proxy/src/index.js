@@ -17,7 +17,7 @@ const MANIFEST_CACHE_TTL = 30;
 const MANIFEST_STALE_TTL = 60;
 const SEGMENT_CACHE_TTL = 86400;
 const MOON_SEGMENT_CACHE_TTL = SEGMENT_CACHE_TTL;
-const STREAM_API_MEMORY_TTL = 120 * 1000;
+const STREAM_API_MEMORY_TTL = 10 * 60 * 1000;
 const IMAGE_CACHE_TTL = 60 * 60 * 24 * 30;
 const MOON_WARM_DEFAULT_SEGMENTS = 12;
 const MOON_WARM_MAX_SEGMENTS = 24;
@@ -196,6 +196,10 @@ async function proxyMoonM3u8(request, env, ctx) {
   const url = new URL(request.url);
   const videoId = url.pathname.split("/")[3];
   if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
+  const cache = caches.default;
+  const cacheKey = new Request(url.toString(), { headers: cacheVaryHeaders(request) });
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
   const variant = url.searchParams.get("variant");
   const fastStart = url.searchParams.get("fast") === "1" || url.searchParams.get("direct") === "1";
   const seededPlayback = moonSeedPlaybackFromUrl(url);
@@ -218,14 +222,14 @@ async function proxyMoonM3u8(request, env, ctx) {
     const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${variant}`);
     ctx.waitUntil(warmMoonSegments(videoId, variant, child.text, variantUrl, env, MOON_WARM_DEFAULT_SEGMENTS));
     const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, new URL(request.url).origin, videoId, variant);
-    return new Response(rewrittenChild, {
+    return cacheMoonManifest(ctx, cacheKey, new Response(rewrittenChild, {
       status: 200,
       headers: {
         ...corsHeaders(),
         "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
         "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
       },
-    });
+    }));
   }
 
   if (fastStart) {
@@ -235,50 +239,50 @@ async function proxyMoonM3u8(request, env, ctx) {
       const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${fastVariant}`);
       ctx.waitUntil(warmMoonSegments(videoId, fastVariant, child.text, variantUrl, env, MOON_WARM_DEFAULT_SEGMENTS));
       const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, url.origin, videoId, fastVariant);
-      return new Response(rewrittenChild, {
+      return cacheMoonManifest(ctx, cacheKey, new Response(rewrittenChild, {
         status: 200,
         headers: {
           ...corsHeaders(),
           "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
           "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
         },
-      });
+      }));
     }
     const directVariant = "direct.m3u8";
     ctx.waitUntil(warmMoonSegments(videoId, directVariant, master.text, playback.url, env, MOON_WARM_DEFAULT_SEGMENTS));
     const rewrittenDirect = rewriteMoonVariant(master.text, playback.url, url.origin, videoId, directVariant);
-    return new Response(rewrittenDirect, {
+    return cacheMoonManifest(ctx, cacheKey, new Response(rewrittenDirect, {
       status: 200,
       headers: {
         ...corsHeaders(),
         "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
         "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
       },
-    });
+    }));
   }
 
   ctx.waitUntil(warmMoonPipeline(videoId, env, MOON_WARM_DEFAULT_SEGMENTS, playback, master.text));
   if (!firstMoonVariantUrl(master.text, playback.url)) {
     const directVariant = "direct.m3u8";
     const rewrittenDirect = rewriteMoonVariant(master.text, playback.url, url.origin, videoId, directVariant);
-    return new Response(rewrittenDirect, {
+    return cacheMoonManifest(ctx, cacheKey, new Response(rewrittenDirect, {
       status: 200,
       headers: {
         ...corsHeaders(),
         "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
         "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
       },
-    });
+    }));
   }
   const rewritten = rewriteMoonMaster(master.text, playback.url, url.origin, videoId);
-  return new Response(rewritten, {
+  return cacheMoonManifest(ctx, cacheKey, new Response(rewritten, {
     status: 200,
     headers: {
       ...corsHeaders(),
       "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
       "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
     },
-  });
+  }));
 }
 
 async function proxyMoonChunk(request, env, ctx) {
@@ -301,6 +305,11 @@ async function proxyMoonChunk(request, env, ctx) {
   }
   if (!upstream.ok && upstream.status !== 206) return upstreamError(upstream);
   return streamUpstream(upstream, detectMime(segmentUrl));
+}
+
+function cacheMoonManifest(ctx, cacheKey, response) {
+  ctx.waitUntil(caches.default.put(cacheKey, response.clone()).catch((error) => logMoonError("moon_manifest_cache_put_failed", "manifest", error)));
+  return response;
 }
 
 async function proxyChunk(request, env, ctx) {
