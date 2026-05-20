@@ -1,4 +1,5 @@
 import { getEpisodeMetadata, getHomeAnimeCatalog } from "@/lib/server-anime";
+import { videoUploadDate } from "@/lib/seo";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 import { animeId, episodeCount, posterOf, titleOf, watchPath } from "@/lib/utils";
 
@@ -35,16 +36,22 @@ export async function GET() {
       const watchUrl = absoluteUrl(watchPath(anime, id, episode.number));
       const playerUrl = absoluteUrl(`/embed/${id}/${episode.number}`);
       const videoTitle = `${title} Episode ${episode.number}`;
+      const publishedAt = videoUploadDate(anime);
+      const description = `Watch ${episode.title || videoTitle} on ${SITE_NAME}. Fast anime streaming with subtitles, episode navigation, server switching, and HD playback.`;
       urls.push(`  <url>
     <loc>${xmlEscape(watchUrl)}</loc>
+    <lastmod>${xmlEscape(publishedAt)}</lastmod>
     <video:video>
       <video:thumbnail_loc>${xmlEscape(poster)}</video:thumbnail_loc>
       <video:title>${xmlEscape(videoTitle)}</video:title>
-      <video:description>${xmlEscape(`Watch ${episode.title || videoTitle} on ${SITE_NAME}. Fast anime streaming with subtitles, episode navigation, and server switching.`)}</video:description>
+      <video:description>${xmlEscape(description)}</video:description>
       <video:player_loc allow_embed="yes">${xmlEscape(playerUrl)}</video:player_loc>
       <video:family_friendly>yes</video:family_friendly>
       <video:requires_subscription>no</video:requires_subscription>
-      <video:publication_date>${new Date().toISOString()}</video:publication_date>
+      <video:publication_date>${xmlEscape(publishedAt)}</video:publication_date>
+      <video:uploader info="${xmlEscape(absoluteUrl("/licensing"))}">${xmlEscape(SITE_NAME)}</video:uploader>
+      <video:live>no</video:live>
+      ${videoTags(title, episode.number).map((tag) => `<video:tag>${xmlEscape(tag)}</video:tag>`).join("\n      ")}
     </video:video>
   </url>`);
     }
@@ -59,6 +66,7 @@ ${urls.join("\n")}
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
       "Cache-Control": "public, max-age=900, s-maxage=3600, stale-while-revalidate=86400",
+      "X-Robots-Tag": "index, follow",
     },
   });
 }
@@ -83,4 +91,14 @@ function xmlEscape(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+function videoTags(title: string, episode: number) {
+  return [
+    "animeTVplus",
+    "anime streaming",
+    "watch anime online",
+    title,
+    `${title} episode ${episode}`,
+  ];
 }

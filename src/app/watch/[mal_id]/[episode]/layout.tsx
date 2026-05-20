@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getKnownAnimeById } from "@/lib/server-anime";
-import { animeKeywords, breadcrumbJsonLd, buildPageMetadata, episodeJsonLd, safeJsonLd, watchDescription, watchPageTitle } from "@/lib/seo";
+import { animeKeywords, breadcrumbJsonLd, buildPageMetadata, episodeJsonLd, safeJsonLd, videoUploadDate, watchDescription, watchPageTitle } from "@/lib/seo";
 import { animePath, episodeNumberFromSlug, idFromSlug, posterOf, titleOf, watchPath } from "@/lib/utils";
 
 type WatchLayoutProps = {
@@ -14,20 +14,6 @@ async function getWatchInfo(malId: string, episode: string) {
   const animeTitle = titleOf(anime) === "Untitled" ? `Anime ${malId}` : titleOf(anime);
   const episodeTitle = `${animeTitle} Episode ${episode}`;
   return { anime, animeTitle, episodeTitle, episodeNumber };
-}
-
-function videoUploadDate(anime: Awaited<ReturnType<typeof getKnownAnimeById>>) {
-  if (anime?.start_date) {
-    const parsed = new Date(anime.start_date);
-    if (Number.isFinite(parsed.getTime())) return parsed.toISOString();
-  }
-
-  const year = Number(anime?.year);
-  if (Number.isFinite(year) && year > 1900) {
-    return new Date(Date.UTC(year, 0, 1)).toISOString();
-  }
-
-  return "2026-05-01T00:00:00.000Z";
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ mal_id: string; episode: string }> }): Promise<Metadata> {

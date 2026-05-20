@@ -102,6 +102,20 @@ export function watchDescription(anime: Anime | undefined, malId: string, episod
   return `Watch ${label} online on ${SITE_NAME}. Stream the episode with fast loading, subtitles, server switching, watch history, and smooth HD HLS playback.`;
 }
 
+export function videoUploadDate(anime: Anime | undefined) {
+  if (anime?.start_date) {
+    const parsed = new Date(anime.start_date);
+    if (Number.isFinite(parsed.getTime())) return parsed.toISOString();
+  }
+
+  const year = Number(anime?.year);
+  if (Number.isFinite(year) && year > 1900) {
+    return new Date(Date.UTC(year, 0, 1)).toISOString();
+  }
+
+  return "2026-05-01T00:00:00.000Z";
+}
+
 export function genreTitle(name: string) {
   const genre = cleanText(decodeURIComponent(name), "Anime");
   return `${genre} Anime - Watch Popular ${genre} Shows on ${SITE_NAME}`;
@@ -190,6 +204,15 @@ export function episodeJsonLd({
       embedUrl: absoluteUrl(embedPath),
       isFamilyFriendly: true,
       inLanguage: ["ja", "en"],
+      publisher: {
+        "@type": "Organization",
+        name: SITE_NAME,
+        url: absoluteUrl("/"),
+        logo: {
+          "@type": "ImageObject",
+          url: absoluteUrl("/icon-512.png"),
+        },
+      },
       potentialAction: [
         {
           "@type": "WatchAction",
