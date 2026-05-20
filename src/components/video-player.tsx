@@ -903,6 +903,13 @@ export function VideoPlayer({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       switch (e.key) {
+        case "n":
+        case "N":
+          if (nextHrefRef.current) {
+            e.preventDefault();
+            window.location.assign(nextHrefRef.current);
+          }
+          break;
         case "Escape":
           if (mobileFullscreen) {
             e.preventDefault();
