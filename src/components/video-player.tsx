@@ -61,8 +61,8 @@ const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
   opacity: 1,
   boxOpacity: 0.22,
 };
-const FAST_START_BUFFER_SECONDS = 18;
-const MOON_FAST_START_BUFFER_SECONDS = 12;
+const FAST_START_BUFFER_SECONDS = 6;
+const MOON_FAST_START_BUFFER_SECONDS = 4;
 const DEEP_BUFFER_SECONDS = 180;
 const MAX_BUFFER_WINDOW_SECONDS = 600;
 const NORMAL_BUFFER_SECONDS = 90;
@@ -447,6 +447,7 @@ export function VideoPlayer({
     lastTimeRef.current = startupTime;
     let playRequested = false;
     let startupReady = false;
+    let startupQualityReleased = false;
     let bufferChaseTimer: number | undefined;
     let prefetchStartTimer: number | undefined;
     const initialForwardBuffer = isMoonStream ? MOON_FAST_START_BUFFER_SECONDS : FAST_START_BUFFER_SECONDS;
@@ -467,9 +468,15 @@ export function VideoPlayer({
         backBufferLength: number;
       };
       config.maxBufferLength = target;
-      config.maxMaxBufferLength = startupReady && shouldDeepBuffer ? MAX_BUFFER_WINDOW_SECONDS : Math.max(target, 60);
+      config.maxMaxBufferLength = startupReady && shouldDeepBuffer ? MAX_BUFFER_WINDOW_SECONDS : Math.max(target, 24);
       config.maxBufferSize = startupReady && shouldDeepBuffer ? DEEP_BUFFER_BYTES : 120 * 1024 * 1024;
       config.backBufferLength = isMoonStream ? 12 : 20;
+    };
+    const releaseStartupQuality = () => {
+      if (!hls || startupQualityReleased) return;
+      startupQualityReleased = true;
+      hls.startLevel = -1;
+      hls.nextLevel = -1;
     };
     const scheduleSegmentPrefetch = () => {
       if (!shouldDeepBuffer || prefetchStartTimer || segmentCache.prefetching) return;
@@ -553,6 +560,7 @@ export function VideoPlayer({
     };
     const markPlaying = () => {
       startupReady = true;
+      releaseStartupQuality();
       setHasVideoFrame(true);
       playIntentRef.current = true;
       setIsBuffering(false);
@@ -565,6 +573,7 @@ export function VideoPlayer({
     };
     const markCanPlay = () => {
       startupReady = true;
+      releaseStartupQuality();
       setHasVideoFrame(true);
       setIsBuffering(false);
       scheduleSegmentPrefetch();
@@ -603,12 +612,12 @@ export function VideoPlayer({
           enableWorker: true,
           progressive: true,
           lowLatencyMode: false,
-          autoStartLoad: true,
+          autoStartLoad: false,
           startFragPrefetch: true,
           startPosition: startupTime > 2 ? startupTime : 0,
           testBandwidth: false,
           capLevelToPlayerSize: true,
-          startLevel: -1,
+          startLevel: 0,
           abrEwmaDefaultEstimate: 2_000_000,
           abrEwmaFastVoD: 3,
           abrEwmaSlowVoD: 9,
@@ -627,16 +636,12 @@ export function VideoPlayer({
           levelLoadingMaxRetry: 3,
         });
         hlsRef.current = hls;
-        hls.loadSource(src);
-        hls.attachMedia(video);
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+          hls?.loadSource(src);
           hls?.startLoad(startupTime > 2 ? startupTime : 0);
         });
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-          if (isMoonStream) {
-            hls!.startLevel = 0;
-            hls!.nextLevel = 0;
-          }
+          hls!.nextLevel = 0;
           const seen = new Set<number>();
           const levels: QualityLevel[] = data.levels
             .map((level, i) => ({ hlsIndex: i, height: level.height || 0, bitrate: level.bitrate || 0 }))
@@ -653,6 +658,7 @@ export function VideoPlayer({
         });
         hls.on(Hls.Events.FRAG_BUFFERED, () => {
           startupReady = true;
+          releaseStartupQuality();
           setIsBuffering(false);
           updateBuffered(true);
           scheduleSegmentPrefetch();
@@ -711,6 +717,7 @@ export function VideoPlayer({
           setIsBuffering(false);
           onFatalErrorRef.current?.(message);
         });
+        hls.attachMedia(video);
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = src;
         video.addEventListener("canplay", playWhenReady, { once: true });

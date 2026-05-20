@@ -38,6 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refetchOnReconnect: false,
   });
 
+  useEffect(() => {
+    if (!token || !me.isError) return;
+    const message = me.error instanceof Error ? me.error.message : String(me.error ?? "");
+    if (!/(401|invalid|expired|unauthorized)/i.test(message)) return;
+    localStorage.removeItem(TOKEN_KEY);
+    setToken(null);
+  }, [me.error, me.isError, token]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       token,
