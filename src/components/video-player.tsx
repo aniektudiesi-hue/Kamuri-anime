@@ -30,6 +30,21 @@ type CaptionSettings = {
 
 type WebKitFullscreenVideo = HTMLVideoElement & {
   webkitEnterFullscreen?: () => void;
+  webkitExitFullscreen?: () => void;
+  webkitDisplayingFullscreen?: boolean;
+  webkitSupportsFullscreen?: boolean;
+};
+
+type FullscreenElementWithPrefixes = HTMLDivElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  msRequestFullscreen?: () => void;
+};
+
+type DocumentWithFullscreenPrefixes = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+  msFullscreenElement?: Element | null;
+  msExitFullscreen?: () => void;
 };
 
 type LockableScreenOrientation = ScreenOrientation & {
@@ -52,6 +67,39 @@ const DEEP_BUFFER_SECONDS = 180;
 const MAX_BUFFER_WINDOW_SECONDS = 600;
 const NORMAL_BUFFER_SECONDS = 90;
 const DEEP_BUFFER_BYTES = 512 * 1024 * 1024;
+
+function currentFullscreenElement() {
+  const doc = document as DocumentWithFullscreenPrefixes;
+  return document.fullscreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement || null;
+}
+
+async function lockLandscape() {
+  const orientation = typeof screen !== "undefined"
+    ? (screen.orientation as LockableScreenOrientation | undefined)
+    : undefined;
+  await orientation?.lock?.("landscape").catch(() => undefined);
+}
+
+function unlockOrientation() {
+  const orientation = typeof screen !== "undefined"
+    ? (screen.orientation as LockableScreenOrientation | undefined)
+    : undefined;
+  orientation?.unlock?.();
+}
+
+async function fullscreenRequestSettled(request: Promise<void> | void, timeoutMs = 900) {
+  if (!request || typeof (request as Promise<void>).then !== "function") return true;
+  let timer: number | undefined;
+  const timeout = new Promise<boolean>((resolve) => {
+    timer = window.setTimeout(() => resolve(false), timeoutMs);
+  });
+  const result = await Promise.race([
+    request.then(() => true).catch(() => false),
+    timeout,
+  ]);
+  if (timer) window.clearTimeout(timer);
+  return result;
+}
 
 export function VideoPlayer({
   stream,
@@ -125,6 +173,7 @@ export function VideoPlayer({
   const [bufferAhead, setBufferAhead] = useState(0);
   const [bufferedPercent, setBufferedPercent] = useState(0);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
+  const [mobileFullscreen, setMobileFullscreen] = useState(false);
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
   const isMegaPlayServer =
@@ -319,10 +368,36 @@ export function VideoPlayer({
   }, []);
 
   useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const video = videoRef.current as WebKitFullscreenVideo | null;
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(currentFullscreenElement()) || Boolean(video?.webkitDisplayingFullscreen) || mobileFullscreen);
+    };
+    const handleNativeVideoExit = () => {
+      unlockOrientation();
+      setMobileFullscreen(false);
+      setIsFullscreen(false);
+    };
+
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    video?.addEventListener("webkitbeginfullscreen", handleFullscreenChange);
+    video?.addEventListener("webkitendfullscreen", handleNativeVideoExit);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      video?.removeEventListener("webkitbeginfullscreen", handleFullscreenChange);
+      video?.removeEventListener("webkitendfullscreen", handleNativeVideoExit);
+    };
+  }, [mobileFullscreen]);
+
+  useEffect(() => {
+    if (!mobileFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileFullscreen]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -698,21 +773,115 @@ export function VideoPlayer({
   }, [muted]);
 
   const fullscreen = useCallback(async () => {
-    const container = containerRef.current;
+    const container = containerRef.current as FullscreenElementWithPrefixes | null;
     const video = videoRef.current as WebKitFullscreenVideo | null;
     if (!container) return;
-    if (document.fullscreenElement) {
-      await document.exitFullscreen().catch(() => undefined);
-      (screen.orientation as LockableScreenOrientation | undefined)?.unlock?.();
-    } else {
+
+    const exitFullscreen = async () => {
+      const doc = document as DocumentWithFullscreenPrefixes;
+      setMobileFullscreen(false);
+      setIsFullscreen(false);
+      unlockOrientation();
+
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen().catch(() => undefined);
+        return;
+      }
+
+      if (doc.webkitFullscreenElement && doc.webkitExitFullscreen) {
+        await Promise.resolve(doc.webkitExitFullscreen()).catch(() => undefined);
+        return;
+      }
+
+      if (doc.msFullscreenElement && doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+        return;
+      }
+
+      if (video?.webkitDisplayingFullscreen) {
+        video.webkitExitFullscreen?.();
+      }
+    };
+
+    if (currentFullscreenElement() || video?.webkitDisplayingFullscreen || mobileFullscreen) {
+      await exitFullscreen();
+      return;
+    }
+
+    playIntentRef.current = true;
+    if (video?.paused) video.play().catch(() => undefined);
+
+    const standardFullscreenUnavailable = !document.fullscreenEnabled && !container.requestFullscreen;
+    if (video?.webkitEnterFullscreen && standardFullscreenUnavailable) {
       try {
-        await container.requestFullscreen({ navigationUI: "hide" });
-        await (screen.orientation as LockableScreenOrientation | undefined)?.lock?.("landscape").catch(() => undefined);
+        video.webkitEnterFullscreen();
+        setIsFullscreen(true);
+        return;
       } catch {
-        video?.webkitEnterFullscreen?.();
+        // Fall through to other fullscreen paths.
       }
     }
-  }, []);
+
+    try {
+      if (container.requestFullscreen) {
+        const entered = await fullscreenRequestSettled(container.requestFullscreen({ navigationUI: "hide" }));
+        if (entered) {
+          await lockLandscape();
+          setIsFullscreen(true);
+          showControls(true);
+          return;
+        }
+      }
+
+      if (container.webkitRequestFullscreen) {
+        const entered = await fullscreenRequestSettled(Promise.resolve(container.webkitRequestFullscreen()));
+        if (entered) {
+          await lockLandscape();
+          setIsFullscreen(true);
+          showControls(true);
+          return;
+        }
+      }
+
+      if (container.msRequestFullscreen) {
+        container.msRequestFullscreen();
+        await lockLandscape();
+        setIsFullscreen(true);
+        showControls(true);
+        return;
+      }
+    } catch {
+      // Some mobile browsers expose requestFullscreen but reject it for nested media.
+    }
+
+    try {
+      if (video?.requestFullscreen) {
+        const entered = await fullscreenRequestSettled(video.requestFullscreen({ navigationUI: "hide" }));
+        if (entered) {
+          await lockLandscape();
+          setIsFullscreen(true);
+          return;
+        }
+      }
+    } catch {
+      // Keep trying iOS native video fullscreen before CSS fallback.
+    }
+
+    try {
+      if (video?.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen();
+        setIsFullscreen(true);
+        return;
+      }
+    } catch {
+      // Final fallback below keeps custom controls usable in restricted webviews.
+    }
+
+    setMobileFullscreen(true);
+    setIsFullscreen(true);
+    await lockLandscape();
+    showControls(true);
+  }, [mobileFullscreen, showControls]);
 
   const togglePictureInPicture = useCallback(() => {
     const video = videoRef.current;
@@ -734,6 +903,12 @@ export function VideoPlayer({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       switch (e.key) {
+        case "Escape":
+          if (mobileFullscreen) {
+            e.preventDefault();
+            fullscreen();
+          }
+          break;
         case " ":
         case "k":
           e.preventDefault();
@@ -821,7 +996,7 @@ export function VideoPlayer({
 
     container.addEventListener("keydown", handleKeyDown);
     return () => container.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlay, toggleMute, fullscreen, togglePictureInPicture, showControls, flashSeek]);
+  }, [togglePlay, toggleMute, fullscreen, togglePictureInPicture, showControls, flashSeek, mobileFullscreen]);
 
   function clientXToFraction(clientX: number) {
     const bar = seekBarRef.current;
@@ -947,9 +1122,11 @@ export function VideoPlayer({
       ref={containerRef}
       tabIndex={0}
       aria-label={`Video player: ${title}`}
-      className="video-player-shell group relative aspect-video w-full overflow-hidden rounded-xl border border-white/[0.095] bg-black shadow-[0_32px_110px_rgba(0,0,0,0.78)] outline-none ring-1 ring-white/[0.035] sm:rounded-[22px]"
+      data-mobile-fullscreen={mobileFullscreen ? "true" : undefined}
+      className={`video-player-shell group relative aspect-video w-full overflow-hidden rounded-xl border border-white/[0.095] bg-black shadow-[0_32px_110px_rgba(0,0,0,0.78)] outline-none ring-1 ring-white/[0.035] sm:rounded-[22px] ${mobileFullscreen ? "mobile-fullscreen" : ""}`}
       style={{ cursor: controlsOpen ? "default" : "none" }}
       onMouseMove={() => showControls()}
+      onTouchStart={() => showControls()}
       onMouseLeave={() => {
         if (playing) hideControlsSoon();
       }}
