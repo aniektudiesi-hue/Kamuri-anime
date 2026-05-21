@@ -218,7 +218,6 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     search: query,
     sort: "START_DATE_DESC",
     jikanQuery: query,
-    jikanOrderBy: "start_date",
   };
 }
 
@@ -303,9 +302,9 @@ export async function fetchJikanDiscovery(
       page: String(page),
       limit: "25",
       sfw: "true",
-      order_by: intent.jikanOrderBy ?? "popularity",
       sort: "desc",
     });
+    if (intent.jikanOrderBy) params.set("order_by", intent.jikanOrderBy);
     if (intent.jikanStatus) params.set("status", intent.jikanStatus);
     if (intent.jikanQuery) params.set("q", intent.jikanQuery);
 

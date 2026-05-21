@@ -23,9 +23,13 @@ export function animeId(anime: Anime | undefined) {
 }
 
 export function posterOf(anime: Anime | undefined, variant: "poster-xs" | "poster-sm" | "poster-md" | "poster-lg" = "poster-md") {
+  return imageCdnUrl(rawPosterOf(anime), variant);
+}
+
+export function rawPosterOf(anime: Anime | undefined) {
   const jpg = anime?.images?.jpg;
   const webp = anime?.images?.webp;
-  return imageCdnUrl(
+  return (
     anime?.poster ||
     anime?.image ||
     anime?.thumbnail ||
@@ -36,8 +40,7 @@ export function posterOf(anime: Anime | undefined, variant: "poster-xs" | "poste
     jpg?.large_image_url ||
     webp?.image_url ||
     jpg?.image_url ||
-    "",
-    variant,
+    ""
   );
 }
 

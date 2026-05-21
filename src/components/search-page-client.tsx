@@ -20,7 +20,7 @@ import {
 } from "@/lib/anime-discovery";
 import { localSearchAnime, mergeSearchResults, rememberSearchCatalog } from "@/lib/search-index";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { HISTORY_UPDATED_EVENT, animeId, posterOf, rememberedHistory, titleOf } from "@/lib/utils";
+import { HISTORY_UPDATED_EVENT, animeId, rankAnimeForSearch, rawPosterOf, rememberedHistory, titleOf } from "@/lib/utils";
 
 const GENRE_LINKS = new Set([
   "Action",
@@ -174,11 +174,15 @@ function SearchContentBody({ q }: { q: string }) {
   }, [fetchAllSources, results.isLoading, anilistQ.isLoading, jikanQ.isLoading]);
 
   const backendResults = useMemo(() => intent.useBackend ? (results.data ?? []) : [], [intent.useBackend, results.data]);
+  const rankedJikan = useMemo(
+    () => intent.useBackend ? rankAnimeForSearch(allJikan, q) : allJikan,
+    [allJikan, intent.useBackend, q],
+  );
   const mergedRaw = fetchAllSources
     ? intent.useBackend
-      ? mergeSearchResults(q, allJikan, instantResults, backendResults, allAnilist)
-      : mergeAnimeSources(allJikan, instantResults, allAnilist)
-    : allJikan;
+      ? mergeSearchResults(q, rankedJikan, instantResults, backendResults, allAnilist)
+      : mergeAnimeSources(rankedJikan, instantResults, allAnilist)
+    : rankedJikan;
   const merged = mergedRaw;
   const visibleMerged = merged.slice(0, visibleCount);
   const hasMore = Boolean(anilistQ.data?.hasNextPage || jikanQ.data?.hasNextPage);
@@ -196,7 +200,7 @@ function SearchContentBody({ q }: { q: string }) {
     if (!visibleMerged.length) return;
     const links: HTMLLinkElement[] = [];
     for (const [index, anime] of visibleMerged.slice(0, 12).entries()) {
-      const poster = posterOf(anime, "poster-lg");
+      const poster = rawPosterOf(anime);
       if (!poster) continue;
       const link = document.createElement("link");
       link.rel = index < 6 ? "preload" : "prefetch";
@@ -288,7 +292,14 @@ function SearchContentBody({ q }: { q: string }) {
             <>
               <div className="content-visibility-auto grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
                 {visibleMerged.map((anime, i) => (
-                  <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 8} />
+                  <AnimeCard
+                    key={`${animeId(anime)}-${i}`}
+                    anime={anime}
+                    className="w-full"
+                    priority={i < 10}
+                    fastImage
+                    posterOverride={rawPosterOf(anime)}
+                  />
                 ))}
               </div>
 

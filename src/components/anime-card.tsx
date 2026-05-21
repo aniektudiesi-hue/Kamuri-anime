@@ -26,12 +26,24 @@ const STATUS_DOT: Record<string, string> = {
   finished_airing: "bg-white/30",
 };
 
-export function AnimeCard({ anime, priority = false, className }: { anime: Anime; priority?: boolean; className?: string }) {
+export function AnimeCard({
+  anime,
+  priority = false,
+  className,
+  fastImage = false,
+  posterOverride,
+}: {
+  anime: Anime;
+  priority?: boolean;
+  className?: string;
+  fastImage?: boolean;
+  posterOverride?: string;
+}) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const id = animeId(anime);
   const episodes = episodeCount(anime);
-  const poster = posterOf(anime, priority ? "poster-lg" : "poster-md");
+  const poster = posterOverride || posterOf(anime, priority ? "poster-lg" : "poster-md");
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(() => Boolean(poster && loadedPosterUrls.has(poster)));
   const title = titleOf(anime);
@@ -85,8 +97,8 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
                 setImageLoaded(true);
               }}
               onError={() => setImageFailed(true)}
-              className={`object-cover transition duration-200 group-hover:scale-[1.025] ${
-                imageLoaded ? "opacity-100" : "opacity-0"
+              className={`object-cover transition group-hover:scale-[1.025] ${
+                fastImage ? "duration-150 opacity-100" : `duration-700 ${imageLoaded ? "opacity-100" : "opacity-0"}`
               }`}
             />
           ) : (
