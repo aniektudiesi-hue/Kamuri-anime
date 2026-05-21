@@ -121,7 +121,7 @@ function SearchContent() {
   const anilistQ = useQuery({
     queryKey: ["anilist-discovery", intent.key, discoveryPage],
     queryFn: () => fetchAniListDiscovery(intent, discoveryPage),
-    enabled: q.length > 0,
+    enabled: q.length > 0 && (!intent.useBackend || results.isFetched || results.isError || instantResults.length === 0),
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
   });
@@ -129,7 +129,7 @@ function SearchContent() {
   const jikanQ = useQuery({
     queryKey: ["jikan-discovery", intent.key, discoveryPage],
     queryFn: () => fetchJikanDiscovery(intent, discoveryPage),
-    enabled: q.length > 0 && (intent.useBackend || discoveryPage > 1),
+    enabled: q.length > 0 && (!intent.useBackend || discoveryPage > 1 || ((results.isFetched || results.isError) && (results.data?.length ?? 0) === 0)),
     staleTime: 1000 * 60 * 45,
     gcTime: 1000 * 60 * 120,
   });
@@ -158,7 +158,7 @@ function SearchContent() {
     if (slowTimer.current) window.clearTimeout(slowTimer.current);
     const reset = window.setTimeout(() => setIsSlow(false), 0);
     if (results.isLoading || anilistQ.isLoading) {
-      slowTimer.current = window.setTimeout(() => setIsSlow(true), 4000);
+      slowTimer.current = window.setTimeout(() => setIsSlow(true), 1200);
     }
     return () => {
       window.clearTimeout(reset);
@@ -174,8 +174,8 @@ function SearchContent() {
   const visibleMerged = merged.slice(0, visibleCount);
   const hasMore = Boolean(anilistQ.data?.hasNextPage || jikanQ.data?.hasNextPage);
   const isTimeout = results.error instanceof Error && results.error.message === "timeout";
-  const hasInstantPosters = instantResults.some((anime) => Boolean(posterOf(anime, "poster-sm")));
-  const isLoading = (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1 && !hasInstantPosters;
+  const hasRenderableResults = merged.length > 0;
+  const isLoading = !hasRenderableResults && (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1;
   const isLoadingMore = discoveryPage > 1 && (anilistQ.isLoading || jikanQ.isLoading);
 
   useEffect(() => {

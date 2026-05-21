@@ -1273,9 +1273,11 @@ export function VideoPlayer({
       {/* Buffering spinner */}
       {isBuffering && !playbackError ? (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center">
-          <div className="relative grid h-[72px] w-[72px] place-items-center rounded-full border border-white/[0.1] bg-black/22 shadow-[0_24px_80px_rgba(0,0,0,0.62)] backdrop-blur-2xl">
-            <div className="absolute inset-2.5 animate-spin rounded-full border-[3px] border-white/10 border-t-white/95" />
-            <div className="h-2 w-2 rounded-full bg-white/95 shadow-[0_0_22px_rgba(255,255,255,0.85)]" />
+          <div className="relative grid h-[74px] w-[74px] place-items-center rounded-full border border-white/[0.075] bg-black/28 shadow-[0_24px_90px_rgba(0,0,0,0.72)] backdrop-blur-xl">
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(225,29,72,0.13),transparent_58%)]" />
+            <div className="absolute inset-3 animate-spin rounded-full border-[2px] border-white/[0.08] border-t-[#cf2442]/90 border-r-white/45" />
+            <div className="absolute inset-5 animate-[spin_1.7s_linear_infinite_reverse] rounded-full border border-white/[0.055] border-b-white/55" />
+            <div className="h-2 w-2 rounded-full bg-white/84 shadow-[0_0_20px_rgba(207,36,66,0.48)]" />
           </div>
         </div>
       ) : null}

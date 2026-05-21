@@ -69,6 +69,7 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
 function ContinueWatchingSection() {
   const { token } = useAuth();
   const [localItems, setLocalItems] = useState<LibraryItem[]>([]);
+  const [imagesReadyKey, setImagesReadyKey] = useState("");
 
   useEffect(() => {
     const refresh = () => setLocalItems(rememberedHistory(8));
@@ -85,7 +86,54 @@ function ContinueWatchingSection() {
   });
 
   const items = useMemo(() => mergeHistoryItems(localItems, serverHistory.data).slice(0, 5), [localItems, serverHistory.data]);
-  if (!items.length) return null;
+  const posterKey = useMemo(
+    () => items.map((item) => posterOf(item, "poster-sm")).filter(Boolean).join("|"),
+    [items],
+  );
+
+  useEffect(() => {
+    if (!items.length) {
+      setImagesReadyKey("");
+      return;
+    }
+
+    const posters = items.map((item) => posterOf(item, "poster-sm")).filter(Boolean);
+    if (!posters.length) {
+      setImagesReadyKey(posterKey);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) setImagesReadyKey(posterKey);
+    }, 1800);
+
+    Promise.allSettled(
+      posters.map(
+        (src) =>
+          new Promise<void>((resolve) => {
+            const image = new window.Image();
+            image.decoding = "async";
+            image.onload = () => resolve();
+            image.onerror = () => resolve();
+            image.src = src;
+            if (image.complete) resolve();
+          }),
+      ),
+    ).then(() => {
+      if (!cancelled) {
+        window.clearTimeout(timer);
+        setImagesReadyKey(posterKey);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [items, posterKey]);
+
+  if (!items.length || imagesReadyKey !== posterKey) return null;
 
   return (
     <section className="mx-auto max-w-screen-2xl px-4 pt-4 lg:px-6">
@@ -288,7 +336,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
   const [now] = useState(() => Date.now());
   const today = items.filter((item) => isTodayInKolkata(item.airingAt));
   const fallbackUpcoming = items.filter((item) => item.airingAt * 1000 >= now);
-  const visibleItems = (today.length ? today : fallbackUpcoming).slice(0, 12);
+  const visibleItems = (today.length ? today : fallbackUpcoming.length ? fallbackUpcoming : items).slice(0, 12);
   const title = today.length ? "Airing Today" : "Upcoming Schedule";
   if (!visibleItems.length) return null;
 
