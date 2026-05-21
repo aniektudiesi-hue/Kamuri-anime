@@ -472,19 +472,6 @@ export default function WatchPage({
                   </button>
                 </div>
               </div>
-            ) : streamsLoading && !selectedStream ? (
-              <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] sm:rounded-[22px]">
-                {animePoster ? (
-                  <Image src={animePoster} alt="" fill priority sizes="100vw" className="object-cover opacity-30 blur-xl" />
-                ) : null}
-                <div className="absolute inset-0 bg-black/68" />
-                <div className="absolute inset-0 grid place-items-center">
-                  <div className="relative grid h-14 w-14 place-items-center rounded-full border border-white/[0.08] bg-black/18 shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-                    <div className="absolute inset-2 animate-spin rounded-full border-2 border-white/10 border-t-white/90" />
-                    <div className="h-1.5 w-1.5 rounded-full bg-white/90 shadow-[0_0_18px_rgba(255,255,255,0.75)]" />
-                  </div>
-                </div>
-              </div>
             ) : (
               <VideoPlayer
                 stream={selectedStreamForPlayer}
@@ -494,6 +481,7 @@ export default function WatchPage({
                 initialTime={initialTime}
                 autoPlay
                 deepBuffer={settings.autoFetchWhileWatching}
+                loading={streamsLoading && !selectedStream}
                 nextHref={nextHref}
                 onProgress={saveWatchProgress}
                 onFatalError={handlePlayerFatalError}

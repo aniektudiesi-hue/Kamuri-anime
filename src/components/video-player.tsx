@@ -134,6 +134,7 @@ export function VideoPlayer({
   onFatalError,
   autoPlay = true,
   deepBuffer = true,
+  loading = false,
 }: {
   stream?: StreamResponse;
   title: string;
@@ -145,6 +146,7 @@ export function VideoPlayer({
   onFatalError?: (message: string) => void;
   autoPlay?: boolean;
   deepBuffer?: boolean;
+  loading?: boolean;
 }) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -464,7 +466,11 @@ export function VideoPlayer({
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !src) return;
+    if (!video || !src) {
+      setIsBuffering(Boolean(loading));
+      setHasVideoFrame(false);
+      return;
+    }
     let hls: Hls | null = null;
     activeCaptionRef.current = "";
     setActiveCaption("");
@@ -805,7 +811,7 @@ export function VideoPlayer({
       video.removeEventListener("stalled", markWaiting);
       video.removeEventListener("progress", updateBufferedFromEvent);
     };
-  }, [hideControlsSoon, isHlsStream, isMegaPlayServer, isMoonStream, serverId, src, stream?.server, syncCaptionAt]);
+  }, [hideControlsSoon, isHlsStream, isMegaPlayServer, isMoonStream, loading, serverId, src, stream?.server, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
@@ -1183,10 +1189,23 @@ export function VideoPlayer({
 
   if (!src) {
     return (
-      <div className="grid aspect-[4/3] w-full place-items-center rounded-2xl border border-white/[0.08] bg-black text-sm text-white/50 sm:aspect-video">
-        <div className="text-center">
-          <p className="font-semibold text-white">No stream available</p>
-          <p className="mt-1 text-white/40">Try switching to another server below.</p>
+      <div className="video-player-shell relative aspect-video w-full overflow-hidden rounded-xl border border-white/[0.095] bg-black shadow-[0_32px_110px_rgba(0,0,0,0.78)] ring-1 ring-white/[0.035] sm:rounded-[22px]">
+        {poster ? (
+          <Image src={poster} alt="" fill priority sizes="100vw" className="object-cover opacity-82" />
+        ) : null}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/30 to-black/38" />
+        <div className="absolute inset-0 grid place-items-center">
+          {loading ? (
+            <div className="relative grid h-14 w-14 place-items-center rounded-full border border-white/[0.075] bg-black/24 shadow-[0_22px_70px_rgba(0,0,0,0.68)] backdrop-blur-lg">
+              <div className="absolute inset-3 animate-spin rounded-full border-[2px] border-white/[0.08] border-t-[#cf2442]/90 border-r-white/45" />
+              <div className="h-2 w-2 rounded-full bg-white/84 shadow-[0_0_20px_rgba(207,36,66,0.42)]" />
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/[0.08] bg-black/32 px-5 py-3 text-center text-sm text-white/62 backdrop-blur-md">
+              <p className="font-semibold text-white">No stream available</p>
+              <p className="mt-1 text-white/42">Try switching to another server below.</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1245,9 +1264,11 @@ export function VideoPlayer({
           </div>
         </div>
 
-        <div className="hidden rounded-full border border-white/[0.08] bg-black/32 px-3 py-1.5 text-[11px] font-black text-white/58 shadow-2xl backdrop-blur-2xl sm:block">
-          {bufferAhead > 2 ? `${bufferAheadLabel} ready` : "Starting"}
-        </div>
+        {bufferAhead > 2 ? (
+          <div className="hidden rounded-full border border-white/[0.08] bg-black/32 px-3 py-1.5 text-[11px] font-black text-white/58 shadow-2xl backdrop-blur-xl sm:block">
+            {bufferAheadLabel} ready
+          </div>
+        ) : null}
       </div>
 
       {/* Captions */}
