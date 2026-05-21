@@ -61,7 +61,7 @@ const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
   opacity: 1,
   boxOpacity: 0.22,
 };
-const FAST_START_BUFFER_SECONDS = 6;
+const FAST_START_BUFFER_SECONDS = 1.25;
 const MOON_FAST_START_BUFFER_SECONDS = 4;
 const DEEP_BUFFER_SECONDS = 180;
 const MAX_BUFFER_WINDOW_SECONDS = 600;
@@ -471,8 +471,9 @@ export function VideoPlayer({
     const startupTime = Math.max(0, Number(initialTimeRef.current || 0));
     const shouldAutoPlay = autoPlayRef.current;
     const shouldDeepBuffer = deepBufferRef.current;
+    const useSegmentCache = shouldDeepBuffer && !isMegaPlayServer;
     const segmentCache = createHlsSegmentCacheSession({
-      enabled: shouldDeepBuffer,
+      enabled: useSegmentCache,
       namespace: `${serverId ?? stream?.server ?? "stream"}:${src}`,
       concurrency: isMoonStream ? 4 : 3,
       immediateAheadSeconds: 300,
@@ -522,7 +523,7 @@ export function VideoPlayer({
       prefetchStartTimer = window.setTimeout(() => {
         prefetchStartTimer = undefined;
         segmentCache.startPrefetch();
-      }, 3500);
+      }, isMegaPlayServer ? 6500 : 3500);
     };
     const chaseForwardBuffer = () => {
       if (!hls || !shouldDeepBuffer) return;
@@ -657,14 +658,14 @@ export function VideoPlayer({
           testBandwidth: false,
           capLevelToPlayerSize: true,
           startLevel: 0,
-          abrEwmaDefaultEstimate: 2_000_000,
+          abrEwmaDefaultEstimate: isMegaPlayServer ? 5_000_000 : 2_000_000,
           abrEwmaFastVoD: 3,
           abrEwmaSlowVoD: 9,
           maxBufferLength: initialForwardBuffer,
-          maxMaxBufferLength: Math.max(initialForwardBuffer, 60),
-          maxBufferSize: 120 * 1024 * 1024,
-          maxBufferHole: 0.35,
-          backBufferLength: 30,
+          maxMaxBufferLength: isMegaPlayServer ? 24 : Math.max(initialForwardBuffer, 60),
+          maxBufferSize: isMegaPlayServer ? 48 * 1024 * 1024 : 120 * 1024 * 1024,
+          maxBufferHole: 0.5,
+          backBufferLength: isMegaPlayServer ? 12 : 30,
           fragLoadingTimeOut: 8000,
           fragLoadingMaxRetry: 4,
           fragLoadingRetryDelay: 500,
@@ -794,7 +795,7 @@ export function VideoPlayer({
       video.removeEventListener("stalled", markWaiting);
       video.removeEventListener("progress", updateBufferedFromEvent);
     };
-  }, [hideControlsSoon, isHlsStream, isMoonStream, serverId, src, stream?.server, syncCaptionAt]);
+  }, [hideControlsSoon, isHlsStream, isMegaPlayServer, isMoonStream, serverId, src, stream?.server, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
