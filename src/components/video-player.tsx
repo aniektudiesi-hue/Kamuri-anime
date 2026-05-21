@@ -73,6 +73,27 @@ function currentFullscreenElement() {
   return document.fullscreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement || null;
 }
 
+function isIOSLikeDevice() {
+  if (typeof navigator === "undefined") return false;
+
+  const ua = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+
+  return (
+    /iPad|iPhone|iPod/.test(ua) ||
+    (platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+function isSmallTouchDevice() {
+  if (typeof window === "undefined") return false;
+
+  return (
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches &&
+    window.matchMedia("(max-width: 900px)").matches
+  );
+}
+
 async function lockLandscape() {
   const orientation = typeof screen !== "undefined"
     ? (screen.orientation as LockableScreenOrientation | undefined)
@@ -392,10 +413,28 @@ export function VideoPlayer({
 
   useEffect(() => {
     if (!mobileFullscreen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+
+    const html = document.documentElement;
+    const body = document.body;
+
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyTouchAction = body.style.touchAction;
+
+    html.classList.add("ro-player-locked");
+    body.classList.add("ro-player-locked");
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+
     return () => {
-      document.body.style.overflow = previousOverflow;
+      html.classList.remove("ro-player-locked");
+      body.classList.remove("ro-player-locked");
+
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.touchAction = prevBodyTouchAction;
     };
   }, [mobileFullscreen]);
 
@@ -817,6 +856,17 @@ export function VideoPlayer({
 
     playIntentRef.current = true;
     if (video?.paused) video.play().catch(() => undefined);
+
+    // iOS Safari / iPhone does not reliably allow JS orientation lock.
+    // Native webkit fullscreen follows physical device orientation and can stay portrait.
+    // So on iOS/small mobile, force our CSS fullscreen fallback instead.
+    if (isIOSLikeDevice() || (isSmallTouchDevice() && !document.fullscreenEnabled)) {
+      setMobileFullscreen(true);
+      setIsFullscreen(true);
+      await lockLandscape();
+      showControls(true);
+      return;
+    }
 
     const standardFullscreenUnavailable = !document.fullscreenEnabled && !container.requestFullscreen;
     if (video?.webkitEnterFullscreen && standardFullscreenUnavailable) {
