@@ -2,6 +2,7 @@
 
 import Hls from "hls.js";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Captions, ChevronRight, Gauge, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, RotateCw, Settings2, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StreamResponse, Subtitle } from "@/lib/types";
@@ -145,6 +146,7 @@ export function VideoPlayer({
   autoPlay?: boolean;
   deepBuffer?: boolean;
 }) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const seekBarRef = useRef<HTMLDivElement | null>(null);
@@ -237,6 +239,14 @@ export function VideoPlayer({
     },
     [playing],
   );
+  const goNextEpisode = useCallback(() => {
+    const href = nextHrefRef.current;
+    if (!href) return;
+    playIntentRef.current = true;
+    setIsBuffering(false);
+    setControlsOpen(true);
+    router.push(href);
+  }, [router]);
 
   useEffect(() => {
     if (subtitleCount === 0) {
@@ -965,7 +975,7 @@ export function VideoPlayer({
         case "N":
           if (nextHrefRef.current) {
             e.preventDefault();
-            window.location.assign(nextHrefRef.current);
+            goNextEpisode();
           }
           break;
         case "Escape":
@@ -1061,7 +1071,7 @@ export function VideoPlayer({
 
     container.addEventListener("keydown", handleKeyDown);
     return () => container.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlay, toggleMute, fullscreen, togglePictureInPicture, showControls, flashSeek, mobileFullscreen]);
+  }, [togglePlay, toggleMute, fullscreen, togglePictureInPicture, showControls, flashSeek, mobileFullscreen, goNextEpisode]);
 
   function clientXToFraction(clientX: number) {
     const bar = seekBarRef.current;
@@ -1332,13 +1342,14 @@ export function VideoPlayer({
 
       {/* Next episode prompt */}
       {showNextPrompt && nextHref && !showSkipIntro ? (
-        <a
-          href={nextHref}
+        <button
+          type="button"
+          onClick={goNextEpisode}
           className="absolute bottom-[132px] right-4 z-50 inline-flex h-10 items-center gap-1.5 rounded-full bg-[#cf2442] px-4 text-sm font-black text-white shadow-lg shadow-[#cf2442]/22 transition-colors hover:bg-[#dc2d4b] sm:bottom-[126px]"
         >
           Next Episode
           <ChevronRight size={15} />
-        </a>
+        </button>
       ) : null}
 
       {/* Center play/pause overlay — only shown when paused */}

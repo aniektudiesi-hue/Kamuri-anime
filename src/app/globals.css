@@ -481,6 +481,21 @@ input[type="range"] { accent-color: var(--accent-2); }
   object-fit: contain;
 }
 
+.video-player-shell {
+  contain: layout paint style;
+  transform: translateZ(0);
+  will-change: transform;
+  transition:
+    border-color 180ms ease,
+    box-shadow 220ms ease,
+    background-color 180ms ease;
+}
+
+.video-player-shell video {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
 .video-player-shell:-webkit-full-screen {
   width: 100vw;
   height: 100vh;
