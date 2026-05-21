@@ -291,7 +291,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const id = animeId(current);
   const title = titleOf(current);
   const poster = posterOf(current, "poster-md");
-  const banner = bannerOf(current, "banner-sm");
+  const banner = bannerOf(current, "banner-lg");
   const count = episodeCount(current);
 
   return (
@@ -306,16 +306,16 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             priority={index === 0}
             fetchPriority={index === 0 ? "high" : "auto"}
             loading={index === 0 ? undefined : "lazy"}
-            sizes="(max-width: 639px) 100vw, 1px"
-            className="object-cover opacity-100"
+            sizes="100vw"
+            className="object-cover opacity-100 contrast-[1.04] saturate-[1.12]"
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/42 to-transparent" />
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#06070d]/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#06070d]/82 via-[#06070d]/16 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#06070d]/46 to-transparent" />
       </div>
 
       <div className="relative flex min-h-[286px] items-end px-4">
-        <div className="w-[92%] max-w-[350px] rounded-2xl border border-white/[0.1] bg-[#090b13]/56 p-3 shadow-2xl shadow-black/30">
+        <div className="w-[92%] max-w-[350px] rounded-2xl border border-white/[0.08] bg-[#090b13]/30 p-3 shadow-2xl shadow-black/24">
           <div className="mb-2 flex items-center gap-2">
             <span className="rounded-full bg-[#cf2442]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#cf2442]/30">
               Featured
@@ -342,7 +342,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             <Link
               href={animePath(current, id)}
               aria-label={`View details for ${title}`}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.1] px-3.5 text-sm font-bold text-white/85 backdrop-blur-xl"
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/[0.16] bg-black/24 px-3.5 text-sm font-bold text-white/90"
             >
               Details
             </Link>
