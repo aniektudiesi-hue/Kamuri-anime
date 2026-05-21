@@ -20,7 +20,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
   const queryClient = useQueryClient();
   const id = animeId(anime);
   const episodes = episodeCount(anime);
-  const poster = posterOf(anime);
+  const poster = posterOf(anime, "poster-sm");
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const title = titleOf(anime);
@@ -54,8 +54,9 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
               src={poster}
               alt={title}
               fill
-              sizes="190px"
+              sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 180px"
               priority={priority}
+              fetchPriority={priority ? "high" : "auto"}
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageFailed(true)}
               className={`object-cover transition duration-700 group-hover:scale-105 ${imageLoaded ? "opacity-100" : "opacity-0"}`}

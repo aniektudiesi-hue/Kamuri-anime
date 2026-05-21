@@ -12,10 +12,37 @@ import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { rememberSearchCatalog } from "@/lib/search-index";
 import type { AiringScheduleItem, Anime, HomeInitialData, LibraryItem } from "@/lib/types";
-import { HISTORY_UPDATED_EVENT, animeId, animePath, episodeCount, episodeLabel, posterOf, progressOf, rememberedHistory, titleOf, watchPath } from "@/lib/utils";
+import { HISTORY_UPDATED_EVENT, animeId, animePath, episodeCount, episodeLabel, posterOf, progressOf, rememberAnime, rememberedAnime, rememberedHistory, titleOf, watchPath } from "@/lib/utils";
+
+const HOME_CACHE_KEY = "animeTVplus-home-cache-v2";
+const HOME_CACHE_TTL = 1000 * 60 * 60;
 
 export function HomePageClient({ initialData }: { initialData: HomeInitialData }) {
+  const [homeData, setHomeData] = useState(initialData);
+
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(HOME_CACHE_KEY);
+      if (!raw) return;
+      const cached = JSON.parse(raw) as { expiresAt: number; value: HomeInitialData };
+      if (cached.expiresAt > Date.now() && cached.value?.thumbnails?.length) {
+        setHomeData((current) => (current.thumbnails.length ? current : cached.value));
+      }
+    } catch {
+      // Cache is only a speed hint.
+    }
+  }, []);
+
+  useEffect(() => {
+    setHomeData(initialData);
+    try {
+      window.localStorage.setItem(
+        HOME_CACHE_KEY,
+        JSON.stringify({ expiresAt: Date.now() + HOME_CACHE_TTL, value: initialData }),
+      );
+    } catch {
+      // Best-effort cache.
+    }
     rememberSearchCatalog([
       ...initialData.banners,
       ...initialData.thumbnails,
@@ -28,11 +55,11 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
   return (
     <AppShell>
       <div className="hidden sm:block">
-        <HeroCarousel items={initialData.banners} loading={!initialData.banners.length} />
+        <HeroCarousel items={homeData.banners} loading={!homeData.banners.length} />
       </div>
       <MobileHeroBanner
-        items={initialData.banners.length ? initialData.banners : initialData.thumbnails}
-        loading={!initialData.banners.length && !initialData.thumbnails.length}
+        items={homeData.banners.length ? homeData.banners : homeData.thumbnails}
+        loading={!homeData.banners.length && !homeData.thumbnails.length}
       />
       <ContinueWatchingSection />
 
@@ -40,25 +67,25 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
         <BigSection
           title="Popular Today"
           icon={<Flame size={14} className="text-[#cf2442]" />}
-          items={initialData.thumbnails}
+          items={homeData.thumbnails}
           viewAllHref="/popular"
         />
 
         <BigSection
           title="New Episodes"
           icon={<Radio size={14} className="text-[#c8ced8]" />}
-          items={initialData.recent}
+          items={homeData.recent}
           viewAllHref="/new-releases"
         />
 
         <BigSection
           title="Top Rated All Time"
           icon={<Trophy size={14} className="text-[#d8b56a]" />}
-          items={initialData.topRated}
+          items={homeData.topRated}
           viewAllHref="/top-rated"
         />
 
-        <AiringScheduleSection items={initialData.schedule} />
+        <AiringScheduleSection items={homeData.schedule} />
       </SidebarLayout>
 
       <HomeSeoSection />
@@ -85,7 +112,10 @@ function ContinueWatchingSection() {
     staleTime: 1000 * 60 * 10,
   });
 
-  const items = useMemo(() => mergeHistoryItems(localItems, serverHistory.data).slice(0, 5), [localItems, serverHistory.data]);
+  const items = useMemo(
+    () => mergeHistoryItems(localItems, serverHistory.data).map(enrichHistoryPoster).filter(hasPoster).slice(0, 5),
+    [localItems, serverHistory.data],
+  );
   const posterKey = useMemo(
     () => items.map((item) => posterOf(item, "poster-sm")).filter(Boolean).join("|"),
     [items],
@@ -279,7 +309,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
 
   return (
     <article className="card-lift scroll-card group w-[132px] shrink-0 sm:w-[154px]">
-      <Link href={animePath(anime, id)} className="block">
+      <Link href={animePath(anime, id)} onClick={() => rememberAnime(anime)} className="block">
         <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.055] transition group-hover:ring-[#cf2442]/28">
           {poster ? (
             <Image
@@ -365,6 +395,7 @@ function ScheduleCard({ item }: { item: AiringScheduleItem }) {
   return (
     <Link
       href={animePath(item.anime, item.id)}
+      onClick={() => rememberAnime(item.anime)}
       className="scroll-card group grid grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#111421]/72 p-2 transition hover:-translate-y-0.5 hover:border-[#f43f5e]/30 hover:bg-[#171b2a]"
     >
       <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
@@ -470,6 +501,27 @@ function mergeHistoryItems(localItems: LibraryItem[], serverItems: LibraryItem[]
     if (!existing || nextTime >= existingTime) byId.set(id, { ...existing, ...item });
   });
   return Array.from(byId.values()).sort((a, b) => watchedAt(b) - watchedAt(a));
+}
+
+function enrichHistoryPoster(item: LibraryItem): LibraryItem {
+  const id = animeId(item);
+  const remembered = rememberedAnime(id);
+  if (!remembered) return item;
+  return {
+    ...remembered,
+    ...item,
+    mal_id: String(item.mal_id || remembered.mal_id || remembered.anime_id || id),
+    anime_id: String(item.anime_id || remembered.anime_id || remembered.mal_id || id),
+    image_url: item.image_url || remembered.image_url || remembered.poster || remembered.image || remembered.thumbnail,
+    poster: item.poster || remembered.poster || remembered.image_url,
+    image: item.image || remembered.image,
+    thumbnail: item.thumbnail || remembered.thumbnail,
+    banner: item.banner || remembered.banner,
+  };
+}
+
+function hasPoster(item: LibraryItem) {
+  return Boolean(posterOf(item, "poster-sm"));
 }
 
 function watchedAt(item: LibraryItem | undefined) {

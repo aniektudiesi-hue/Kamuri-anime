@@ -186,8 +186,8 @@ function SearchContent() {
   useEffect(() => {
     if (!visibleMerged.length) return;
     const links: HTMLLinkElement[] = [];
-    for (const anime of visibleMerged.slice(0, 4)) {
-      const poster = posterOf(anime, "poster-md");
+    for (const anime of visibleMerged.slice(0, 8)) {
+      const poster = posterOf(anime, "poster-sm");
       if (!poster) continue;
       const link = document.createElement("link");
       link.rel = "prefetch";
@@ -278,7 +278,7 @@ function SearchContent() {
             <>
               <div className="content-visibility-auto grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
                 {visibleMerged.map((anime, i) => (
-                  <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 3} />
+                  <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 8} />
                 ))}
               </div>
 
