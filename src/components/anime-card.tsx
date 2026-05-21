@@ -29,7 +29,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
   const router = useRouter();
   const id = animeId(anime);
   const episodes = episodeCount(anime);
-  const poster = posterOf(anime, "poster-sm");
+  const poster = posterOf(anime, priority ? "poster-lg" : "poster-md");
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const title = titleOf(anime);
@@ -79,7 +79,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
               fetchPriority={priority ? "high" : "auto"}
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageFailed(true)}
-              className={`object-cover transition duration-700 group-hover:scale-105 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+              className="object-cover transition duration-180 group-hover:scale-[1.025]"
             />
           ) : (
             <PosterFallback title={title} />

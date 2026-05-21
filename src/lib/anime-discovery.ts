@@ -137,7 +137,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: `season:${season}:${year}`,
       label: `${toTitleCase(season.toLowerCase())} ${year}`,
-      sourceLabel: "Seasonal results from AniList and MyAnimeList",
+      sourceLabel: "Fast MyAnimeList results",
       useBackend: false,
       season: season as MediaSeason,
       seasonYear: year,
@@ -151,7 +151,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: "browse:popular",
       label: "Popular Anime",
-      sourceLabel: "Ranked by AniList trending and MyAnimeList popularity",
+      sourceLabel: "Fast MyAnimeList results",
       useBackend: false,
       sort: "TRENDING_DESC",
       jikanOrderBy: "popularity",
@@ -162,7 +162,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: "browse:top-rated",
       label: "Top Rated Anime",
-      sourceLabel: "Sorted by AniList scores with MyAnimeList backup",
+      sourceLabel: "Fast MyAnimeList results",
       useBackend: false,
       sort: "SCORE_DESC",
       jikanOrderBy: "score",
@@ -173,7 +173,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: "browse:airing",
       label: "Currently Airing",
-      sourceLabel: "Fresh airing anime from AniList and MyAnimeList",
+      sourceLabel: "Fast MyAnimeList results",
       useBackend: false,
       status: "RELEASING",
       sort: "START_DATE_DESC",
@@ -187,7 +187,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: `genre:${genre}`,
       label: genre,
-      sourceLabel: "Genre results from AniList with MyAnimeList backup",
+      sourceLabel: "Fast MyAnimeList results",
       useBackend: false,
       genre,
       sort: "POPULARITY_DESC",
@@ -201,7 +201,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: `tag:${tag}`,
       label: tag,
-      sourceLabel: "Tag results from AniList with MyAnimeList backup",
+      sourceLabel: "Fast MyAnimeList results",
       useBackend: false,
       tag,
       sort: "POPULARITY_DESC",
@@ -213,7 +213,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
   return {
     key: `search:${normalized}`,
     label: query,
-    sourceLabel: "Search results from your API, AniList, and MyAnimeList",
+    sourceLabel: "Fast MyAnimeList results",
     useBackend: true,
     search: query,
     sort: "START_DATE_DESC",
@@ -301,7 +301,7 @@ export async function fetchJikanDiscovery(
   try {
     const params = new URLSearchParams({
       page: String(page),
-      limit: "24",
+      limit: "25",
       sfw: "true",
       order_by: intent.jikanOrderBy ?? "popularity",
       sort: "desc",

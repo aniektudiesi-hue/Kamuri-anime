@@ -79,14 +79,16 @@ function SearchContent() {
   const [discoveryPage, setDiscoveryPage] = useState(1);
   const [allAnilist, setAllAnilist] = useState<Anime[]>([]);
   const [allJikan, setAllJikan] = useState<Anime[]>([]);
-  const [visibleCount, setVisibleCount] = useState(18);
+  const [visibleCount, setVisibleCount] = useState(40);
+  const [fetchAllSources, setFetchAllSources] = useState(false);
   const [localHistory, setLocalHistory] = useState<LibraryItem[]>([]);
 
   useEffect(() => {
     setDiscoveryPage(1);
     setAllAnilist([]);
     setAllJikan([]);
-    setVisibleCount(18);
+    setVisibleCount(40);
+    setFetchAllSources(false);
   }, [intent.key]);
 
   useEffect(() => {
@@ -111,7 +113,7 @@ function SearchContent() {
   const results = useQuery({
     queryKey: ["search", q],
     queryFn: () => api.search(q),
-    enabled: q.length > 0 && intent.useBackend,
+    enabled: q.length > 0 && intent.useBackend && fetchAllSources,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
     retry: 1,
@@ -121,7 +123,7 @@ function SearchContent() {
   const anilistQ = useQuery({
     queryKey: ["anilist-discovery", intent.key, discoveryPage],
     queryFn: () => fetchAniListDiscovery(intent, discoveryPage),
-    enabled: q.length > 0 && (!intent.useBackend || results.isFetched || results.isError || instantResults.length === 0),
+    enabled: q.length > 0 && fetchAllSources,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
   });
@@ -129,7 +131,7 @@ function SearchContent() {
   const jikanQ = useQuery({
     queryKey: ["jikan-discovery", intent.key, discoveryPage],
     queryFn: () => fetchJikanDiscovery(intent, discoveryPage),
-    enabled: q.length > 0 && (!intent.useBackend || discoveryPage > 1 || ((results.isFetched || results.isError) && (results.data?.length ?? 0) === 0)),
+    enabled: q.length > 0,
     staleTime: 1000 * 60 * 45,
     gcTime: 1000 * 60 * 120,
   });
@@ -157,26 +159,28 @@ function SearchContent() {
   useEffect(() => {
     if (slowTimer.current) window.clearTimeout(slowTimer.current);
     const reset = window.setTimeout(() => setIsSlow(false), 0);
-    if (results.isLoading || anilistQ.isLoading) {
+    if (jikanQ.isLoading || (fetchAllSources && (results.isLoading || anilistQ.isLoading))) {
       slowTimer.current = window.setTimeout(() => setIsSlow(true), 1200);
     }
     return () => {
       window.clearTimeout(reset);
       if (slowTimer.current) window.clearTimeout(slowTimer.current);
     };
-  }, [results.isLoading, anilistQ.isLoading]);
+  }, [fetchAllSources, results.isLoading, anilistQ.isLoading, jikanQ.isLoading]);
 
   const backendResults = useMemo(() => intent.useBackend ? (results.data ?? []) : [], [intent.useBackend, results.data]);
-  const mergedRaw = intent.useBackend
-    ? mergeSearchResults(q, instantResults, backendResults, allAnilist, allJikan)
-    : mergeAnimeSources(instantResults, allAnilist, allJikan);
-  const merged = intent.useBackend ? mergedRaw : mergedRaw;
+  const mergedRaw = fetchAllSources
+    ? intent.useBackend
+      ? mergeSearchResults(q, allJikan, instantResults, backendResults, allAnilist)
+      : mergeAnimeSources(allJikan, instantResults, allAnilist)
+    : allJikan;
+  const merged = mergedRaw;
   const visibleMerged = merged.slice(0, visibleCount);
   const hasMore = Boolean(anilistQ.data?.hasNextPage || jikanQ.data?.hasNextPage);
   const isTimeout = results.error instanceof Error && results.error.message === "timeout";
   const hasRenderableResults = merged.length > 0;
-  const isLoading = !hasRenderableResults && (results.isLoading || anilistQ.isLoading || jikanQ.isLoading) && discoveryPage === 1;
-  const isLoadingMore = discoveryPage > 1 && (anilistQ.isLoading || jikanQ.isLoading);
+  const isLoading = !hasRenderableResults && (jikanQ.isLoading || (fetchAllSources && (results.isLoading || anilistQ.isLoading))) && discoveryPage === 1;
+  const isLoadingMore = discoveryPage > 1 && (jikanQ.isLoading || (fetchAllSources && anilistQ.isLoading));
 
   useEffect(() => {
     const items = [...backendResults, ...allAnilist, ...allJikan];
@@ -187,7 +191,7 @@ function SearchContent() {
     if (!visibleMerged.length) return;
     const links: HTMLLinkElement[] = [];
     for (const anime of visibleMerged.slice(0, 8)) {
-      const poster = posterOf(anime, "poster-sm");
+      const poster = posterOf(anime, "poster-lg");
       if (!poster) continue;
       const link = document.createElement("link");
       link.rel = "prefetch";
@@ -267,7 +271,7 @@ function SearchContent() {
                 <Loader2 size={15} className="shrink-0 animate-spin text-amber-400" />
                 <div>
                   <p className="text-sm font-medium text-amber-300">Loading discovery sources</p>
-                  <p className="text-xs text-amber-400/60">Your API, AniList, and MyAnimeList are being checked in parallel.</p>
+                  <p className="text-xs text-amber-400/60">MyAnimeList is loading the fast first page.</p>
                 </div>
               </div>
               <GridSkeleton count={18} />
@@ -281,6 +285,18 @@ function SearchContent() {
                   <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 8} />
                 ))}
               </div>
+
+              {q && !fetchAllSources ? (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={() => setFetchAllSources(true)}
+                    className="flex items-center gap-2 rounded-2xl border border-[#cf2442]/25 bg-[#cf2442]/12 px-8 py-3 text-sm font-bold text-white transition-colors hover:border-[#cf2442]/45 hover:bg-[#cf2442]/18"
+                  >
+                    <Search size={16} />
+                    Fetch all sources
+                  </button>
+                </div>
+              ) : null}
 
               {isLoadingMore ? (
                 <div className="mt-6">

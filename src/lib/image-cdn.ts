@@ -6,9 +6,9 @@ export type ImageVariant = "poster-xs" | "poster-sm" | "poster-md" | "poster-lg"
 
 const VARIANT_WIDTH: Record<ImageVariant, number> = {
   "poster-xs": 64,
-  "poster-sm": 144,
-  "poster-md": 184,
-  "poster-lg": 300,
+  "poster-sm": 184,
+  "poster-md": 260,
+  "poster-lg": 420,
   "banner-sm": 768,
   "banner-lg": 1600,
   thumb: 320,
@@ -16,9 +16,9 @@ const VARIANT_WIDTH: Record<ImageVariant, number> = {
 
 const VARIANT_QUALITY: Record<ImageVariant, number> = {
   "poster-xs": 58,
-  "poster-sm": 66,
-  "poster-md": 69,
-  "poster-lg": 72,
+  "poster-sm": 74,
+  "poster-md": 80,
+  "poster-lg": 86,
   "banner-sm": 76,
   "banner-lg": 80,
   thumb: 66,
