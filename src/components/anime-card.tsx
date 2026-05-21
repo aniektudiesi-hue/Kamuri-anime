@@ -18,6 +18,8 @@ import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
 import { animeId, animePath, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf, watchPath } from "@/lib/utils";
 
+const loadedPosterUrls = new Set<string>();
+
 const STATUS_DOT: Record<string, string> = {
   currently_airing: "bg-[#c8ced8]",
   not_yet_aired: "bg-white/45",
@@ -31,7 +33,7 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
   const episodes = episodeCount(anime);
   const poster = posterOf(anime, priority ? "poster-lg" : "poster-md");
   const [imageFailed, setImageFailed] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(() => Boolean(poster && loadedPosterUrls.has(poster)));
   const title = titleOf(anime);
   const statusKey = (anime.status || "").toLowerCase();
   const resume = useResumeHistory(id);
@@ -77,9 +79,15 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
               sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 180px"
               priority={priority}
               fetchPriority={priority ? "high" : "auto"}
-              onLoad={() => setImageLoaded(true)}
+              decoding="async"
+              onLoad={() => {
+                loadedPosterUrls.add(poster);
+                setImageLoaded(true);
+              }}
               onError={() => setImageFailed(true)}
-              className="object-cover transition duration-180 group-hover:scale-[1.025]"
+              className={`object-cover transition duration-200 group-hover:scale-[1.025] ${
+                imageLoaded ? "opacity-100" : "opacity-0"
+              }`}
             />
           ) : (
             <PosterFallback title={title} />

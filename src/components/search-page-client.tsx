@@ -70,8 +70,13 @@ function GridSkeleton({ count = 20 }: { count?: number }) {
 
 function SearchContent() {
   const params = useSearchParams();
-  const { token } = useAuth();
   const q = params.get("q")?.trim() ?? "";
+  const intentKey = resolveDiscoveryIntent(q).key;
+  return <SearchContentBody key={intentKey} q={q} />;
+}
+
+function SearchContentBody({ q }: { q: string }) {
+  const { token } = useAuth();
   const intent = useMemo(() => resolveDiscoveryIntent(q), [q]);
   const instantResults = useMemo(() => localSearchAnime(q, 30), [q]);
   const slowTimer = useRef<number | undefined>(undefined);
@@ -121,7 +126,7 @@ function SearchContent() {
   });
 
   const anilistQ = useQuery({
-    queryKey: ["anilist-discovery", intent.key, discoveryPage],
+    queryKey: ["anilist-discovery", intent.key, q, discoveryPage],
     queryFn: () => fetchAniListDiscovery(intent, discoveryPage),
     enabled: q.length > 0 && fetchAllSources,
     staleTime: 1000 * 60 * 30,
@@ -129,7 +134,7 @@ function SearchContent() {
   });
 
   const jikanQ = useQuery({
-    queryKey: ["jikan-discovery", intent.key, discoveryPage],
+    queryKey: ["jikan-discovery", intent.key, q, discoveryPage],
     queryFn: () => fetchJikanDiscovery(intent, discoveryPage),
     enabled: q.length > 0,
     staleTime: 1000 * 60 * 45,
@@ -190,13 +195,14 @@ function SearchContent() {
   useEffect(() => {
     if (!visibleMerged.length) return;
     const links: HTMLLinkElement[] = [];
-    for (const anime of visibleMerged.slice(0, 8)) {
+    for (const [index, anime] of visibleMerged.slice(0, 12).entries()) {
       const poster = posterOf(anime, "poster-lg");
       if (!poster) continue;
       const link = document.createElement("link");
-      link.rel = "prefetch";
+      link.rel = index < 6 ? "preload" : "prefetch";
       link.as = "image";
       link.href = poster;
+      if (index < 6) link.fetchPriority = "high";
       document.head.appendChild(link);
       links.push(link);
     }
