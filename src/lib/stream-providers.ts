@@ -31,6 +31,7 @@ export const STREAM_PROVIDERS = [
     queryType: (type) => type,
     fetch: (malId, episode, type) => api.stream(malId, episode, type),
     retry: false,
+    warm: (stream) => warmStreamManifest(stream, { segments: 2, timeoutMs: 8_000 }),
   },
   {
     id: "moon",

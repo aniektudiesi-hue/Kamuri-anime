@@ -1,7 +1,7 @@
 import type { StreamResponse } from "./types";
 
 const STREAM_CACHE_PREFIX = "anime-tv-stream-meta:";
-const STREAM_CACHE_TTL = 1000 * 60 * 15;
+const STREAM_CACHE_TTL = 1000 * 60 * 60;
 const warmedManifests = new Set<string>();
 const warmedMoon = new Map<string, number>();
 const MOON_WARM_TTL = 1000 * 60 * 8;
@@ -13,13 +13,16 @@ type CachedStream = {
 
 export function readCachedStream(key: string) {
   try {
-    const raw = window.sessionStorage.getItem(STREAM_CACHE_PREFIX + key);
+    const storageKey = STREAM_CACHE_PREFIX + key;
+    const raw = window.sessionStorage.getItem(storageKey) || window.localStorage.getItem(storageKey);
     if (!raw) return undefined;
     const cached = JSON.parse(raw) as CachedStream;
     if (!cached.value || cached.expiresAt < Date.now()) {
-      window.sessionStorage.removeItem(STREAM_CACHE_PREFIX + key);
+      window.sessionStorage.removeItem(storageKey);
+      window.localStorage.removeItem(storageKey);
       return undefined;
     }
+    window.sessionStorage.setItem(storageKey, raw);
     return cached.value;
   } catch {
     return undefined;
@@ -28,10 +31,10 @@ export function readCachedStream(key: string) {
 
 export function writeCachedStream(key: string, value: StreamResponse) {
   try {
-    window.sessionStorage.setItem(
-      STREAM_CACHE_PREFIX + key,
-      JSON.stringify({ expiresAt: Date.now() + STREAM_CACHE_TTL, value } satisfies CachedStream),
-    );
+    const payload = JSON.stringify({ expiresAt: Date.now() + STREAM_CACHE_TTL, value } satisfies CachedStream);
+    const storageKey = STREAM_CACHE_PREFIX + key;
+    window.sessionStorage.setItem(storageKey, payload);
+    window.localStorage.setItem(storageKey, payload);
   } catch {
     // Cache writes are opportunistic.
   }
@@ -39,7 +42,9 @@ export function writeCachedStream(key: string, value: StreamResponse) {
 
 export function clearCachedStream(key: string) {
   try {
-    window.sessionStorage.removeItem(STREAM_CACHE_PREFIX + key);
+    const storageKey = STREAM_CACHE_PREFIX + key;
+    window.sessionStorage.removeItem(storageKey);
+    window.localStorage.removeItem(storageKey);
   } catch {
     // Cache clears are opportunistic.
   }

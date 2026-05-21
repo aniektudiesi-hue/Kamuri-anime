@@ -606,6 +606,18 @@ export function VideoPlayer({
         await video.play().catch(() => undefined);
       }
     };
+    const requestPlaybackNow = () => {
+      if (!shouldAutoPlay || playRequested) return;
+      playRequested = true;
+      playIntentRef.current = true;
+      const play = video.play();
+      if (play && typeof play.catch === "function") {
+        play.catch(() => {
+          video.muted = true;
+          video.play().catch(() => undefined);
+        });
+      }
+    };
     const markWaiting = () => {
       rememberTime();
       if (video.paused || video.ended || !playIntentRef.current || hasEnoughBuffer()) {
@@ -668,7 +680,7 @@ export function VideoPlayer({
           enableWorker: true,
           progressive: true,
           lowLatencyMode: false,
-          autoStartLoad: false,
+          autoStartLoad: true,
           startFragPrefetch: true,
           startPosition: startupTime > 2 ? startupTime : 0,
           testBandwidth: false,
@@ -695,6 +707,7 @@ export function VideoPlayer({
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
           hls?.loadSource(src);
           hls?.startLoad(startupTime > 2 ? startupTime : 0);
+          requestPlaybackNow();
         });
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
           hls!.nextLevel = 0;
@@ -776,10 +789,12 @@ export function VideoPlayer({
         hls.attachMedia(video);
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = src;
+        requestPlaybackNow();
         video.addEventListener("canplay", playWhenReady, { once: true });
       }
     } else {
       video.src = src;
+      requestPlaybackNow();
       video.addEventListener("canplay", playWhenReady, { once: true });
     }
 
