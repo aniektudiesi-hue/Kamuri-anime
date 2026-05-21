@@ -315,7 +315,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
       </div>
 
       <div className="relative flex min-h-[286px] items-end px-4">
-        <div className="w-[92%] max-w-[350px] rounded-2xl border border-white/[0.08] bg-[#090b13]/30 p-3 shadow-2xl shadow-black/24">
+        <div className="w-[82%] max-w-[300px] rounded-2xl border border-white/[0.06] bg-[#090b13]/18 p-2.5 shadow-xl shadow-black/18">
           <div className="mb-2 flex items-center gap-2">
             <span className="rounded-full bg-[#cf2442]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#cf2442]/30">
               Featured
@@ -327,22 +327,22 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
             ) : null}
           </div>
 
-          <h1 className="line-clamp-2 text-lg font-black leading-tight text-white drop-shadow-xl">
+          <h1 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-lg">
             {title}
           </h1>
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-2.5 flex gap-2">
             <Link
               href={watchPath(current, id, 1)}
-              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#cf2442] text-sm font-black text-white shadow-lg shadow-[#cf2442]/22"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-[#cf2442] text-xs font-bold text-white shadow-lg shadow-[#cf2442]/20"
             >
-              <Play size={16} fill="currentColor" />
+              <Play size={14} fill="currentColor" />
               Watch
             </Link>
             <Link
               href={animePath(current, id)}
               aria-label={`View details for ${title}`}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/[0.16] bg-black/24 px-3.5 text-sm font-bold text-white/90"
+              className="inline-flex h-9 items-center justify-center rounded-xl border border-white/[0.12] bg-black/18 px-3 text-xs font-semibold text-white/88"
             >
               Details
             </Link>
