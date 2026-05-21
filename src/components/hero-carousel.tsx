@@ -292,7 +292,6 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const title = titleOf(current);
   const poster = posterOf(current, "poster-md");
   const banner = bannerOf(current, "banner-lg");
-  const count = episodeCount(current);
 
   return (
     <section ref={sectionRef} className="relative -mt-1 min-h-[286px] overflow-hidden pb-3 sm:hidden">
@@ -314,35 +313,24 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
         <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#06070d]/46 to-transparent" />
       </div>
 
-      <div className="relative flex min-h-[286px] items-end px-4">
-        <div className="w-[82%] max-w-[300px] rounded-2xl border border-white/[0.06] bg-[#090b13]/18 p-2.5 shadow-xl shadow-black/18">
-          <div className="mb-2 flex items-center gap-2">
-            <span className="rounded-full bg-[#cf2442]/24 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[#f2c6cd] ring-1 ring-[#cf2442]/30">
-              Featured
-            </span>
-            {count > 0 ? (
-              <span className="rounded-full bg-white/[0.12] px-2.5 py-1 text-[10px] font-bold text-white/70 ring-1 ring-white/15">
-                {count} Episodes
-              </span>
-            ) : null}
-          </div>
-
+      <div className="relative flex min-h-[286px] items-end px-4 pb-2">
+        <div className="w-[74%] max-w-[270px] rounded-xl border border-white/[0.045] bg-[#090b13]/10 p-2 shadow-md shadow-black/10">
           <h1 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-lg">
             {title}
           </h1>
 
-          <div className="mt-2.5 flex gap-2">
+          <div className="mt-2 flex gap-1.5">
             <Link
               href={watchPath(current, id, 1)}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-[#cf2442] text-xs font-bold text-white shadow-lg shadow-[#cf2442]/20"
+              className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#cf2442] text-xs font-bold text-white shadow-md shadow-[#cf2442]/16"
             >
-              <Play size={14} fill="currentColor" />
+              <Play size={13} fill="currentColor" />
               Watch
             </Link>
             <Link
               href={animePath(current, id)}
               aria-label={`View details for ${title}`}
-              className="inline-flex h-9 items-center justify-center rounded-xl border border-white/[0.12] bg-black/18 px-3 text-xs font-semibold text-white/88"
+              className="inline-flex h-8 items-center justify-center rounded-lg border border-white/[0.09] bg-black/10 px-2.5 text-xs font-semibold text-white/88"
             >
               Details
             </Link>
@@ -353,7 +341,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
               {items.slice(0, 5).map((_, i) => (
                 <button
                   key={i}
-                  aria-label={`Featured ${i + 1}`}
+                  aria-label={`Hero slide ${i + 1}`}
                   onClick={() => setIndex(i)}
                   className="grid h-6 w-7 place-items-center rounded-full"
                 >

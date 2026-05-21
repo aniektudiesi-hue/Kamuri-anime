@@ -11,8 +11,10 @@ import { animeId, animePath, episodeCount, posterOf, titleOf, watchPath } from "
 
 const GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy",
-  "Horror", "Isekai", "Mecha", "Mystery", "Romance",
-  "School", "Sci-Fi", "Slice of Life", "Sports", "Supernatural",
+  "Horror", "Isekai", "Dungeon", "Reincarnation", "Harem",
+  "Ecchi", "Erotica", "Mecha", "Mystery", "Psychological",
+  "Romance", "School", "Sci-Fi", "Slice of Life", "Sports",
+  "Supernatural", "Thriller", "Martial Arts", "Demons",
 ];
 
 export function SidebarContent() {

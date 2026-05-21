@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Heart, Home, MessageCircle, Search } from "lucide-react";
+import { Clock3, Heart, Home, MessageCircle, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/", label: "Home", icon: Home },
   { href: "/search", label: "Search", icon: Search },
+  { href: "/history", label: "History", icon: Clock3 },
   { href: "/chat", label: "Chat", icon: MessageCircle },
-  { href: "/schedule", label: "Schedule", icon: CalendarDays },
   { href: "/watchlist", label: "Watchlist", icon: Heart },
 ];
 

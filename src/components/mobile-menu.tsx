@@ -34,9 +34,9 @@ export function MobileMenu({ isLoggedIn, isAdminOwner }: { isLoggedIn: boolean; 
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="w-[88vw] max-w-[380px] border-white/[0.08] bg-[#080a12]/96 p-0 text-white shadow-2xl backdrop-blur-2xl"
+        className="flex h-dvh w-[88vw] max-w-[380px] flex-col overflow-hidden border-white/[0.08] bg-[#080a12]/96 p-0 text-white shadow-2xl backdrop-blur-2xl"
       >
-        <SheetHeader className="border-b border-white/[0.07] p-4 text-left">
+        <SheetHeader className="shrink-0 border-b border-white/[0.07] p-4 text-left">
           <SheetTitle className="flex items-center gap-3 text-white">
             <Image src="/logo.svg" alt="" width={32} height={32} />
             anime<span className="-ml-2 text-[#e11d48]">Tv</span>
@@ -44,7 +44,7 @@ export function MobileMenu({ isLoggedIn, isAdminOwner }: { isLoggedIn: boolean; 
           <SheetDescription className="text-white/38">Browse, resume, and tune playback.</SheetDescription>
         </SheetHeader>
 
-        <div className="flex flex-col gap-4 p-4">
+        <div className="no-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="grid gap-1.5">
             {nav.map((item) => (
               <Link

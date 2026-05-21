@@ -19,7 +19,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
       <div className="flex items-start gap-6">
         <div className="min-w-0 flex-1">{children}</div>
         <div className="hidden w-[280px] shrink-0 lg:block">
-          <div className="sticky top-[80px]">
+          <div className="no-scrollbar sticky top-[80px] max-h-[calc(100dvh-92px)] overflow-y-auto overscroll-contain pr-1">
             {showSidebar ? <SidebarContent /> : <SidebarSkeleton />}
           </div>
         </div>

@@ -2,14 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Flame, Play, Radio, Star, Trophy } from "lucide-react";
-import { useEffect } from "react";
+import { CalendarDays, ChevronRight, Clock3, Flame, Play, Radio, Star, Trophy } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { HeroCarousel, MobileHeroBanner } from "@/components/hero-carousel";
 import { SidebarLayout } from "@/components/sidebar";
+import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { rememberSearchCatalog } from "@/lib/search-index";
-import type { AiringScheduleItem, Anime, HomeInitialData } from "@/lib/types";
-import { animeId, animePath, episodeCount, episodeLabel, posterOf, titleOf } from "@/lib/utils";
+import type { AiringScheduleItem, Anime, HomeInitialData, LibraryItem } from "@/lib/types";
+import { HISTORY_UPDATED_EVENT, animeId, animePath, episodeCount, episodeLabel, posterOf, progressOf, rememberedHistory, titleOf, watchPath } from "@/lib/utils";
 
 export function HomePageClient({ initialData }: { initialData: HomeInitialData }) {
   useEffect(() => {
@@ -31,6 +34,7 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
         items={initialData.banners.length ? initialData.banners : initialData.thumbnails}
         loading={!initialData.banners.length && !initialData.thumbnails.length}
       />
+      <ContinueWatchingSection />
 
       <SidebarLayout>
         <BigSection
@@ -59,6 +63,82 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
 
       <HomeSeoSection />
     </AppShell>
+  );
+}
+
+function ContinueWatchingSection() {
+  const { token } = useAuth();
+  const [localItems, setLocalItems] = useState<LibraryItem[]>([]);
+
+  useEffect(() => {
+    const refresh = () => setLocalItems(rememberedHistory(8));
+    refresh();
+    window.addEventListener(HISTORY_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(HISTORY_UPDATED_EVENT, refresh);
+  }, []);
+
+  const serverHistory = useQuery({
+    queryKey: ["history", token],
+    queryFn: () => api.history(token!),
+    enabled: Boolean(token),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const items = useMemo(() => mergeHistoryItems(localItems, serverHistory.data).slice(0, 5), [localItems, serverHistory.data]);
+  if (!items.length) return null;
+
+  return (
+    <section className="mx-auto max-w-screen-2xl px-4 pt-4 lg:px-6">
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-2xl border border-white/[0.075] bg-white/[0.045]">
+            <Clock3 size={14} className="text-[#cf2442]" />
+          </span>
+          <div>
+            <h2 className="text-lg font-black tracking-tight text-white">Watch From Where You Left</h2>
+            <p className="hidden text-[11px] font-semibold uppercase tracking-[0.22em] text-white/48 sm:block">
+              Continue instantly
+            </p>
+          </div>
+        </div>
+        <Link href="/history" className="rounded-full border border-white/[0.09] bg-white/[0.055] px-3 py-1.5 text-xs font-black text-white/74">
+          History
+        </Link>
+      </div>
+
+      <div className="no-scrollbar flex gap-3 overflow-x-auto pb-3 pt-3">
+        {items.map((item) => (
+          <ContinueCard key={`${item.mal_id || item.anime_id}-${item.episode || item.episode_num}`} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ContinueCard({ item }: { item: LibraryItem }) {
+  const id = animeId(item);
+  const episode = Number(item.episode || item.episode_num || 1);
+  const poster = posterOf(item, "poster-sm");
+  const title = titleOf(item);
+  const progress = progressOf(item);
+
+  return (
+    <Link
+      href={watchPath(item, id, episode)}
+      className="group grid w-[245px] shrink-0 grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#111421]/76 p-2 transition hover:border-[#cf2442]/30 hover:bg-[#171b2a] sm:w-[280px]"
+    >
+      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
+        {poster ? <Image src={poster} alt={title} fill sizes="72px" className="object-cover" loading="lazy" /> : <PosterFallback title={title} />}
+      </div>
+      <div className="min-w-0 py-1">
+        <p className="line-clamp-2 text-sm font-black leading-5 text-white/88 group-hover:text-white">{title}</p>
+        <p className="mt-1 text-xs font-bold text-white/54">Episode {episode}{progress > 1 ? ` at ${formatClock(progress)}` : ""}</p>
+        <span className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-xl bg-[#cf2442] px-3 text-xs font-black text-white">
+          <Play size={12} fill="currentColor" />
+          Resume
+        </span>
+      </div>
+    </Link>
   );
 }
 
@@ -205,20 +285,24 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
 }
 
 function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
-  const upcoming = items.slice(0, 12);
-  if (!upcoming.length) return null;
+  const [now] = useState(() => Date.now());
+  const today = items.filter((item) => isTodayInKolkata(item.airingAt));
+  const fallbackUpcoming = items.filter((item) => item.airingAt * 1000 >= now);
+  const visibleItems = (today.length ? today : fallbackUpcoming).slice(0, 12);
+  const title = today.length ? "Airing Today" : "Upcoming Schedule";
+  if (!visibleItems.length) return null;
 
   return (
     <section className="content-visibility-auto border-t border-white/[0.05] py-6">
       <SectionHeader
-        title="Monthly Airing Schedule"
+        title={title}
         icon={<CalendarDays size={14} className="text-[#cf2442]" />}
-        count={items.length}
+        count={visibleItems.length}
         viewAllHref="/schedule"
       />
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {upcoming.map((item) => (
+        {visibleItems.map((item) => (
           <ScheduleCard key={`${item.id}-${item.episode}-${item.airingAt}`} item={item} />
         ))}
       </div>
@@ -315,4 +399,46 @@ function HomeSeoSection() {
 
 function formatAiringTime(value: number) {
   return new Date(value * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function isTodayInKolkata(value: number) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(new Date(value * 1000)) === formatter.format(new Date());
+}
+
+function mergeHistoryItems(localItems: LibraryItem[], serverItems: LibraryItem[] | undefined) {
+  const byId = new Map<string, LibraryItem>();
+  [...localItems, ...(serverItems ?? [])].forEach((item) => {
+    const id = animeId(item);
+    if (!id) return;
+    const existing = byId.get(id);
+    const existingTime = watchedAt(existing);
+    const nextTime = watchedAt(item);
+    if (!existing || nextTime >= existingTime) byId.set(id, { ...existing, ...item });
+  });
+  return Array.from(byId.values()).sort((a, b) => watchedAt(b) - watchedAt(a));
+}
+
+function watchedAt(item: LibraryItem | undefined) {
+  const value = item?.watched_at || item?.created_at;
+  if (typeof value === "number") return value < 10_000_000_000 ? value * 1000 : value;
+  if (typeof value === "string") {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function formatClock(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }

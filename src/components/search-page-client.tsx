@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +10,7 @@ import { AnimeCard } from "@/components/anime-card";
 import { SearchBox } from "@/components/search-box";
 import { SidebarLayout } from "@/components/sidebar";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import {
   DISCOVERY_CHIPS,
   fetchAniListDiscovery,
@@ -17,8 +19,8 @@ import {
   resolveDiscoveryIntent,
 } from "@/lib/anime-discovery";
 import { localSearchAnime, mergeSearchResults, rememberSearchCatalog } from "@/lib/search-index";
-import type { Anime } from "@/lib/types";
-import { animeId, posterOf } from "@/lib/utils";
+import type { Anime, LibraryItem } from "@/lib/types";
+import { HISTORY_UPDATED_EVENT, animeId, posterOf, rememberedHistory, titleOf } from "@/lib/utils";
 
 const GENRE_LINKS = new Set([
   "Action",
@@ -26,13 +28,22 @@ const GENRE_LINKS = new Set([
   "Comedy",
   "Drama",
   "Fantasy",
+  "Harem",
+  "Ecchi",
+  "Erotica",
   "Isekai",
+  "Dungeon",
+  "Reincarnation",
   "Mystery",
+  "Psychological",
   "Romance",
   "Sci-Fi",
   "Slice of Life",
   "Sports",
   "Supernatural",
+  "Thriller",
+  "Martial Arts",
+  "Demons",
 ]);
 
 export function SearchPageClient() {
@@ -59,6 +70,7 @@ function GridSkeleton({ count = 20 }: { count?: number }) {
 
 function SearchContent() {
   const params = useSearchParams();
+  const { token } = useAuth();
   const q = params.get("q")?.trim() ?? "";
   const intent = useMemo(() => resolveDiscoveryIntent(q), [q]);
   const instantResults = useMemo(() => localSearchAnime(q, 30), [q]);
@@ -68,6 +80,7 @@ function SearchContent() {
   const [allAnilist, setAllAnilist] = useState<Anime[]>([]);
   const [allJikan, setAllJikan] = useState<Anime[]>([]);
   const [visibleCount, setVisibleCount] = useState(18);
+  const [localHistory, setLocalHistory] = useState<LibraryItem[]>([]);
 
   useEffect(() => {
     setDiscoveryPage(1);
@@ -75,6 +88,25 @@ function SearchContent() {
     setAllJikan([]);
     setVisibleCount(18);
   }, [intent.key]);
+
+  useEffect(() => {
+    const refresh = () => setLocalHistory(rememberedHistory(12));
+    refresh();
+    window.addEventListener(HISTORY_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(HISTORY_UPDATED_EVENT, refresh);
+  }, []);
+
+  const serverHistory = useQuery({
+    queryKey: ["history", token],
+    queryFn: () => api.history(token!),
+    enabled: Boolean(token),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const suggestionQueries = useMemo(
+    () => buildHistorySuggestions(localHistory, serverHistory.data),
+    [localHistory, serverHistory.data],
+  );
 
   const results = useQuery({
     queryKey: ["search", q],
@@ -208,6 +240,8 @@ function SearchContent() {
             </div>
           )}
 
+          <HistorySuggestions queries={suggestionQueries} />
+
           {results.isError && merged.length === 0 ? (
             <div className="flex flex-col items-center gap-5 py-16 text-center">
               <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#141828]">
@@ -301,6 +335,43 @@ function SearchContent() {
       </SidebarLayout>
     </AppShell>
   );
+}
+
+function HistorySuggestions({ queries }: { queries: string[] }) {
+  if (!queries.length) return null;
+  return (
+    <section className="mb-6 rounded-2xl border border-white/[0.06] bg-[#0d1020]/72 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#cf2442]">Suggested for you</p>
+          <p className="mt-1 text-xs font-semibold text-white/42">Based on what you were watching</p>
+        </div>
+      </div>
+      <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        {queries.map((query) => (
+          <Link
+            key={query}
+            href={GENRE_LINKS.has(query) ? `/genre/${encodeURIComponent(query)}` : `/search?q=${encodeURIComponent(query)}`}
+            className="shrink-0 rounded-xl border border-white/[0.075] bg-white/[0.045] px-3 py-2 text-xs font-black text-white/72 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/12 hover:text-white"
+          >
+            {query}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function buildHistorySuggestions(localItems: LibraryItem[], serverItems: LibraryItem[] | undefined) {
+  const values = new Set<string>();
+  [...localItems, ...(serverItems ?? [])].forEach((item) => {
+    const title = titleOf(item);
+    if (title && title !== "Untitled") values.add(title);
+  });
+  ["Airing", "Top Rated", "Isekai", "Fantasy", "Action", "Reincarnation", "Dungeon", "Romance"].forEach((chip) => {
+    if (values.size < 10) values.add(chip);
+  });
+  return Array.from(values).slice(0, 10);
 }
 
 function SearchFallback() {

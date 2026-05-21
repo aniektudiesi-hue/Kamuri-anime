@@ -44,9 +44,35 @@ export default async function SchedulePage() {
             </p>
           </header>
 
+          {grouped.length ? (
+            <nav
+              aria-label="Schedule days"
+              className="sticky top-[76px] z-20 -mx-4 mb-5 border-y border-white/[0.055] bg-[#06070d]/88 px-4 py-3 backdrop-blur-xl sm:top-[82px] lg:mx-0 lg:rounded-2xl lg:border lg:bg-[#0d1020]/82"
+            >
+              <div className="no-scrollbar flex snap-x gap-2 overflow-x-auto">
+                {grouped.map((group) => (
+                  <Link
+                    key={group.key}
+                    href={`#${group.key}`}
+                    className={`shrink-0 snap-start rounded-xl border px-3 py-2 text-left transition ${
+                      group.isToday
+                        ? "border-[#cf2442]/45 bg-[#cf2442]/18 text-white shadow-lg shadow-[#cf2442]/12"
+                        : "border-white/[0.075] bg-white/[0.045] text-white/68 hover:border-white/[0.14] hover:text-white"
+                    }`}
+                  >
+                    <span className="block text-[10px] font-black uppercase tracking-widest">
+                      {group.isToday ? "Today" : group.weekday}
+                    </span>
+                    <span className="mt-0.5 block text-xs font-bold">{group.shortLabel}</span>
+                  </Link>
+                ))}
+              </div>
+            </nav>
+          ) : null}
+
           <div className="space-y-7">
             {grouped.length ? grouped.map((group) => (
-              <section key={group.label}>
+              <section key={group.key} id={group.key} className="scroll-mt-36">
                 <div className="mb-3 flex items-center gap-2">
                   <span className="h-5 w-1 rounded-full bg-[#cf2442]" />
                   <h2 className="text-lg font-black text-white">{group.label}</h2>
@@ -94,17 +120,62 @@ export default async function SchedulePage() {
 }
 
 function groupByDay(items: Awaited<ReturnType<typeof getHomeInitialData>>["schedule"]) {
-  const groups = new Map<string, typeof items>();
+  type ScheduleGroup = {
+    key: string;
+    label: string;
+    shortLabel: string;
+    weekday: string;
+    dayValue: string;
+    isToday: boolean;
+    items: typeof items;
+  };
+  const groups = new Map<string, ScheduleGroup>();
+  const dayFormatter = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Kolkata",
+  });
+  const todayValue = dayFormatter.format(new Date());
   for (const item of items) {
+    const date = new Date(item.airingAt * 1000);
+    const dayValue = dayFormatter.format(date);
     const label = new Intl.DateTimeFormat("en", {
       weekday: "long",
       month: "short",
       day: "numeric",
       timeZone: "Asia/Kolkata",
-    }).format(new Date(item.airingAt * 1000));
-    groups.set(label, [...(groups.get(label) ?? []), item]);
+    }).format(date);
+    const shortLabel = new Intl.DateTimeFormat("en", {
+      month: "short",
+      day: "numeric",
+      timeZone: "Asia/Kolkata",
+    }).format(date);
+    const weekday = new Intl.DateTimeFormat("en", {
+      weekday: "short",
+      timeZone: "Asia/Kolkata",
+    }).format(date);
+    const existing = groups.get(dayValue);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      groups.set(dayValue, {
+        key: `day-${dayValue}`,
+        label,
+        shortLabel,
+        weekday,
+        dayValue,
+        isToday: dayValue === todayValue,
+        items: [item],
+      });
+    }
   }
-  return Array.from(groups.entries()).map(([label, groupItems]) => ({ label, items: groupItems }));
+  return Array.from(groups.values()).sort((a, b) => {
+    const aPast = a.dayValue < todayValue;
+    const bPast = b.dayValue < todayValue;
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    return a.dayValue.localeCompare(b.dayValue);
+  });
 }
 
 function formatTime(airingAt: number) {

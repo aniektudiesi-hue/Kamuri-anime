@@ -59,13 +59,21 @@ export const DISCOVERY_CHIPS = [
   "Comedy",
   "Drama",
   "Fantasy",
+  "Harem",
+  "Ecchi",
+  "Erotica",
   "Isekai",
+  "Dungeon",
+  "Reincarnation",
   "Mystery",
+  "Psychological",
   "Romance",
   "Sci-Fi",
   "Slice of Life",
   "Sports",
   "Supernatural",
+  "Thriller",
+  "Martial Arts",
 ];
 
 const ANILIST_STATUS: Record<string, string> = {
@@ -104,6 +112,13 @@ const TAG_ALIASES: Record<string, string> = {
   vampire: "Vampire",
   "time travel": "Time Manipulation",
   demons: "Demons",
+  dungeon: "Dungeon",
+  dungeons: "Dungeon",
+  reincarnation: "Reincarnation",
+  reincarnated: "Reincarnation",
+  erotica: "Erotica",
+  erotic: "Erotica",
+  harem: "Harem",
   ninja: "Ninja",
 };
 
