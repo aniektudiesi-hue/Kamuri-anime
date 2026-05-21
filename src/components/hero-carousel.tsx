@@ -95,7 +95,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
             alt=""
             fill
             loading="eager"
-            fetchPriority="auto"
+            fetchPriority={index === 0 ? "high" : "auto"}
             sizes="(max-width: 639px) 1px, 100vw"
             className="object-cover object-center opacity-80 motion-safe:will-change-transform"
           />
@@ -291,7 +291,7 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
   const id = animeId(current);
   const title = titleOf(current);
   const poster = posterOf(current, "poster-md");
-  const banner = bannerOf(current, "banner-lg");
+  const banner = bannerOf(current, "banner-sm");
 
   return (
     <section ref={sectionRef} className="relative -mt-1 min-h-[286px] overflow-hidden pb-3 sm:hidden">

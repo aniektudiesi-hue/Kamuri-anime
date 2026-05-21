@@ -19,6 +19,21 @@ const HOME_CACHE_TTL = 1000 * 60 * 60;
 
 export function HomePageClient({ initialData }: { initialData: HomeInitialData }) {
   const [homeData, setHomeData] = useState(initialData);
+  const loadRest = useIdleMount();
+  const scheduleQuery = useQuery({
+    queryKey: ["home-schedule"],
+    queryFn: async () => {
+      const response = await fetch("/api/home/schedule", {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return [] as AiringScheduleItem[];
+      const payload = (await response.json()) as { schedule?: AiringScheduleItem[] };
+      return payload.schedule ?? [];
+    },
+    enabled: loadRest,
+    staleTime: 1000 * 60 * 60 * 6,
+    gcTime: 1000 * 60 * 60 * 12,
+  });
 
   useEffect(() => {
     try {
@@ -54,13 +69,7 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
 
   return (
     <AppShell>
-      <div className="hidden sm:block">
-        <HeroCarousel items={homeData.banners} loading={!homeData.banners.length} />
-      </div>
-      <MobileHeroBanner
-        items={homeData.banners.length ? homeData.banners : homeData.thumbnails}
-        loading={!homeData.banners.length && !homeData.thumbnails.length}
-      />
+      <ResponsiveHero homeData={homeData} />
       <ContinueWatchingSection />
 
       <SidebarLayout>
@@ -71,25 +80,109 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
           viewAllHref="/popular"
         />
 
-        <BigSection
-          title="New Episodes"
-          icon={<Radio size={14} className="text-[#c8ced8]" />}
-          items={homeData.recent}
-          viewAllHref="/new-releases"
-        />
+        {loadRest ? (
+          <>
+            <BigSection
+              title="New Episodes"
+              icon={<Radio size={14} className="text-[#c8ced8]" />}
+              items={homeData.recent}
+              viewAllHref="/new-releases"
+            />
 
-        <BigSection
-          title="Top Rated All Time"
-          icon={<Trophy size={14} className="text-[#d8b56a]" />}
-          items={homeData.topRated}
-          viewAllHref="/top-rated"
-        />
+            <BigSection
+              title="Top Rated All Time"
+              icon={<Trophy size={14} className="text-[#d8b56a]" />}
+              items={homeData.topRated}
+              viewAllHref="/top-rated"
+            />
 
-        <AiringScheduleSection items={homeData.schedule} />
+            <AiringScheduleSection items={scheduleQuery.data?.length ? scheduleQuery.data : homeData.schedule} />
+          </>
+        ) : (
+          <DeferredSectionsSkeleton />
+        )}
       </SidebarLayout>
 
-      <HomeSeoSection />
+      {loadRest ? <HomeSeoSection /> : null}
     </AppShell>
+  );
+}
+
+function ResponsiveHero({ homeData }: { homeData: HomeInitialData }) {
+  const isMobile = useSmallScreen();
+  if (isMobile === null) {
+    return (
+      <section className="relative min-h-[286px] overflow-hidden bg-[#080a12] sm:min-h-[460px]">
+        <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#151827] to-[#06070d]" />
+      </section>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <MobileHeroBanner
+        items={homeData.banners.length ? homeData.banners : homeData.thumbnails}
+        loading={!homeData.banners.length && !homeData.thumbnails.length}
+      />
+    );
+  }
+
+  return <HeroCarousel items={homeData.banners} loading={!homeData.banners.length} />;
+}
+
+function useSmallScreen() {
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return isMobile;
+}
+
+function useIdleMount() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (ready) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let idleId: number | undefined;
+    const show = () => setReady(true);
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(show, { timeout: 1200 });
+    } else {
+      timer = globalThis.setTimeout(show, 650);
+    }
+    return () => {
+      if (idleId !== undefined && "cancelIdleCallback" in window) window.cancelIdleCallback(idleId);
+      if (timer !== undefined) globalThis.clearTimeout(timer);
+    };
+  }, [ready]);
+
+  return ready;
+}
+
+function DeferredSectionsSkeleton() {
+  return (
+    <div className="border-t border-white/[0.055] py-8">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="h-7 w-1 rounded-full bg-[#cf2442]/80" />
+        <div className="h-8 w-8 rounded-2xl bg-white/[0.045]" />
+        <div className="h-5 w-40 rounded-full bg-white/[0.055]" />
+      </div>
+      <div className="no-scrollbar flex gap-3 overflow-hidden pb-3 sm:gap-4">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className="w-[132px] shrink-0 sm:w-[154px]">
+            <div className="aspect-[2/3] animate-pulse rounded-2xl bg-white/[0.045]" />
+            <div className="mt-2 h-3 w-5/6 rounded-full bg-white/[0.04]" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

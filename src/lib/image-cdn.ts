@@ -9,8 +9,8 @@ const VARIANT_WIDTH: Record<ImageVariant, number> = {
   "poster-sm": 144,
   "poster-md": 184,
   "poster-lg": 300,
-  "banner-sm": 960,
-  "banner-lg": 1920,
+  "banner-sm": 768,
+  "banner-lg": 1600,
   thumb: 320,
 };
 
@@ -19,8 +19,8 @@ const VARIANT_QUALITY: Record<ImageVariant, number> = {
   "poster-sm": 66,
   "poster-md": 69,
   "poster-lg": 72,
-  "banner-sm": 82,
-  "banner-lg": 88,
+  "banner-sm": 76,
+  "banner-lg": 80,
   thumb: 66,
 };
 

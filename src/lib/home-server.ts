@@ -39,15 +39,16 @@ type HomeInitialDataOptions = {
 };
 
 export async function getHomeInitialData(options: HomeInitialDataOptions = {}): Promise<HomeInitialData> {
-  const [banners, thumbnails, recent, topRated, schedule] = await Promise.all([
+  const [banners, thumbnails, recent, topRated] = await Promise.all([
     fetchHomeList("/api/v1/banners"),
     fetchHomeList("/home/thumbnails"),
     fetchHomeList("/home/recently-added", 15 * 60),
     fetchHomeList("/home/top-rated"),
-    fetchMonthlyAiringSchedule(options.fullSchedule ? MONTHLY_SCHEDULE_MAX_PAGES : 1),
   ]);
 
-  const scheduleItems = options.fullSchedule ? schedule : schedule.slice(0, HOMEPAGE_SCHEDULE_LIMIT);
+  const scheduleItems = options.fullSchedule
+    ? await fetchMonthlyAiringSchedule(MONTHLY_SCHEDULE_MAX_PAGES)
+    : [];
 
   return {
     banners: banners.slice(0, 10),
@@ -57,6 +58,11 @@ export async function getHomeInitialData(options: HomeInitialDataOptions = {}): 
     schedule: scheduleItems,
     generatedAt: new Date().toISOString(),
   };
+}
+
+export async function getHomepageSchedule() {
+  const schedule = await fetchMonthlyAiringSchedule(1);
+  return schedule.slice(0, HOMEPAGE_SCHEDULE_LIMIT);
 }
 
 async function fetchHomeList(path: string, revalidate = HOME_REVALIDATE_SECONDS) {
