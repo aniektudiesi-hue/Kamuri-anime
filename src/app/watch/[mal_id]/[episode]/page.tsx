@@ -148,7 +148,10 @@ export default function WatchPage({
 
   useEffect(() => {
     if (!selectedServer || !selectedStream) return;
-    const id = window.setTimeout(() => warmStreamProvider(selectedServer, selectedStream), 0);
+    // Do not compete with first-frame playback. Card/episode hover already warms before navigation;
+    // once the player is mounted, let HLS own the network for the first moment.
+    const delay = selectedServer.id === DEFAULT_STREAM_PROVIDER_ID ? 2200 : 900;
+    const id = window.setTimeout(() => warmStreamProvider(selectedServer, selectedStream), delay);
     return () => window.clearTimeout(id);
   }, [selectedServer, selectedStream]);
 

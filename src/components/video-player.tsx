@@ -685,7 +685,7 @@ export function VideoPlayer({
           startPosition: startupTime > 2 ? startupTime : 0,
           testBandwidth: false,
           capLevelToPlayerSize: true,
-          startLevel: 0,
+          startLevel: -1,
           abrEwmaDefaultEstimate: isMegaPlayServer ? 5_000_000 : 2_000_000,
           abrEwmaFastVoD: 3,
           abrEwmaSlowVoD: 9,
@@ -710,7 +710,13 @@ export function VideoPlayer({
           requestPlaybackNow();
         });
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-          hls!.nextLevel = 0;
+          const lowestStartupLevel = data.levels.reduce((best, level, index) => {
+            const bestBitrate = data.levels[best]?.bitrate || Number.POSITIVE_INFINITY;
+            const bitrate = level.bitrate || Number.POSITIVE_INFINITY;
+            return bitrate < bestBitrate ? index : best;
+          }, 0);
+          hls!.startLevel = lowestStartupLevel;
+          hls!.nextLevel = lowestStartupLevel;
           const seen = new Set<number>();
           const levels: QualityLevel[] = data.levels
             .map((level, i) => ({ hlsIndex: i, height: level.height || 0, bitrate: level.bitrate || 0 }))
