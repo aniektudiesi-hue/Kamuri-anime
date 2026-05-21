@@ -2,10 +2,18 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Play, Star } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import {
+  DEFAULT_STREAM_PROVIDER_ID,
+  STREAM_PROVIDERS,
+  fetchStreamProvider,
+  streamProviderQueryKey,
+  warmStreamProvider,
+} from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
 import { animeId, animePath, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf, watchPath } from "@/lib/utils";
@@ -18,6 +26,7 @@ const STATUS_DOT: Record<string, string> = {
 
 export function AnimeCard({ anime, priority = false, className }: { anime: Anime; priority?: boolean; className?: string }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const id = animeId(anime);
   const episodes = episodeCount(anime);
   const poster = posterOf(anime, "poster-sm");
@@ -32,17 +41,28 @@ export function AnimeCard({ anime, priority = false, className }: { anime: Anime
 
   function prefetch() {
     if (!id) return;
+    const episode = resume.hasResume ? String(resume.episode) : "1";
+    const provider = STREAM_PROVIDERS.find((item) => item.id === DEFAULT_STREAM_PROVIDER_ID) ?? STREAM_PROVIDERS[0];
+    const targetHref = resume.hasResume ? href : watchPath(anime, id, 1);
+    router.prefetch(targetHref);
     queryClient.prefetchQuery({
       queryKey: ["episodes", id, episodes],
       queryFn: () => api.episodes(id, episodes),
       staleTime: 1000 * 60 * 20,
     });
+    queryClient.fetchQuery({
+      queryKey: streamProviderQueryKey(provider, id, episode, "sub"),
+      queryFn: () => fetchStreamProvider(provider, { malId: id, episode, type: "sub" }),
+      staleTime: 1000 * 60 * 25,
+    }).then((stream) => warmStreamProvider(provider, stream)).catch(() => undefined);
   }
 
   return (
     <article
       onMouseEnter={prefetch}
       onFocus={prefetch}
+      onPointerDown={prefetch}
+      onTouchStart={prefetch}
       className={`card-lift scroll-card group ${className ?? "w-[160px] shrink-0 sm:w-[180px]"}`}
     >
       <Link href={href} onClick={() => rememberAnime(anime)} className="block">

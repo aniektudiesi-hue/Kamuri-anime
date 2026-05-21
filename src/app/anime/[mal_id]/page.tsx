@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight, Clock, Play, Plus, Star, Tv, CheckCircle2, Loader2 } from "lucide-react";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,7 @@ import {
   STREAM_PROVIDERS,
   fetchStreamProvider,
   streamProviderQueryKey,
+  warmStreamProvider,
 } from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
@@ -45,6 +47,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const malId = idFromSlug(rawMalId);
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [clickedAnime, setClickedAnime] = useState<Anime | undefined>();
   const [watchlistSaved, setWatchlistSaved] = useState(false);
   const [activeRange, setActiveRange] = useState(0);
@@ -119,12 +122,13 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const prefetchWatch = useCallback((ep: number) => {
     const episode = String(ep);
     const primary = STREAM_PROVIDERS[0];
-    queryClient.prefetchQuery({
+    router.prefetch(watchPath(displayAnime, malId, ep));
+    queryClient.fetchQuery({
       queryKey: streamProviderQueryKey(primary, malId, episode, "sub"),
       queryFn: () => fetchStreamProvider(primary, { malId, episode, type: "sub" }),
       staleTime: 1000 * 60 * 25,
-    });
-  }, [malId, queryClient]);
+    }).then((stream) => warmStreamProvider(primary, stream)).catch(() => undefined);
+  }, [displayAnime, malId, queryClient, router]);
 
   const episodeTotal = episodes.data?.num_episodes || episodeCount(displayAnime);
   const poster = posterOf(displayAnime);
@@ -339,6 +343,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                     href={href}
                     onMouseEnter={() => prefetchWatch(ep.episode_number)}
                     onFocus={() => prefetchWatch(ep.episode_number)}
+                    onPointerDown={() => prefetchWatch(ep.episode_number)}
                     onTouchStart={() => prefetchWatch(ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
                     className={`group relative mb-2 grid grid-cols-[140px_1fr] items-center gap-3 rounded-[18px] border p-3 text-left transition duration-200 last:mb-0 sm:grid-cols-[230px_1fr_auto] sm:gap-[18px] sm:rounded-[24px] sm:p-4 ${

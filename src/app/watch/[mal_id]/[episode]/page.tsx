@@ -24,6 +24,7 @@ import {
   streamProviderCacheKey,
   streamProviderIndex,
   streamProviderQueryKey,
+  warmStreamProvider,
   type StreamProviderId,
 } from "@/lib/stream-providers";
 import type { Anime } from "@/lib/types";
@@ -112,6 +113,8 @@ export default function WatchPage({
       queryKey: streamProviderQueryKey(provider, malId, episode, type),
       queryFn: () => fetchStreamProvider(provider, { malId, episode, type }),
       enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
+        provider.id === DEFAULT_STREAM_PROVIDER_ID || secondaryDataEnabled
+      ) && (
         type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID
       ),
       retry: provider.retry,
@@ -142,6 +145,12 @@ export default function WatchPage({
   const streamsLoading = !selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
   const streamError = allSettled && !playableServers.length;
+
+  useEffect(() => {
+    if (!selectedServer || !selectedStream) return;
+    const id = window.setTimeout(() => warmStreamProvider(selectedServer, selectedStream), 0);
+    return () => window.clearTimeout(id);
+  }, [selectedServer, selectedStream]);
 
   const episodes = useQuery({
     queryKey: ["episodes", malId, 0],
@@ -368,6 +377,13 @@ export default function WatchPage({
     router.prefetch(watchPath(displayAnime, malId, episodeNum + 1));
     const id = window.setTimeout(() => {
       queryClient.prefetchQuery({ queryKey: ["episodes", malId, 0], queryFn: () => api.episodes(malId), staleTime: 1000 * 60 * 20 });
+      const primary = STREAM_PROVIDERS[streamProviderIndex(DEFAULT_STREAM_PROVIDER_ID)] ?? STREAM_PROVIDERS[0];
+      const nextEpisode = String(episodeNum + 1);
+      queryClient.fetchQuery({
+        queryKey: streamProviderQueryKey(primary, malId, nextEpisode, "sub"),
+        queryFn: () => fetchStreamProvider(primary, { malId, episode: nextEpisode, type: "sub" }),
+        staleTime: 1000 * 60 * 25,
+      }).then((stream) => warmStreamProvider(primary, stream)).catch(() => undefined);
     }, 1400);
     return () => window.clearTimeout(id);
   }, [displayAnime, episodeNum, malId, queryClient, router]);
@@ -458,7 +474,10 @@ export default function WatchPage({
               </div>
             ) : streamsLoading && !selectedStream ? (
               <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-black shadow-[0_24px_90px_rgba(0,0,0,0.72)] sm:rounded-[22px]">
-                <div className="absolute inset-0 bg-black" />
+                {animePoster ? (
+                  <Image src={animePoster} alt="" fill priority sizes="100vw" className="object-cover opacity-30 blur-xl" />
+                ) : null}
+                <div className="absolute inset-0 bg-black/68" />
                 <div className="absolute inset-0 grid place-items-center">
                   <div className="relative grid h-14 w-14 place-items-center rounded-full border border-white/[0.08] bg-black/18 shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
                     <div className="absolute inset-2 animate-spin rounded-full border-2 border-white/10 border-t-white/90" />
@@ -469,7 +488,7 @@ export default function WatchPage({
             ) : (
               <VideoPlayer
                 stream={selectedStreamForPlayer}
-                poster={undefined}
+                poster={animePoster}
                 serverId={activeServerId}
                 title={`${displayTitle} · Episode ${episodeNum}`}
                 initialTime={initialTime}
@@ -716,6 +735,8 @@ function EpisodeSidebar({
   playedEps: number[];
   mobile?: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const router = useRouter();
   const ranges = getRanges(maxEpisode);
   const defaultRange = ranges.length
     ? Math.max(0, ranges.findIndex((r) => currentEp >= r.start && currentEp <= r.end))
@@ -734,6 +755,17 @@ function EpisodeSidebar({
         (ep) => ep.episode_number >= ranges[activeRange].start && ep.episode_number <= ranges[activeRange].end,
       )
     : (episodesData ?? []);
+
+  const prefetchEpisode = useCallback((ep: number) => {
+    const primary = STREAM_PROVIDERS[streamProviderIndex(DEFAULT_STREAM_PROVIDER_ID)] ?? STREAM_PROVIDERS[0];
+    const episode = String(ep);
+    router.prefetch(watchPath(undefined, malId, ep));
+    queryClient.fetchQuery({
+      queryKey: streamProviderQueryKey(primary, malId, episode, "sub"),
+      queryFn: () => fetchStreamProvider(primary, { malId, episode, type: "sub" }),
+      staleTime: 1000 * 60 * 25,
+    }).then((stream) => warmStreamProvider(primary, stream)).catch(() => undefined);
+  }, [malId, queryClient, router]);
 
   if (mobile) {
     return (
@@ -764,6 +796,10 @@ function EpisodeSidebar({
                 return (
                   <Link key={ep.episode_number} href={watchPath(undefined, malId, ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
+                    onMouseEnter={() => prefetchEpisode(ep.episode_number)}
+                    onFocus={() => prefetchEpisode(ep.episode_number)}
+                    onPointerDown={() => prefetchEpisode(ep.episode_number)}
+                    onTouchStart={() => prefetchEpisode(ep.episode_number)}
                     className={`grid h-10 place-items-center rounded-xl text-xs font-bold transition ${
                       isActive
                         ? "bg-[#cf2442] text-white shadow-md shadow-[#cf2442]/20"
@@ -827,6 +863,10 @@ function EpisodeSidebar({
                   key={ep.episode_number}
                   href={watchPath(undefined, malId, ep.episode_number)}
                   ref={isActive ? currentRef : null}
+                  onMouseEnter={() => prefetchEpisode(ep.episode_number)}
+                  onFocus={() => prefetchEpisode(ep.episode_number)}
+                  onPointerDown={() => prefetchEpisode(ep.episode_number)}
+                  onTouchStart={() => prefetchEpisode(ep.episode_number)}
                   className={`group flex gap-3 border-b border-white/[0.04] p-3 transition-colors ${
                     isActive
                       ? "bg-[#cf2442]/10"
