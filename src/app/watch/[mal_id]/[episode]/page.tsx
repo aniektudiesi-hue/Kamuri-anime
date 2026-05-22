@@ -140,6 +140,7 @@ export default function WatchPage({
     : undefined;
   const selectedStreamForPlayer = selectedStream;
   const activeServerId = selectedServer?.id;
+  const playerEpisodeKey = `${malId}:${episode}`;
   const availableServerIds = availableServers.map((s) => s.id).join("|");
   const firstAvailableServerId = availableServers[0]?.id;
   const streamsLoading = !selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching);
@@ -477,6 +478,7 @@ export default function WatchPage({
               </div>
             ) : (
               <VideoPlayer
+                key={playerEpisodeKey}
                 stream={selectedStreamForPlayer}
                 poster={animePoster}
                 serverId={activeServerId}
