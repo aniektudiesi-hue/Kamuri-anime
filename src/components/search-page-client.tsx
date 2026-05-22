@@ -20,7 +20,7 @@ import {
 } from "@/lib/anime-discovery";
 import { localSearchAnime, mergeSearchResults, rememberSearchCatalog } from "@/lib/search-index";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { HISTORY_UPDATED_EVENT, animeId, rankAnimeForSearch, rawPosterOf, rememberedHistory, titleOf } from "@/lib/utils";
+import { HISTORY_UPDATED_EVENT, animeId, rawPosterOf, rememberedHistory, titleOf } from "@/lib/utils";
 
 const GENRE_LINKS = new Set([
   "Action",
@@ -128,7 +128,7 @@ function SearchContentBody({ q }: { q: string }) {
   const anilistQ = useQuery({
     queryKey: ["anilist-discovery", intent.key, q, discoveryPage],
     queryFn: () => fetchAniListDiscovery(intent, discoveryPage),
-    enabled: q.length > 0 && fetchAllSources,
+    enabled: q.length > 0,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
   });
@@ -136,7 +136,7 @@ function SearchContentBody({ q }: { q: string }) {
   const jikanQ = useQuery({
     queryKey: ["jikan-discovery", intent.key, q, discoveryPage],
     queryFn: () => fetchJikanDiscovery(intent, discoveryPage),
-    enabled: q.length > 0,
+    enabled: q.length > 0 && fetchAllSources,
     staleTime: 1000 * 60 * 45,
     gcTime: 1000 * 60 * 120,
   });
@@ -164,7 +164,7 @@ function SearchContentBody({ q }: { q: string }) {
   useEffect(() => {
     if (slowTimer.current) window.clearTimeout(slowTimer.current);
     const reset = window.setTimeout(() => setIsSlow(false), 0);
-    if (jikanQ.isLoading || (fetchAllSources && (results.isLoading || anilistQ.isLoading))) {
+    if (anilistQ.isLoading || (fetchAllSources && (results.isLoading || jikanQ.isLoading))) {
       slowTimer.current = window.setTimeout(() => setIsSlow(true), 1200);
     }
     return () => {
@@ -174,22 +174,18 @@ function SearchContentBody({ q }: { q: string }) {
   }, [fetchAllSources, results.isLoading, anilistQ.isLoading, jikanQ.isLoading]);
 
   const backendResults = useMemo(() => intent.useBackend ? (results.data ?? []) : [], [intent.useBackend, results.data]);
-  const rankedJikan = useMemo(
-    () => intent.useBackend ? rankAnimeForSearch(allJikan, q) : allJikan,
-    [allJikan, intent.useBackend, q],
-  );
   const mergedRaw = fetchAllSources
     ? intent.useBackend
-      ? mergeSearchResults(q, rankedJikan, instantResults, backendResults, allAnilist)
-      : mergeAnimeSources(rankedJikan, instantResults, allAnilist)
-    : rankedJikan;
+      ? mergeSearchResults(q, allAnilist, instantResults, backendResults, allJikan)
+      : mergeAnimeSources(allAnilist, instantResults, allJikan)
+    : allAnilist;
   const merged = mergedRaw;
   const visibleMerged = merged.slice(0, visibleCount);
   const hasMore = Boolean(anilistQ.data?.hasNextPage || jikanQ.data?.hasNextPage);
   const isTimeout = results.error instanceof Error && results.error.message === "timeout";
   const hasRenderableResults = merged.length > 0;
-  const isLoading = !hasRenderableResults && (jikanQ.isLoading || (fetchAllSources && (results.isLoading || anilistQ.isLoading))) && discoveryPage === 1;
-  const isLoadingMore = discoveryPage > 1 && (jikanQ.isLoading || (fetchAllSources && anilistQ.isLoading));
+  const isLoading = !hasRenderableResults && (anilistQ.isLoading || (fetchAllSources && (results.isLoading || jikanQ.isLoading))) && discoveryPage === 1;
+  const isLoadingMore = discoveryPage > 1 && (anilistQ.isLoading || (fetchAllSources && jikanQ.isLoading));
 
   useEffect(() => {
     const items = [...backendResults, ...allAnilist, ...allJikan];
@@ -280,8 +276,8 @@ function SearchContentBody({ q }: { q: string }) {
               <div className="mb-5 flex items-center gap-3 rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-3">
                 <Loader2 size={15} className="shrink-0 animate-spin text-amber-400" />
                 <div>
-                  <p className="text-sm font-medium text-amber-300">Loading discovery sources</p>
-                  <p className="text-xs text-amber-400/60">MyAnimeList is loading the fast first page.</p>
+                  <p className="text-sm font-medium text-amber-300">Loading AniList results</p>
+                  <p className="text-xs text-amber-400/60">AniList is loading the fast first page.</p>
                 </div>
               </div>
               <GridSkeleton count={18} />
