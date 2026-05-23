@@ -41,7 +41,7 @@ const worker = {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/health") return json({ ok: true, worker: "anime-tv-stream-proxy" });
-      if (url.pathname === "/image") return await proxyImage(request);
+      if (url.pathname === "/image") return await proxyImage(request, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/warm")) return await warmMoon(request, env, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return await proxyMoonM3u8(request, env, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/chunk")) return await proxyMoonChunk(request, env, ctx);
@@ -112,7 +112,7 @@ async function proxyOrigin(request, env, ctx) {
   return withCors(response, streamApi);
 }
 
-async function proxyImage(request) {
+async function proxyImage(request, ctx) {
   const url = new URL(request.url);
   const src = url.searchParams.get("url") || url.searchParams.get("src") || "";
   if (!src) return json({ error: "Missing image url" }, 400, cacheHeaders("no-store"));
@@ -120,6 +120,23 @@ async function proxyImage(request) {
   const source = new URL(src);
   if (source.protocol !== "https:" && source.protocol !== "http:") return json({ error: "Invalid image url" }, 400, cacheHeaders("no-store"));
   if (!isAllowedImageHost(source.hostname)) return json({ error: "Image host not allowed" }, 403, cacheHeaders("no-store"));
+
+  if (url.searchParams.get("transform") !== "1") {
+    const redirectKey = new Request(`${url.origin}/image-redirect/${encodeURIComponent(source.toString())}`);
+    const cachedRedirect = await caches.default.match(redirectKey);
+    if (cachedRedirect) return cachedRedirect;
+
+    const redirect = new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders(),
+        location: source.toString(),
+        "cache-control": `public, max-age=${IMAGE_CACHE_TTL}, immutable`,
+      },
+    });
+    ctx.waitUntil(caches.default.put(redirectKey, redirect.clone()));
+    return redirect;
+  }
 
   const width = clampInt(url.searchParams.get("w"), 80, 1920, 480);
   const quality = clampInt(url.searchParams.get("q"), 45, 95, 82);
@@ -149,7 +166,7 @@ async function proxyImage(request) {
 
   if (!response.ok) return upstreamError(response);
   const cacheable = withImageHeaders(response);
-  await caches.default.put(cacheKey, cacheable.clone());
+  ctx.waitUntil(caches.default.put(cacheKey, cacheable.clone()));
   return cacheable;
 }
 
