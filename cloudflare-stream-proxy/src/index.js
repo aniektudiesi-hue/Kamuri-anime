@@ -481,7 +481,7 @@ async function fetchMoonPlayback(videoId) {
 
   const playback = (JSON.parse(text).playback || {});
   const keys = [
-    concatBytes((playback.key_parts || []).map(base64UrlBytes)),
+    concatBytes(selectMoonKeyParts(playback).map(base64UrlBytes)),
     ...Object.values(playback.decrypt_keys || {}).map(base64UrlBytes),
   ];
 
@@ -495,6 +495,22 @@ async function fetchMoonPlayback(videoId) {
     }
   }
   throw new Error("Moon playback decrypt failed");
+}
+
+function selectMoonKeyParts(playback) {
+  const parts = Array.isArray(playback?.key_parts)
+    ? playback.key_parts.filter((part) => typeof part === "string" && part.length > 0)
+    : [];
+  const version = String(playback?.version || "").trim();
+  if (/^\d+$/.test(version)) {
+    const first = Number(version);
+    const second = 31 - first;
+    if (first >= 1 && second >= 1 && first <= parts.length && second <= parts.length) {
+      const selected = [parts[first - 1], parts[second - 1]];
+      if (selected.every(Boolean)) return selected;
+    }
+  }
+  return parts;
 }
 
 async function fetchMoonText(url, env) {
