@@ -10,6 +10,7 @@ const nav = [
   { href: "/top-rated", label: "Top Rated" },
   { href: "/schedule", label: "Schedule" },
   { href: "/chat", label: "Chat" },
+  { href: "/android-app", label: "Android App" },
 ];
 
 export function Header() {
