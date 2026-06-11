@@ -7,6 +7,8 @@ type ThemeMode = "dark";
 type AppSettings = {
   autoFetchWhileWatching: boolean;
   autoResume: boolean;
+  /** When true, mature / adult-rated titles are hidden across the app. Default ON (safe). */
+  ageRestriction: boolean;
   theme: ThemeMode;
 };
 
@@ -17,6 +19,7 @@ type StoredSettings = Partial<AppSettings> & {
 type SettingsContextValue = AppSettings & {
   setAutoFetchWhileWatching: (value: boolean) => void;
   setAutoResume: (value: boolean) => void;
+  setAgeRestriction: (value: boolean) => void;
   setTheme: (value: ThemeMode) => void;
 };
 
@@ -26,6 +29,7 @@ const PREFETCH_SETTINGS_VERSION = 2;
 const DEFAULT_SETTINGS: AppSettings = {
   autoFetchWhileWatching: true,
   autoResume: true,
+  ageRestriction: true,
   theme: "dark",
 };
 
@@ -42,6 +46,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setSettings({
           ...DEFAULT_SETTINGS,
           autoResume: parsed.autoResume ?? DEFAULT_SETTINGS.autoResume,
+          ageRestriction: parsed.ageRestriction ?? DEFAULT_SETTINGS.ageRestriction,
           autoFetchWhileWatching:
             parsed.prefetchVersion === PREFETCH_SETTINGS_VERSION
               ? parsed.autoFetchWhileWatching ?? DEFAULT_SETTINGS.autoFetchWhileWatching
@@ -69,6 +74,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setSettings((current) => ({ ...current, autoFetchWhileWatching })),
       setAutoResume: (autoResume) =>
         setSettings((current) => ({ ...current, autoResume })),
+      setAgeRestriction: (ageRestriction) =>
+        setSettings((current) => ({ ...current, ageRestriction })),
       setTheme: () => setSettings((current) => ({ ...current, theme: "dark" })),
     }),
     [settings],

@@ -3,7 +3,7 @@ import { warmMoonPipeline, warmStreamManifest } from "./stream-cache";
 import type { StreamResponse, Subtitle } from "./types";
 
 export type StreamAudioType = "sub" | "dub";
-export type StreamProviderId = "mega" | "moon" | "hd1" | (string & {});
+export type StreamProviderId = "hd1" | "hd2" | "moon" | (string & {});
 
 export type StreamProvider = {
   id: StreamProviderId;
@@ -15,7 +15,29 @@ export type StreamProvider = {
   warm?: (stream: StreamResponse | undefined) => void;
 };
 
-export const DEFAULT_STREAM_PROVIDER_ID = "mega" satisfies StreamProviderId;
+// HD1 and HD2 are the SAME stream proxied through two different Cloudflare
+// workers. If one worker is under heavy load (or fails), the player falls back
+// to the other — so we always have a healthy edge.
+const KAMURI_WORKER = "anime-tv-stream-proxy.kamuri-anime.workers.dev";
+const ANIMETVPLUS_WORKER = "anime-tv-stream-proxy.animetvplus-stream.workers.dev";
+
+// Rewrite every proxied URL in a stream response from the Kamuri worker host to
+// another worker host (used for HD2).
+function viaWorker(stream: StreamResponse | undefined, host: string): StreamResponse | undefined {
+  if (!stream) return stream;
+  const swap = (u: unknown) => (typeof u === "string" ? u.split(KAMURI_WORKER).join(host) : u as string | undefined);
+  return {
+    ...stream,
+    m3u8_url: swap(stream.m3u8_url),
+    url: swap(stream.url),
+    stream_url: swap(stream.stream_url),
+    subtitle_url: swap(stream.subtitle_url),
+    vtt_url: swap(stream.vtt_url),
+    subtitles: stream.subtitles?.map((s) => ({ ...s, file: swap(s.file) as string })),
+  } as StreamResponse;
+}
+
+export const DEFAULT_STREAM_PROVIDER_ID = "hd1" satisfies StreamProviderId;
 
 function warmMoonStream(stream: StreamResponse | undefined) {
   if (!warmMoonPipeline(stream, 12)) {
@@ -26,11 +48,20 @@ function warmMoonStream(stream: StreamResponse | undefined) {
 export const STREAM_PROVIDERS = [
   {
     id: DEFAULT_STREAM_PROVIDER_ID,
-    label: "MegaPlay",
-    desc: "Primary - Adaptive HLS",
+    label: "HD1",
+    desc: "Kamuri edge",
     queryType: (type) => type,
     fetch: (malId, episode, type) => api.stream(malId, episode, type),
     retry: false,
+    warm: (stream) => warmStreamManifest(stream, { segments: 2, timeoutMs: 8_000 }),
+  },
+  {
+    id: "hd2",
+    label: "HD2",
+    desc: "AnimeTVPlus edge",
+    queryType: (type) => type,
+    fetch: async (malId, episode, type) => viaWorker(await api.stream(malId, episode, type), ANIMETVPLUS_WORKER) as StreamResponse,
+    retry: 1,
     warm: (stream) => warmStreamManifest(stream, { segments: 2, timeoutMs: 8_000 }),
   },
   {
@@ -41,15 +72,6 @@ export const STREAM_PROVIDERS = [
     fetch: (malId, episode) => api.moon(malId, episode),
     retry: 1,
     warm: warmMoonStream,
-  },
-  {
-    id: "hd1",
-    label: "HD1",
-    desc: "Alternate - Direct",
-    queryType: () => "any",
-    fetch: (malId, episode) => api.hd1(malId, episode),
-    retry: false,
-    warm: (stream) => warmStreamManifest(stream, { segments: 1, timeoutMs: 10_000 }),
   },
 ] as const satisfies readonly StreamProvider[];
 

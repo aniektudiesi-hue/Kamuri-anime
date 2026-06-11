@@ -2,7 +2,8 @@ import { FAMOUS_ANIME } from "@/lib/seo-keywords";
 import type { Anime } from "@/lib/types";
 import { rankAnimeForSearch } from "@/lib/utils";
 
-const SEARCH_CATALOG_KEY = "anime-tv-search-catalog-v2";
+// v4: dropped stale child-season ("Season 2/3") entries cached before root-only dedup.
+const SEARCH_CATALOG_KEY = "anime-tv-search-catalog-v4";
 const SEARCH_CATALOG_LIMIT = 1200;
 
 export function localSearchAnime(query: string, limit = 12): Anime[] {

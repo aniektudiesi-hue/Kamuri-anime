@@ -1,6 +1,7 @@
 import type { Anime, EpisodeResponse, LibraryItem, StreamResponse, User } from "./types";
 import { listFromPayload } from "./utils";
 import { readCachedStream, writeCachedStream } from "./stream-cache";
+import { fetchCatalogEpisodes, fetchCatalogSearch, fetchCatalogStream } from "./catalog-api";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
 const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
@@ -202,11 +203,13 @@ export const api = {
   thumbnails: async () => listFromPayload<Anime>(await request("/home/thumbnails")),
   recentlyAdded: async () => listFromPayload<Anime>(await request("/home/recently-added")),
   topRated: async () => listFromPayload<Anime>(await request("/home/top-rated")),
-  search: async (query: string) => listFromPayload<Anime>(await request(`/search/${encodeURIComponent(query)}`)),
-  suggest: async (query: string) => listFromPayload<Anime>(await request(`/suggest/${encodeURIComponent(query)}`)),
-  episodes: (malId: string, hint = 0) => cachedEpisodesRequest(malId, hint),
+  search: async (query: string) => fetchCatalogSearch(query),
+  suggest: async (query: string) => fetchCatalogSearch(query, 8),
+  episodes: (malId: string, hint = 0) => {
+    return fetchCatalogEpisodes(malId, hint);
+  },
   stream: (malId: string, episode: string | number, type: "sub" | "dub") =>
-    cachedStreamRequest(`mega:${malId}:${episode}:${type}`, `/api/stream/${malId}/${episode}?type=${type}&embed=false`),
+    fetchCatalogStream(malId, episode, type),
   moon: (malId: string, episode: string | number) =>
     cachedStreamRequest(`moon-fast:${malId}:${episode}`, `/api/moon/${malId}/${episode}`),
   hd1: (malId: string, episode: string | number) =>

@@ -1,11 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { extractToken, useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
+import { Kairo } from "@/components/mascot/kairo";
 import { Button } from "./button";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
@@ -13,6 +15,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const { isLoggedIn, setSession, user } = useAuth();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [welcomeName, setWelcomeName] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -22,64 +25,88 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     const form = new FormData(event.currentTarget);
     const username = String(form.get("username") || "");
     const password = String(form.get("password") || "");
-    const body = {
-      username,
-      password,
-      email: `${username}@animetv.app`,
-    };
+    const body = { username, password, email: `${username}@animetv.app` };
 
     try {
       const response = await openUsername(body, mode);
       const token = extractToken(response);
       if (!token) throw new Error("The API did not return an auth token.");
       setSession(token);
+      // Kairo welcomes the user, then we redirect.
+      setWelcomeName(username || "back");
       const returnTo = new URLSearchParams(window.location.search).get("returnTo") || "/";
-      router.push(returnTo.startsWith("/") ? returnTo : "/");
+      const dest = returnTo.startsWith("/") ? returnTo : "/";
+      setTimeout(() => router.push(dest), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");
-    } finally {
       setLoading(false);
     }
   }
 
-  return (
-    <form ref={formRef} onSubmit={submit} className="mx-auto mt-14 w-full max-w-md rounded-[30px] border border-white/[0.085] bg-panel/92 p-6 shadow-[0_28px_90px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-      <p className="mb-2 text-[11px] font-black uppercase tracking-[0.24em] text-[#cf2442]">animeTVplus account</p>
-      <h1 className="text-3xl font-black tracking-tight text-white">{isLoggedIn ? "Switch username" : mode === "login" ? "Login" : "Create account"}</h1>
-      <p className="mt-2 text-sm leading-6 text-white/42">
-        {isLoggedIn
-          ? `Current profile: ${user?.username || user?.email || "Account"}. Sign in with another username to switch.`
-          : "Use your username and password to sync watchlist and exact watch history on phone and PC."}
-      </p>
-      <div className="mt-6 grid gap-4">
-        <label className="grid gap-2 text-sm font-semibold">
-          Username
-          <Input name="username" required autoComplete="username" className="h-12 rounded-2xl border-white/[0.09] bg-panel-strong px-4 text-white placeholder:text-white/24 focus-visible:ring-[#cf2442]/30" />
-        </label>
-        <label className="grid gap-2 text-sm font-semibold">
-          Password
-          <Input
-            name="password"
-            required
-            minLength={4}
-            type="password"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            placeholder={mode === "login" ? "Enter password" : ""}
-            className="h-12 rounded-2xl border-white/[0.09] bg-panel-strong px-4 text-white placeholder:text-white/24 focus-visible:ring-[#cf2442]/30"
-          />
-        </label>
+  // Kairo welcome interstitial
+  if (welcomeName) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-6 text-center">
+        <Kairo mood="welcome" size={172} priority className="animate-[slideUp_0.5s_cubic-bezier(0.22,1,0.36,1)]" />
+        <h1 className="mt-5 text-3xl font-black tracking-tight text-white">
+          Welcome{welcomeName !== "back" ? "," : " back"} <span className="text-[#c4182a]">{welcomeName !== "back" ? welcomeName : ""}</span>
+        </h1>
+        <p className="mt-2 text-sm text-white/45">Kairo&apos;s getting your library ready…</p>
+        <div className="mt-6 h-1 w-40 overflow-hidden rounded-full bg-white/[0.08]">
+          <div className="h-full w-full animate-pulse rounded-full bg-[#c4182a]" />
+        </div>
       </div>
-      {error ? <p className="mt-4 rounded-2xl border border-red-400/30 bg-red-950/20 p-3 text-sm text-red-200">{error}</p> : null}
-      <Button disabled={loading} className="mt-6 w-full">
-        {loading ? "Working..." : isLoggedIn ? "Switch profile" : mode === "login" ? "Sign in" : "Create account"}
-      </Button>
-      <p className="mt-4 text-center text-sm text-muted">
+    );
+  }
+
+  return (
+    <div className="mx-auto mt-10 flex w-full max-w-md flex-col items-center px-6 sm:mt-16">
+      {/* Brand + mascot */}
+      <Image src="/logo-full.png" alt="animeTVplus" width={1495} height={402} priority className="h-9 w-auto object-contain" />
+      <div className="mt-7 flex items-center gap-3">
+        <Kairo mood="excited" size={56} priority />
+        <div className="text-left">
+          <h1 className="text-2xl font-black tracking-tight text-white">
+            {isLoggedIn ? "Switch username" : mode === "login" ? "Welcome back" : "Join animeTVplus"}
+          </h1>
+          <p className="text-[13px] text-white/45">
+            {isLoggedIn ? `Signed in as ${user?.username || "Account"}` : "Sync your watchlist & history everywhere"}
+          </p>
+        </div>
+      </div>
+
+      <form ref={formRef} onSubmit={submit} className="mt-7 w-full">
+        <div className="grid gap-3.5">
+          <label className="grid gap-1.5 text-[13px] font-semibold text-white/70">
+            Username
+            <Input name="username" required autoComplete="username" className="h-12 rounded-xl border-white/[0.1] bg-white/[0.04] px-4 text-white placeholder:text-white/24 focus-visible:ring-[#c4182a]/40" />
+          </label>
+          <label className="grid gap-1.5 text-[13px] font-semibold text-white/70">
+            Password
+            <Input
+              name="password"
+              required
+              minLength={4}
+              type="password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              placeholder={mode === "login" ? "Enter password" : "Choose a password"}
+              className="h-12 rounded-xl border-white/[0.1] bg-white/[0.04] px-4 text-white placeholder:text-white/24 focus-visible:ring-[#c4182a]/40"
+            />
+          </label>
+        </div>
+        {error ? <p className="mt-4 rounded-xl border border-red-400/25 bg-red-950/25 p-3 text-sm text-red-200">{error}</p> : null}
+        <Button disabled={loading} className="mt-5 h-12 w-full rounded-xl bg-[#c4182a] text-[15px] font-bold hover:bg-[#d8273a]">
+          {loading ? "Working…" : isLoggedIn ? "Switch profile" : mode === "login" ? "Sign in" : "Create account"}
+        </Button>
+      </form>
+
+      <p className="mt-5 text-center text-sm text-white/45">
         {mode === "login" ? "New here? " : "Already have an account? "}
-        <Link className="font-semibold text-accent-2" href={mode === "login" ? "/register" : "/login"}>
-          {mode === "login" ? "Register" : "Login"}
+        <Link className="font-semibold text-[#e11d2a] hover:text-[#ff3b52]" href={mode === "login" ? "/register" : "/login"}>
+          {mode === "login" ? "Create an account" : "Sign in"}
         </Link>
       </p>
-    </form>
+    </div>
   );
 }
 

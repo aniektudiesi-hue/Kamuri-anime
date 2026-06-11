@@ -11,6 +11,7 @@ import { AppShell } from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
 import { VideoPlayer } from "@/components/video-player";
+import { VastPreroll } from "@/components/vast-preroll";
 import { useAuth } from "@/lib/auth";
 import { shareWatching } from "@/lib/chat";
 import { historySocketUrl } from "@/lib/history-realtime";
@@ -79,6 +80,7 @@ export default function WatchPage({
   const [localResumeItem, setLocalResumeItem] = useState<Record<string, unknown> | undefined>();
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [secondaryDataEnabled, setSecondaryDataEnabled] = useState(false);
+  const [adDone, setAdDone] = useState(true); // gated true until the cap check decides
   const { token } = useAuth();
   const settings = useSettings();
   const queryClient = useQueryClient();
@@ -142,6 +144,17 @@ export default function WatchPage({
   const activeServerId = selectedServer?.id;
   const playerEpisodeKey = `${malId}:${episode}`;
   const availableServerIds = availableServers.map((s) => s.id).join("|");
+
+  // Pre-roll ad gate: show a VAST pre-roll at most once per 10 minutes (so a
+  // binge isn't ad-spammed). Re-evaluated per episode.
+  useEffect(() => {
+    try {
+      const last = Number(window.localStorage.getItem("atv-last-ad") || 0);
+      setAdDone(Date.now() - last < 10 * 60 * 1000);
+    } catch {
+      setAdDone(false);
+    }
+  }, [playerEpisodeKey]);
   const firstAvailableServerId = availableServers[0]?.id;
   const streamsLoading = !selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
@@ -475,6 +488,16 @@ export default function WatchPage({
                     Retry all servers
                   </button>
                 </div>
+              </div>
+            ) : !adDone ? (
+              // Pre-roll ad first; player mounts (and autoplays) once it's done.
+              <div className="relative aspect-video w-full overflow-hidden bg-black">
+                <VastPreroll
+                  onDone={() => {
+                    try { window.localStorage.setItem("atv-last-ad", String(Date.now())); } catch { /* ignore */ }
+                    setAdDone(true);
+                  }}
+                />
               </div>
             ) : (
               <VideoPlayer

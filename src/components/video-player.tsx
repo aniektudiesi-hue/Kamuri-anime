@@ -202,10 +202,12 @@ export function VideoPlayer({
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
   const isMegaPlayServer =
+    serverId === "hd1" ||
+    serverId === "hd2" ||
     serverId === "mega" ||
     stream?.server === "megaplay" ||
     stream?.server === "mega" ||
-    Boolean(src?.includes("/api/stream/") || src?.includes("/proxy/megaplay/"));
+    Boolean(src?.includes("/api/stream/") || src?.includes("/proxy/megaplay/") || src?.includes("/proxy/m3u8"));
   const isMoonStream = stream?.server === "moon" || Boolean(src?.includes("/proxy/moon/"));
   const isHlsStream = Boolean(
     src &&
@@ -594,7 +596,7 @@ export function VideoPlayer({
     };
     const playWhenReady = async () => {
       restoreTime();
-      setIsBuffering(false);
+      if (!shouldAutoPlay) setIsBuffering(false);
       if (!shouldAutoPlay) return;
       if (playRequested) return;
       playRequested = true;
@@ -643,7 +645,7 @@ export function VideoPlayer({
       startupReady = true;
       releaseStartupQuality();
       setHasVideoFrame(true);
-      setIsBuffering(false);
+      setIsBuffering(shouldAutoPlay && video.paused);
       scheduleSegmentPrefetch();
       playWhenReady();
     };

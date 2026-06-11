@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Hide the floating dev-tools indicator (the bottom-left "N" circle). It is a
+  // dev-only overlay and never ships to production, but it breaks the immersive
+  // Crunchyroll-style hero while developing.
+  devIndicators: false,
   allowedDevOrigins: ["127.0.0.1", "localhost", "10.88.55.120"],
   images: {
     unoptimized: true,

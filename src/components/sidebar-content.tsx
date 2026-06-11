@@ -46,7 +46,7 @@ export function SidebarContent() {
 
   return (
     <aside className="w-[280px] shrink-0 space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d1020]">
+      <div className="overflow-hidden rounded-sm border border-white/[0.06] bg-[#0c0c0e]">
         <div className="border-b border-white/[0.06] px-4 py-3">
           <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">Playback Settings</h3>
         </div>
@@ -68,7 +68,7 @@ export function SidebarContent() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d1020]">
+      <div className="overflow-hidden rounded-sm border border-white/[0.06] bg-[#0c0c0e]">
         <div className="border-b border-white/[0.06] px-4 py-3">
           <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">Browse Genres</h3>
         </div>
@@ -77,7 +77,7 @@ export function SidebarContent() {
             <Link
               key={g}
               href={`/genre/${encodeURIComponent(g)}`}
-              className="rounded-lg bg-white/[0.07] px-2.5 py-1 text-[11px] font-semibold text-white/70 transition-colors hover:bg-[#cf2442]/15 hover:text-[#ffccd4]"
+              className="inline-flex h-[32px] items-center rounded-[3px] bg-white/[0.06] px-2.5 text-[13px] font-semibold text-white/65 transition-colors duration-[160ms] hover:bg-[#c4182a]/15 hover:text-[#ffccd4]"
             >
               {g}
             </Link>
@@ -85,10 +85,10 @@ export function SidebarContent() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d1020]">
+      <div className="overflow-hidden rounded-sm border border-white/[0.06] bg-[#0c0c0e]">
         <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
           <div className="flex items-center gap-2">
-            <TrendingUp size={13} className="text-[#cf2442]" />
+            <TrendingUp size={13} className="text-[#c4182a]" />
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/70">Top Anime</h3>
           </div>
           <div className="flex gap-1">
@@ -97,7 +97,7 @@ export function SidebarContent() {
                 key={t}
                 onClick={() => setTab(t)}
                 className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase transition-colors ${
-                  tab === t ? "bg-[#cf2442] text-white" : "text-white/55 hover:text-white"
+                  tab === t ? "bg-[#c4182a] text-white" : "text-white/55 hover:text-white"
                 }`}
               >
                 {t === "popular" ? "Popular" : "Top Rated"}
@@ -147,7 +147,7 @@ export function SidebarContent() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0d1020]">
+      <div className="overflow-hidden rounded-sm border border-white/[0.06] bg-[#0c0c0e]">
         <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-3">
           <Clock size={13} className="text-[#c8ced8]" />
           <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/70">Recently Added</h3>
@@ -216,7 +216,7 @@ function SettingSwitch({
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-3 rounded-xl bg-white/[0.04] p-2.5 text-left transition hover:bg-white/[0.06]"
+      className="flex w-full items-center justify-between gap-3 rounded-[3px] bg-white/[0.03] p-2.5 text-left transition-all duration-[160ms] hover:bg-white/[0.05]"
     >
       <span className="flex min-w-0 items-center gap-2">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[0.06] text-white/64">{icon}</span>
@@ -225,7 +225,7 @@ function SettingSwitch({
           <span className="block truncate text-[10px] text-white/58">{hint}</span>
         </span>
       </span>
-      <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${checked ? "bg-[#cf2442]" : "bg-white/[0.18]"}`}>
+      <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${checked ? "bg-[#c4182a]" : "bg-white/[0.18]"}`}>
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${checked ? "left-4" : "left-0.5"}`} />
       </span>
     </button>

@@ -10,9 +10,9 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { useSettings } from "@/lib/settings";
 
 const nav = [
-  { href: "/popular", label: "Browse" },
-  { href: "/new-releases", label: "New Releases" },
-  { href: "/top-rated", label: "Top Rated" },
+  { href: "/search?q=Popular", label: "Browse" },
+  { href: "/search?q=New%20Releases", label: "New Releases" },
+  { href: "/search?q=Top%20Rated", label: "Top Rated" },
   { href: "/schedule", label: "Schedule" },
 ];
 
@@ -37,9 +37,8 @@ export function MobileMenu({ isLoggedIn, isAdminOwner }: { isLoggedIn: boolean; 
         className="flex h-dvh w-[88vw] max-w-[380px] flex-col overflow-hidden border-white/[0.08] bg-[#080a12]/96 p-0 text-white shadow-2xl backdrop-blur-2xl"
       >
         <SheetHeader className="shrink-0 border-b border-white/[0.07] p-4 text-left">
-          <SheetTitle className="flex items-center gap-3 text-white">
-            <Image src="/logo.svg" alt="" width={32} height={32} />
-            anime<span className="-ml-2 text-[#e11d48]">Tv</span>
+          <SheetTitle className="flex items-center text-white">
+            <Image src="/logo-full.png" alt="animeTVplus" width={1495} height={402} className="h-7 w-auto object-contain" />
           </SheetTitle>
           <SheetDescription className="text-white/38">Browse, resume, and tune playback.</SheetDescription>
         </SheetHeader>

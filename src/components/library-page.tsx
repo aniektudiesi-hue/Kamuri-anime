@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Button, ButtonLink } from "@/components/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { KairoState } from "@/components/mascot/kairo";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { deleteOfflineDownload, listOfflineDownloads, offlineId } from "@/lib/offline-downloads";
@@ -197,7 +198,30 @@ export function LibraryPage({ kind }: { kind: LibraryKind }) {
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl border border-white/[0.08] bg-panel/88 p-10 text-center text-muted shadow-[0_22px_80px_rgba(0,0,0,0.24)]">Nothing saved here yet.</div>
+          <div className="rounded-3xl border border-white/[0.08] bg-panel/88 shadow-[0_22px_80px_rgba(0,0,0,0.24)]">
+            {kind === "history" ? (
+              <KairoState
+                mood="sleepy"
+                title="No watch history yet"
+                subtitle="Episodes you watch will show up here so you can resume right where you left off."
+                action={{ label: "Start watching", href: "/" }}
+              />
+            ) : kind === "downloads" ? (
+              <KairoState
+                mood="empty"
+                title="No downloads yet"
+                subtitle="Save episodes to this browser to watch them offline, anytime."
+                action={{ label: "Browse anime", href: "/search" }}
+              />
+            ) : (
+              <KairoState
+                mood="empty"
+                title="Your watchlist is empty"
+                subtitle="Tap the bookmark on any anime to save it here for your next session."
+                action={{ label: "Discover anime", href: "/search" }}
+              />
+            )}
+          </div>
         )}
       </section>
     </AppShell>

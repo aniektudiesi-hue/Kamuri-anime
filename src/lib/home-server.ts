@@ -1,5 +1,5 @@
 import type { AiringScheduleItem, Anime, HomeInitialData } from "./types";
-import { listFromPayload } from "./utils";
+import { catalogScheduleFromAnime, catalogServerGet, fetchCatalogSection } from "./catalog-api";
 
 const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
 const ANILIST_URL = "https://graphql.anilist.co";
@@ -39,41 +39,84 @@ type HomeInitialDataOptions = {
 };
 
 export async function getHomeInitialData(options: HomeInitialDataOptions = {}): Promise<HomeInitialData> {
-  const [banners, thumbnails, recent, topRated] = await Promise.all([
-    fetchHomeList("/api/v1/banners"),
-    fetchHomeList("/home/thumbnails"),
-    fetchHomeList("/home/recently-added", 15 * 60),
-    fetchHomeList("/home/top-rated"),
+  const [banners, thumbnails, recent, topRated, popularRaw, romanceRaw, isekaiRaw, healingRaw] = await Promise.all([
+    fetchCatalogSection("/api/anime/season/2026/spring", 10, 1, HOME_REVALIDATE_SECONDS),
+    fetchCatalogSection("/api/anime/season/2026/spring", 40, 1, HOME_REVALIDATE_SECONDS),
+    fetchCatalogSection("/api/anime/new-releases", 40, 1, 15 * 60),
+    fetchCatalogSection("/api/anime/top-rated", 40, 1, HOME_REVALIDATE_SECONDS),
+    fetchCatalogSection("/api/anime/popular", 40, 1, HOME_REVALIDATE_SECONDS),
+    fetchCatalogSection("/api/anime/genre/romance", 30, 1, HOME_REVALIDATE_SECONDS),
+    fetchCatalogSection("/api/anime/genre/isekai", 30, 1, HOME_REVALIDATE_SECONDS),
+    fetchCatalogSection("/api/anime/genre/slice-of-life", 30, 1, HOME_REVALIDATE_SECONDS),
+  ]);
+
+  // Bake Crunchyroll posters into the FIRST render and float CR-mapped titles to
+  // the front. Doing this server-side kills the client-side poster swap that was
+  // causing every grid image to reload (the flicker), and guarantees CR art shows
+  // wherever it exists.
+  const [crThumbs, crRecent, crTop, crPopular, crRomance, crIsekai, crHealing] = await Promise.all([
+    enrichWithCr(thumbnails),
+    enrichWithCr(recent),
+    enrichWithCr(topRated),
+    enrichWithCr(popularRaw),
+    enrichWithCr(romanceRaw),
+    enrichWithCr(isekaiRaw),
+    enrichWithCr(healingRaw),
   ]);
 
   const scheduleItems = options.fullSchedule
-    ? await fetchMonthlyAiringSchedule(MONTHLY_SCHEDULE_MAX_PAGES)
+    ? catalogScheduleFromAnime(await fetchCatalogSection("/api/anime/airing", HOMEPAGE_SCHEDULE_LIMIT, 1, SCHEDULE_REVALIDATE_SECONDS))
     : [];
 
   return {
     banners: banners.slice(0, 10),
-    thumbnails: thumbnails.slice(0, 24),
-    recent: recent.slice(0, 24),
-    topRated: topRated.slice(0, 24),
+    thumbnails: crThumbs.slice(0, 24),
+    recent: crRecent.slice(0, 24),
+    topRated: crTop.slice(0, 24),
+    popular: crPopular.slice(0, 24),
+    romance: crRomance.slice(0, 24),
+    isekai: crIsekai.slice(0, 24),
+    healing: crHealing.slice(0, 24),
     schedule: scheduleItems,
     generatedAt: new Date().toISOString(),
   };
 }
 
-export async function getHomepageSchedule() {
-  const schedule = await fetchMonthlyAiringSchedule(1);
-  return schedule.slice(0, HOMEPAGE_SCHEDULE_LIMIT);
+type CrPosterMap = Record<string, { poster?: string; hero?: string; has_cr?: number }>;
+
+// Batch-fetch CR posters for a section from our backend, merge them onto each
+// title, and stable-sort CR-mapped first. Falls back to the original list if the
+// lookup fails so a section never goes empty.
+async function enrichWithCr(items: Anime[]): Promise<Anime[]> {
+  const ids = items
+    .map((a) => String(a.mal_id || a.anime_id || a.id || ""))
+    .filter(Boolean);
+  if (!ids.length) return items;
+  try {
+    const res = await catalogServerGet<{ posters?: CrPosterMap }>(
+      `/api/cr/posters?ids=${encodeURIComponent(ids.join(","))}`,
+      HOME_REVALIDATE_SECONDS,
+    );
+    const map = res?.posters || {};
+    const enriched = items.map((a) => {
+      const id = String(a.mal_id || a.anime_id || a.id || "");
+      const cr = map[id];
+      if (cr?.poster) return { ...a, image_url: cr.poster, poster: cr.poster, cr_mapped: true };
+      if (cr?.has_cr) return { ...a, cr_mapped: true };
+      return a;
+    });
+    return enriched
+      .map((a, i) => ({ a, i }))
+      .sort((x, y) => (x.a.cr_mapped ? 0 : 1) - (y.a.cr_mapped ? 0 : 1) || x.i - y.i)
+      .map((o) => o.a);
+  } catch {
+    return items;
+  }
 }
 
-async function fetchHomeList(path: string, revalidate = HOME_REVALIDATE_SECONDS) {
-  return safeJson(async () => {
-    const response = await timedFetch(`${API_BASE}${path}`, {
-      headers: { Accept: "application/json" },
-      next: { revalidate },
-    });
-    if (!response.ok) return [];
-    return listFromPayload<Anime>(await response.json());
-  }, []);
+export async function getHomepageSchedule() {
+  const airing = await fetchCatalogSection("/api/anime/airing", HOMEPAGE_SCHEDULE_LIMIT, 1, SCHEDULE_REVALIDATE_SECONDS);
+  return catalogScheduleFromAnime(airing).slice(0, HOMEPAGE_SCHEDULE_LIMIT);
 }
 
 async function fetchMonthlyAiringSchedule(maxPages: number): Promise<AiringScheduleItem[]> {

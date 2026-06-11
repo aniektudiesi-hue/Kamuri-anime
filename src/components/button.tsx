@@ -9,7 +9,7 @@ export function Button({ className, variant = "primary", ...props }: ButtonProps
   return (
     <button
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
         variant === "primary" && "bg-[#e11d48] text-white shadow-lg shadow-[#e11d48]/22 hover:bg-[#f43f5e]",
         variant === "ghost" && "text-foreground hover:bg-white/10",
         variant === "panel" && "border border-white/[0.075] bg-panel-strong text-foreground hover:bg-[#222637]",
@@ -28,7 +28,7 @@ export function ButtonLink({
   return (
     <Link
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black transition",
+        "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition",
         variant === "primary" && "bg-[#e11d48] text-white shadow-lg shadow-[#e11d48]/22 hover:bg-[#f43f5e]",
         variant === "ghost" && "text-foreground hover:bg-white/10",
         variant === "panel" && "border border-white/[0.075] bg-panel-strong text-foreground hover:bg-[#222637]",

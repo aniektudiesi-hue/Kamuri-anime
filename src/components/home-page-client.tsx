@@ -6,15 +6,18 @@ import { CalendarDays, ChevronRight, Clock3, Flame, Play, Radio, Star, Trophy } 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
-import { HeroCarousel, MobileHeroBanner } from "@/components/hero-carousel";
-import { SidebarLayout } from "@/components/sidebar";
+import { HeroCarousel, MobileHeroBanner, type HeroCrData } from "@/components/hero-carousel";
+import { fetchCrCard } from "@/lib/catalog-api";
+import { Carousel } from "@/components/carousel";
+import { SpotlightBanner } from "@/components/spotlight-banner";
+import { Kairo } from "@/components/mascot/kairo";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { rememberSearchCatalog } from "@/lib/search-index";
 import type { AiringScheduleItem, Anime, HomeInitialData, LibraryItem } from "@/lib/types";
 import { HISTORY_UPDATED_EVENT, animeId, animePath, episodeCount, episodeLabel, posterOf, progressOf, rememberAnime, rememberedAnime, rememberedHistory, titleOf, watchPath } from "@/lib/utils";
 
-const HOME_CACHE_KEY = "animeTVplus-home-cache-v2";
+const HOME_CACHE_KEY = "animeTVplus-home-cache-v4";
 const HOME_CACHE_TTL = 1000 * 60 * 60;
 
 export function HomePageClient({ initialData }: { initialData: HomeInitialData }) {
@@ -34,6 +37,10 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
     staleTime: 1000 * 60 * 60 * 6,
     gcTime: 1000 * 60 * 60 * 12,
   });
+
+  // CR posters are now baked into the section data server-side (home-server.ts),
+  // so the grid renders Crunchyroll art on the FIRST paint — no client-side
+  // poster swap, no image flicker.
 
   useEffect(() => {
     try {
@@ -67,41 +74,95 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
     ]);
   }, [initialData]);
 
+  // Spring spotlight: a CR-mapped title from the season, rotated daily (stable
+  // between server + client render to avoid a hydration mismatch).
+  const springSpotlightId = useMemo(() => {
+    const pool = homeData.thumbnails.filter((a) => (a as { cr_mapped?: boolean }).cr_mapped);
+    const list = pool.length ? pool : homeData.thumbnails;
+    if (!list.length) return "";
+    const pick = list[new Date().getDate() % list.length];
+    return String(pick.mal_id || pick.anime_id || pick.id || "");
+  }, [homeData.thumbnails]);
+
   return (
     <AppShell>
       <ResponsiveHero homeData={homeData} />
       <ContinueWatchingSection />
 
-      <SidebarLayout>
+      <div className="mx-auto max-w-screen-2xl px-4 lg:px-8">
+        {/* Most Popular — the 24 most-watched titles */}
         <BigSection
-          title="Popular Today"
-          icon={<Flame size={14} className="text-[#cf2442]" />}
-          items={homeData.thumbnails}
-          viewAllHref="/popular"
+          title="Most Popular"
+          icon={<Flame size={14} className="text-[#c4182a]" />}
+          items={homeData.popular}
+          viewAllHref="/search?q=Popular"
         />
+
+        {/* April 2026 / Spring season */}
+        <BigSection
+          title="April 2026 Releases"
+          icon={<CalendarDays size={14} className="text-[#c8ced8]" />}
+          items={homeData.thumbnails}
+          viewAllHref="/search?q=Spring%202026"
+        />
+
+        {/* Spring 2026 spotlight */}
+        {springSpotlightId ? <SpotlightBanner malId={springSpotlightId} label="Spring 2026" /> : null}
 
         {loadRest ? (
           <>
+            {/* Top Picks — loved by fans */}
+            <BigSection
+              title="Top Picks"
+              icon={<Trophy size={14} className="text-[#d8b56a]" />}
+              items={homeData.topRated}
+              viewAllHref="/search?q=Top%20Rated"
+            />
+
+            {/* New Episodes — fresh drops */}
             <BigSection
               title="New Episodes"
               icon={<Radio size={14} className="text-[#c8ced8]" />}
               items={homeData.recent}
-              viewAllHref="/new-releases"
+              viewAllHref="/search?q=New%20Releases"
             />
 
+            <SpotlightBanner malId="57658" label="Now Streaming" fallbackTitle="Jujutsu Kaisen: The Culling Game" />
+
+            {/* Rom-Com & Harem */}
             <BigSection
-              title="Top Rated All Time"
-              icon={<Trophy size={14} className="text-[#d8b56a]" />}
-              items={homeData.topRated}
-              viewAllHref="/top-rated"
+              title="Rom-Com & Harem"
+              icon={<Star size={14} className="text-[#c4182a]" />}
+              items={homeData.romance}
+              viewAllHref="/genre/romance"
+            />
+
+            <SpotlightBanner malId="35507" label="Editor's Pick" fallbackTitle="Classroom of the Elite" />
+
+            {/* Isekai */}
+            <BigSection
+              title="Isekai Worlds"
+              icon={<Flame size={14} className="text-[#c8ced8]" />}
+              items={homeData.isekai}
+              viewAllHref="/genre/isekai"
+            />
+
+            {/* Best Healing / Slice of Life */}
+            <BigSection
+              title="Best Healing Anime"
+              icon={<Star size={14} className="text-[#d8b56a]" />}
+              items={homeData.healing}
+              viewAllHref="/genre/slice-of-life"
             />
 
             <AiringScheduleSection items={scheduleQuery.data?.length ? scheduleQuery.data : homeData.schedule} />
+
+            <KairoExploreCTA />
           </>
         ) : (
           <DeferredSectionsSkeleton />
         )}
-      </SidebarLayout>
+      </div>
 
       {loadRest ? <HomeSeoSection /> : null}
     </AppShell>
@@ -109,25 +170,55 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
 }
 
 function ResponsiveHero({ homeData }: { homeData: HomeInitialData }) {
-  const isMobile = useSmallScreen();
-  if (isMobile === null) {
-    return (
-      <section className="relative min-h-[286px] overflow-hidden bg-[#080a12] sm:min-h-[460px]">
-        <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#151827] to-[#06070d]" />
-      </section>
-    );
-  }
+  const bannerItems = homeData.banners.length ? homeData.banners : homeData.thumbnails;
+  const isLoading = !homeData.banners.length && !homeData.thumbnails.length;
 
-  if (isMobile) {
-    return (
-      <MobileHeroBanner
-        items={homeData.banners.length ? homeData.banners : homeData.thumbnails}
-        loading={!homeData.banners.length && !homeData.thumbnails.length}
-      />
-    );
-  }
+  const malIds = useMemo(
+    () => bannerItems.slice(0, 8).map((a) => String(a.mal_id || a.anime_id || a.id || "")).filter(Boolean),
+    [bannerItems],
+  );
 
-  return <HeroCarousel items={homeData.banners} loading={!homeData.banners.length} />;
+  const crCards = useQuery({
+    queryKey: ["hero-cr-cards", malIds.join(",")],
+    queryFn: async () => {
+      const results: HeroCrData = {};
+      await Promise.allSettled(
+        malIds.map(async (mid) => {
+          const card = await fetchCrCard(mid);
+          if (card?.detail_banner) {
+            results[mid] = { detail_banner: card.detail_banner, title_logo: card.title_logo, synopsis: card.synopsis };
+          }
+        }),
+      );
+      return results;
+    },
+    enabled: malIds.length > 0,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const crData = crCards.data;
+  // The desktop hero is reserved for titles that have real Crunchyroll keyart
+  // (wide detail banner + title logo). Filter the banners down to those; while
+  // the CR lookup is still resolving we show the skeleton, and if none come back
+  // (e.g. the backend is down) we fall back to the raw banners so it never
+  // renders empty.
+  const crBanners = useMemo(() => {
+    if (!crData) return [] as Anime[];
+    return homeData.banners.filter((a) => crData[String(a.mal_id || a.anime_id || a.id || "")]?.detail_banner);
+  }, [homeData.banners, crData]);
+  const heroItems = crData ? (crBanners.length ? crBanners : homeData.banners) : [];
+  const heroLoading = !homeData.banners.length || (malIds.length > 0 && crCards.isLoading);
+
+  return (
+    <>
+      <div className="hidden sm:block">
+        <HeroCarousel items={heroItems} loading={heroLoading} crData={crData} />
+      </div>
+      <div className="sm:hidden">
+        <MobileHeroBanner items={heroItems.length ? heroItems : bannerItems} loading={heroLoading || isLoading} crData={crData} />
+      </div>
+    </>
+  );
 }
 
 function useSmallScreen() {
@@ -170,7 +261,7 @@ function DeferredSectionsSkeleton() {
   return (
     <div className="border-t border-white/[0.055] py-8">
       <div className="mb-5 flex items-center gap-3">
-        <div className="h-7 w-1 rounded-full bg-[#cf2442]/80" />
+        <div className="h-7 w-1 rounded-full bg-[#c4182a]/80" />
         <div className="h-8 w-8 rounded-2xl bg-white/[0.045]" />
         <div className="h-5 w-40 rounded-full bg-white/[0.055]" />
       </div>
@@ -263,7 +354,7 @@ function ContinueWatchingSection() {
       <div className="mb-1 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="grid h-8 w-8 place-items-center rounded-2xl border border-white/[0.075] bg-white/[0.045]">
-            <Clock3 size={14} className="text-[#cf2442]" />
+            <Clock3 size={14} className="text-[#c4182a]" />
           </span>
           <div>
             <h2 className="text-lg font-black tracking-tight text-white">Watch From Where You Left</h2>
@@ -296,7 +387,7 @@ function ContinueCard({ item }: { item: LibraryItem }) {
   return (
     <Link
       href={watchPath(item, id, episode)}
-      className="group grid w-[245px] shrink-0 grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#111421]/76 p-2 transition hover:border-[#cf2442]/30 hover:bg-[#171b2a] sm:w-[280px]"
+      className="group grid w-[245px] shrink-0 grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#111421]/76 p-2 transition hover:border-[#c4182a]/30 hover:bg-[#171b2a] sm:w-[280px]"
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
         {poster ? <Image src={poster} alt={title} fill sizes="72px" className="object-cover" loading="lazy" /> : <PosterFallback title={title} />}
@@ -304,7 +395,7 @@ function ContinueCard({ item }: { item: LibraryItem }) {
       <div className="min-w-0 py-1">
         <p className="line-clamp-2 text-sm font-black leading-5 text-white/88 group-hover:text-white">{title}</p>
         <p className="mt-1 text-xs font-bold text-white/54">Episode {episode}{progress > 1 ? ` at ${formatClock(progress)}` : ""}</p>
-        <span className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-xl bg-[#cf2442] px-3 text-xs font-black text-white">
+        <span className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-xl bg-[#c4182a] px-3 text-xs font-black text-white">
           <Play size={12} fill="currentColor" />
           Resume
         </span>
@@ -325,29 +416,21 @@ function SectionHeader({
   viewAllHref?: string;
 }) {
   return (
-    <div className="mb-5 flex items-end justify-between gap-3">
+    <div className="mb-4 flex items-end justify-between gap-3">
       <div className="flex items-center gap-2.5">
-        <span className="h-7 w-1 rounded-full bg-[#cf2442] shadow-[0_0_18px_rgba(207,36,66,0.44)]" />
-        <span className="grid h-8 w-8 place-items-center rounded-2xl border border-white/[0.075] bg-white/[0.045]">{icon}</span>
-        <div>
-          <h2 className="text-lg font-black tracking-tight text-white">{title}</h2>
-          <p className="mt-0.5 hidden text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60 sm:block">
-            Curated for fast watching
-          </p>
-        </div>
+        <span className="grid h-6 w-6 place-items-center text-[#c4182a]">{icon}</span>
+        <h2 className="text-[22px] font-bold tracking-tight text-white">{title}</h2>
         {count ? (
-          <span className="rounded-full border border-white/[0.1] bg-white/[0.08] px-2.5 py-1 text-[11px] font-black text-white/84">
-            {count}
-          </span>
+          <span className="text-[13px] font-semibold text-white/40">{count}</span>
         ) : null}
       </div>
       {viewAllHref ? (
         <Link
           href={viewAllHref}
           aria-label={`View all ${title}`}
-          className="hidden items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.055] px-3 py-1.5 text-xs font-black text-white/74 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/10 hover:text-white sm:flex"
+          className="hidden items-center gap-0.5 text-[13px] font-bold uppercase tracking-wide text-white/55 transition hover:text-[#c4182a] sm:flex"
         >
-          View All {title} <ChevronRight size={13} />
+          View All <ChevronRight size={15} />
         </Link>
       ) : null}
     </div>
@@ -366,17 +449,17 @@ function BigSection({
   viewAllHref?: string;
 }) {
   const allItems = items ?? [];
-  const visibleItems = allItems.slice(0, 10);
+  const visibleItems = allItems;
 
   return (
-    <section className="content-visibility-auto border-t border-white/[0.055] py-8 first:border-t-0">
+    <section className="content-visibility-auto py-6 first:pt-3">
       <SectionHeader title={title} icon={icon} count={allItems.length || undefined} viewAllHref={viewAllHref} />
 
-      <div className="no-scrollbar scroll-strip -mx-1 flex gap-3 overflow-x-auto px-1 pb-3 sm:gap-4">
+      <Carousel className="-mx-1 gap-4 px-1 pb-3 lg:gap-5">
         {visibleItems.map((anime, i) => (
           <AnimeGridCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i === 0} />
         ))}
-      </div>
+      </Carousel>
 
       {allItems.length > visibleItems.length && viewAllHref ? (
         <div className="mt-2 flex justify-center sm:hidden">
@@ -395,21 +478,21 @@ function BigSection({
 
 function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }) {
   const id = animeId(anime);
-  const poster = posterOf(anime, "poster-sm");
+  const poster = posterOf(anime, "poster-md");
   const title = titleOf(anime);
   const count = episodeCount(anime);
   const statusKey = (anime.status || "").toLowerCase();
 
   return (
-    <article className="card-lift scroll-card group w-[132px] shrink-0 sm:w-[154px]">
+    <article className="card-lift scroll-card group w-[150px] shrink-0 sm:w-[172px] lg:w-[196px] xl:w-[222px]">
       <Link href={animePath(anime, id)} onClick={() => rememberAnime(anime)} className="block">
-        <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-2xl bg-[#141828] shadow-[0_18px_45px_rgba(0,0,0,0.34)] ring-1 ring-white/[0.055] transition group-hover:ring-[#cf2442]/28">
+        <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-md bg-[#0c0c0e] shadow-[0_18px_45px_rgba(0,0,0,0.4)] ring-1 ring-white/[0.05] transition group-hover:ring-[#c4182a]/30">
           {poster ? (
             <Image
               src={poster}
               alt={title}
               fill
-              sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 154px"
+              sizes="(max-width:640px) 45vw, (max-width:1024px) 28vw, 222px"
               priority={priority}
               loading={priority ? undefined : "lazy"}
               className="object-cover transition duration-500 group-hover:scale-105"
@@ -420,8 +503,8 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
           <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/8 to-transparent" />
 
           {statusKey === "currently_airing" && (
-            <span className="absolute right-1.5 top-1.5 flex h-5 items-center gap-1 rounded-full bg-[#cf2442]/22 px-2 text-[8px] font-black text-[#ffd7dd] ring-1 ring-[#cf2442]/30">
-              <span className="h-1 w-1 rounded-full bg-[#cf2442]" />
+            <span className="absolute right-1.5 top-1.5 flex h-5 items-center gap-1 rounded-full bg-[#c4182a]/22 px-2 text-[8px] font-black text-[#ffd7dd] ring-1 ring-[#c4182a]/30">
+              <span className="h-1 w-1 rounded-full bg-[#c4182a]" />
               AIRING
             </span>
           )}
@@ -440,7 +523,7 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
           ) : null}
 
           <div className="absolute inset-0 flex items-center justify-center bg-black/42 opacity-0 backdrop-blur-[1px] transition-opacity duration-200 group-hover:opacity-100">
-            <span className="grid h-11 w-11 place-items-center rounded-full bg-[#cf2442] shadow-lg shadow-[#cf2442]/30">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-[#c4182a] shadow-lg shadow-[#c4182a]/30">
               <Play size={14} fill="white" className="text-white" />
             </span>
           </div>
@@ -467,7 +550,7 @@ function AiringScheduleSection({ items }: { items: AiringScheduleItem[] }) {
     <section className="content-visibility-auto border-t border-white/[0.05] py-6">
       <SectionHeader
         title={title}
-        icon={<CalendarDays size={14} className="text-[#cf2442]" />}
+        icon={<CalendarDays size={14} className="text-[#c4182a]" />}
         count={visibleItems.length}
         viewAllHref="/schedule"
       />
@@ -528,6 +611,25 @@ function PosterFallback({ title }: { title: string }) {
   );
 }
 
+function KairoExploreCTA() {
+  return (
+    <section className="my-10 flex flex-col items-center gap-5 py-10 text-center">
+      <Kairo mood="notfound" size={150} />
+      <div>
+        <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">Still looking for something to watch?</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-white/45">Kairo&apos;s got thousands more. Dive into the full catalog and find your next binge.</p>
+      </div>
+      <Link
+        href="/search"
+        className="inline-flex h-12 items-center gap-2 rounded-[4px] bg-[#c4182a] px-7 text-[14px] font-extrabold uppercase tracking-[0.02em] text-white transition-colors duration-200 hover:bg-[#d8273a]"
+      >
+        Explore our full catalog
+        <ChevronRight size={18} />
+      </Link>
+    </section>
+  );
+}
+
 function HomeSeoSection() {
   const links = [
     { label: "Watch free anime online", href: "/free-anime" },
@@ -558,7 +660,7 @@ function HomeSeoSection() {
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-xl border border-white/[0.09] bg-white/[0.055] px-3 py-1.5 text-xs font-bold text-white/78 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/10 hover:text-white"
+              className="rounded-xl border border-white/[0.09] bg-white/[0.055] px-3 py-1.5 text-xs font-bold text-white/78 transition hover:border-[#c4182a]/35 hover:bg-[#c4182a]/10 hover:text-white"
             >
               {link.label}
             </Link>

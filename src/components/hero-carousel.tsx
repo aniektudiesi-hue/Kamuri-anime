@@ -2,24 +2,18 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Play, Star, TvIcon, Info } from "lucide-react";
-import type { CSSProperties } from "react";
+import { Bookmark, ChevronLeft, ChevronRight, Play, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Anime } from "@/lib/types";
 import { animeId, animePath, bannerOf, episodeCount, posterOf, titleOf, watchPath } from "@/lib/utils";
 
-const STATUS_LABEL: Record<string, string> = {
-  currently_airing: "Airing Now",
-  finished_airing: "Completed",
-  not_yet_aired: "Upcoming",
-};
-
-const HERO_AUTO_ADVANCE_MS = 3000;
+const HERO_AUTO_ADVANCE_MS = 6000;
 const HERO_INITIAL_AUTO_DELAY_MS = 7000;
 
-export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading?: boolean }) {
+export type HeroCrData = Record<string, { detail_banner?: string; title_logo?: string; synopsis?: string; hero_focus?: string }>;
+
+export function HeroCarousel({ items = [], loading, crData = {} }: { items?: Anime[]; loading?: boolean; crData?: HeroCrData }) {
   const [index, setIndex] = useState(0);
-  const [dir, setDir] = useState<1 | -1>(1);
   const [flipKey, setFlipKey] = useState(0);
   const timerRef = useRef<number | undefined>(undefined);
   const len = Math.max(items.length, 1);
@@ -28,7 +22,7 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
   function goTo(next: number, direction: 1 | -1 = 1) {
     if (!items.length) return;
     const clamped = ((next % items.length) + items.length) % items.length;
-    setDir(direction);
+    void direction;
     setFlipKey((value) => value + 1);
     setIndex(clamped);
   }
@@ -39,7 +33,6 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
       goTo(index + 1, 1);
       timerRef.current = window.setInterval(() => {
         setIndex((value) => (value + 1) % items.length);
-        setDir(1);
         setFlipKey((value) => value + 1);
       }, HERO_AUTO_ADVANCE_MS);
     }, HERO_INITIAL_AUTO_DELAY_MS);
@@ -51,20 +44,20 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
 
   if (loading) {
     return (
-      <div className="relative h-[88vh] max-h-[760px] min-h-[520px] overflow-hidden bg-[#06070d]">
-        <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#0d1020] to-[#06070d]" />
-        <div className="absolute inset-0 flex items-end">
-          <div className="w-full max-w-screen-2xl px-6 py-16 lg:px-16">
-            <div className="max-w-lg space-y-5">
-              <div className="h-3 w-28 rounded-full bg-white/[0.07]" />
-              <div className="h-14 w-4/5 rounded-2xl bg-white/[0.07]" />
-              <div className="h-4 w-full rounded-full bg-white/[0.05]" />
-              <div className="h-4 w-3/4 rounded-full bg-white/[0.05]" />
-              <div className="flex gap-3 pt-2">
-                <div className="h-12 w-36 rounded-2xl bg-white/[0.07]" />
-                <div className="h-12 w-28 rounded-2xl bg-white/[0.05]" />
-              </div>
-            </div>
+      <div className="relative h-[560px] overflow-hidden bg-[#050506] md:h-[620px] lg:h-[calc(100vh-64px)] lg:min-h-[620px] lg:max-h-[720px]">
+        <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#0e0e10] to-[#050506]" />
+        <div className="absolute bottom-0 left-0 right-0 h-[180px] bg-gradient-to-t from-[#050506] to-transparent" />
+        <div className="absolute left-6 top-1/2 max-w-[480px] -translate-y-1/2 space-y-5 lg:left-20">
+          <div className="h-[100px] w-[320px] rounded-lg bg-white/[0.05]" />
+          <div className="h-4 w-64 rounded bg-white/[0.04]" />
+          <div className="space-y-2">
+            <div className="h-3 w-full rounded bg-white/[0.03]" />
+            <div className="h-3 w-4/5 rounded bg-white/[0.03]" />
+            <div className="h-3 w-3/5 rounded bg-white/[0.03]" />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <div className="h-[52px] w-[220px] rounded bg-white/[0.05]" />
+            <div className="h-[52px] w-[52px] rounded bg-white/[0.04]" />
           </div>
         </div>
       </div>
@@ -73,169 +66,156 @@ export function HeroCarousel({ items = [], loading }: { items?: Anime[]; loading
 
   if (!current) return null;
 
-  const banner = bannerOf(current, "banner-lg");
-  const poster = posterOf(current, "poster-lg");
   const title = titleOf(current);
   const count = episodeCount(current);
   const id = animeId(current);
-  const statusKey = (current.status || "").toLowerCase();
-  const statusLabel = STATUS_LABEL[statusKey] || (current.status ? current.status.replace(/_/g, " ") : "");
+  const malId = String(current.mal_id || current.anime_id || current.id || "");
+  const cr = crData[malId];
+  const heroSrc = cr?.detail_banner || bannerOf(current, "banner-lg");
+  const titleLogo = cr?.title_logo || "";
+  const synopsis = cr?.synopsis || current.overview || "";
+  const genres = current.genres?.slice(0, 4) ?? [];
+  const score = current.score ? Number(current.score).toFixed(1) : "";
 
   return (
-    <section className="relative h-[76vh] max-h-[700px] min-h-[460px] overflow-hidden bg-[#05060b]">
+    <section className="relative h-[clamp(420px,56vw,680px)] w-full overflow-hidden bg-black">
 
-      {/* Background image */}
+      {/* Key art. Our backdrop_wide is ~2.52:1; in this 16:9 hero object-cover crops the
+          SIDES, so object-position right shows the cast — exactly how Crunchyroll frames it. */}
       <div
         key={`bg-${index}`}
         className={`absolute inset-0 ${flipKey > 0 ? "animate-[heroBackdropTurn_0.82s_cubic-bezier(0.2,0.8,0.18,1)]" : ""}`}
       >
-        {banner ? (
+        {heroSrc ? (
           <Image
-            src={banner}
+            src={heroSrc}
             alt=""
             fill
             loading="eager"
             fetchPriority={index === 0 ? "high" : "auto"}
             sizes="(max-width: 639px) 1px, 100vw"
-            className="object-cover object-center opacity-80 motion-safe:will-change-transform"
+            className="object-cover motion-safe:will-change-transform"
+            style={{ objectPosition: "10% center" }}
           />
         ) : null}
       </div>
 
-      {/* Translucent overlays — lighter so the image shows through */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#05060b]/96 via-[#05060b]/58 to-[#05060b]/12" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#05060b]/90 via-[#05060b]/10 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#05060b]/46 to-transparent" style={{ height: "34%" }} />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_30%,rgba(207,36,66,0.14),transparent_34%)]" />
+      {/* Crunchyroll's EXACT hero gradient: bottom fade to black + left scrim for text. */}
+      <div
+        className="absolute inset-0 z-[1]"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(0,0,0,0) 50%, #000 100%), linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0) 55%)",
+        }}
+      />
 
-      {/* Content grid */}
-      <div className="relative mx-auto flex h-full max-w-screen-2xl items-center gap-8 px-6 py-16 lg:px-16">
+      {/* Content — vertically centered left column, Crunchyroll style */}
+      <div
+        key={`info-${index}`}
+        className="absolute left-6 top-[41%] z-10 max-w-[460px] -translate-y-1/2 animate-[slideUp_0.5s_cubic-bezier(0.22,1,0.36,1)] sm:left-10 lg:left-16 lg:max-w-[480px]"
+      >
+        {/* Title logo or text — hard-clamped so it never dominates */}
+        {titleLogo ? (
+          <img
+            src={titleLogo}
+            alt={`${title} logo`}
+            loading="eager"
+            className="mb-5 block w-auto object-contain object-left drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
+            style={{ maxWidth: "min(360px, 28vw)", maxHeight: "104px" }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)?.style.removeProperty("display"); }}
+          />
+        ) : null}
+        <h1 className={`mb-4 text-[1.8rem] font-bold leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)] sm:text-[2.2rem] lg:text-[2.8rem] ${titleLogo ? "hidden" : ""}`}>
+          {title}
+        </h1>
 
-        {/* Left: metadata + CTAs */}
-        <div key={`info-${index}`} className="flex-1 max-w-3xl animate-[slideUp_0.6s_cubic-bezier(0.22,1,0.36,1)]">
-
-          {/* Status + meta badges */}
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            {statusLabel ? (
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ${
-                statusKey === "currently_airing"
-                  ? "bg-[#cf2442]/18 text-[#ffd7dd] ring-1 ring-[#cf2442]/30"
-                  : statusKey === "not_yet_aired"
-                    ? "bg-[#c8ced8]/12 text-[#dce2ea] ring-1 ring-[#c8ced8]/18"
-                    : "bg-white/[0.07] text-white/50 ring-1 ring-white/10"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${
-                  statusKey === "currently_airing" ? "bg-[#cf2442] animate-pulse" : "bg-current"
-                }`} />
-                {statusLabel}
-              </span>
-            ) : null}
-            {current.score ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#d8b56a]/15 px-3 py-1 text-[11px] font-bold text-[#d8b56a] ring-1 ring-[#d8b56a]/25">
-                <Star size={11} className="fill-[#d8b56a]" />
-                {Number(current.score).toFixed(2)} rating
-              </span>
-            ) : null}
-            {count > 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.07] px-3 py-1 text-[11px] font-semibold text-white/50 ring-1 ring-white/10">
-                <TvIcon size={11} />
-                {count} Episodes
-              </span>
-            ) : null}
-          </div>
-
-          {/* Title */}
-          <h1 className="mb-4 max-w-3xl text-4xl font-black leading-[1.02] tracking-tight text-white drop-shadow-2xl sm:text-5xl lg:text-6xl">
-            {title}
-          </h1>
-
-          {/* CTA buttons */}
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link
-              href={watchPath(current, id, 1)}
-              className="shine group inline-flex h-[52px] items-center gap-2.5 rounded-full bg-[#cf2442] px-7 text-sm font-black text-white shadow-xl shadow-[#cf2442]/28 transition hover:bg-[#dc2d4b] hover:shadow-[#cf2442]/36 hover:shadow-2xl"
-            >
-              <Play size={18} fill="currentColor" />
-              Watch Now
-            </Link>
-            <Link
-              href={animePath(current, id)}
-              aria-label={`More details about ${title}`}
-              className="inline-flex h-[52px] items-center gap-2.5 rounded-full border border-white/[0.12] bg-white/[0.06] px-7 text-sm font-black text-white backdrop-blur-xl transition hover:border-white/20 hover:bg-white/10"
-            >
-              <Info size={16} />
-              More About {title.length > 22 ? `${title.slice(0, 22)}...` : title}
-            </Link>
-          </div>
-
-          {/* Episode progress dots */}
-          {items.length > 1 ? (
-            <div className="mt-10 flex items-center gap-2">
-              {items.slice(0, 8).map((_, i) => (
-                <button
-                  key={i}
-                  aria-label={`Slide ${i + 1}`}
-                  onClick={() => goTo(i, i > index ? 1 : -1)}
-                  className={`rounded-full transition duration-400 ${
-                    i === index
-                      ? "w-8 h-[5px] bg-[#cf2442] shadow-[0_0_18px_rgba(207,36,66,0.45)]"
-                      : "w-[5px] h-[5px] bg-white/20 hover:bg-white/40"
-                  }`}
-                />
-              ))}
-            </div>
+        {/* Metadata row — CR style: genres · score · episodes */}
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-white/60 lg:text-[14px]">
+          {score ? (
+            <span className="flex items-center gap-1 text-[#d8b56a]">
+              <Star size={12} className="fill-[#d8b56a]" />
+              {score}
+            </span>
           ) : null}
+          {score && genres.length > 0 ? <span className="text-white/30">·</span> : null}
+          {genres.map((g, i) => (
+            <span key={g}>
+              {i > 0 ? <span className="mr-2 text-white/30">·</span> : null}
+              {g}
+            </span>
+          ))}
+          {count > 0 && (genres.length > 0 || score) ? <span className="text-white/30">·</span> : null}
+          {count > 0 ? <span>{count} Episodes</span> : null}
         </div>
 
-        {/* Right: floating poster */}
-        {poster ? (
-          <div
-            key={`poster-${index}-${flipKey}`}
-            className="hero-book-stage hidden lg:block relative w-[250px] xl:w-[306px] shrink-0"
+        {/* Synopsis — 3 lines, editorial feel */}
+        {synopsis ? (
+          <p className="mb-8 line-clamp-3 max-w-[480px] text-[14px] leading-[1.55] text-white/75 lg:text-[16px] lg:leading-[1.5]">
+            {synopsis}
+          </p>
+        ) : <div className="mb-8" />}
+
+        {/* Buttons — filled primary + unified square icon button system */}
+        <div className="flex items-center gap-3">
+          <Link
+            href={watchPath(current, id, 1)}
+            className="inline-flex h-[52px] items-center gap-3 rounded-[2px] bg-[#c4182a] px-7 text-[15px] font-extrabold uppercase tracking-[0.02em] text-white transition-all duration-200 hover:bg-[#d8273a] active:translate-y-px lg:h-[56px]"
           >
-            <div className="hero-book-page hero-book-page-a" />
-            <div className="hero-book-page hero-book-page-b" />
-            <div
-              className="hero-book-card relative aspect-[2/3] w-full overflow-hidden rounded-[34px] shadow-[0_34px_110px_rgba(0,0,0,0.72)] ring-1 ring-white/12"
-              style={{ "--book-start": dir === 1 ? "-34deg" : "34deg", "--book-shift": dir === 1 ? "-28px" : "28px" } as CSSProperties}
-            >
-              <Image src={poster} alt={title} fill sizes="(max-width: 1023px) 1px, 280px" loading="eager" className="object-cover" />
-              {/* Glow */}
-              <div className="absolute inset-0 rounded-3xl ring-2 ring-inset ring-white/[0.08]" />
-              <div className="hero-book-sheen" />
-            </div>
-            <div className="absolute -bottom-6 left-1/2 h-px w-3/4 -translate-x-1/2 bg-white/20 blur-sm" />
+            <Play size={17} fill="currentColor" />
+            Start Watching E1
+          </Link>
+          <Link
+            href={animePath(current, id)}
+            aria-label="Add to watchlist"
+            className="grid h-[52px] w-[52px] place-items-center rounded-[2px] border border-white/[0.22] bg-white/[0.04] text-white/70 transition-all duration-200 hover:border-white/40 hover:bg-white/[0.08] hover:text-white lg:h-[56px] lg:w-[56px]"
+          >
+            <Bookmark size={20} />
+          </Link>
+        </div>
+
+        {/* Pill dots */}
+        {items.length > 1 ? (
+          <div className="mt-10 flex items-center gap-2 lg:mt-12">
+            {items.slice(0, 8).map((_, i) => (
+              <button
+                key={i}
+                aria-label={`Slide ${i + 1}`}
+                onClick={() => goTo(i, i > index ? 1 : -1)}
+                className={`h-[7px] rounded-full transition-all duration-300 lg:h-[8px] ${
+                  i === index
+                    ? "w-[40px] bg-[#c4182a] lg:w-[48px]"
+                    : "w-[18px] bg-white/30 hover:bg-white/50 lg:w-[22px]"
+                }`}
+              />
+            ))}
           </div>
         ) : null}
       </div>
 
-      {/* Prev/Next arrows */}
+      {/* Prev/Next arrows — plain chevrons, no border */}
       {items.length > 1 ? (
-        <div className="absolute bottom-8 right-6 flex gap-2 lg:right-16">
+        <>
           <button
             aria-label="Previous"
             onClick={() => goTo(index - 1, -1)}
-            className="glass grid h-10 w-10 place-items-center rounded-xl text-white/60 transition hover:scale-105 hover:text-white"
+            className="absolute left-3 top-1/2 z-10 -translate-y-1/2 p-2 text-white/50 transition-all duration-200 hover:text-white lg:left-5"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={30} strokeWidth={2.5} />
           </button>
           <button
             aria-label="Next"
             onClick={() => goTo(index + 1, 1)}
-            className="glass grid h-10 w-10 place-items-center rounded-xl text-white/60 transition hover:scale-105 hover:text-white"
+            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 p-2 text-white/50 transition-all duration-200 hover:text-white lg:right-5"
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={30} strokeWidth={2.5} />
           </button>
-        </div>
+        </>
       ) : null}
-
-      {/* Bottom fade */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#05060b] to-transparent" />
     </section>
   );
 }
 
-export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loading?: boolean }) {
+export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?: Anime[]; loading?: boolean; crData?: HeroCrData }) {
   const [index, setIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -269,17 +249,15 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
 
   if (loading) {
     return (
-      <section ref={sectionRef} className="relative -mt-1 min-h-[320px] overflow-hidden pb-3 sm:hidden">
-        <div className="absolute inset-0 animate-pulse bg-[#141828]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#06070d] via-[#06070d]/35 to-transparent" />
-        <div className="relative flex min-h-[320px] items-end px-4">
-          <div className="w-full rounded-2xl border border-white/[0.1] bg-black/30 p-3.5 shadow-2xl shadow-black/35 backdrop-blur-2xl">
-            <div className="mb-3 h-3 w-24 rounded-full bg-white/[0.12]" />
-            <div className="h-8 w-4/5 rounded-xl bg-white/[0.12]" />
-            <div className="mt-4 flex gap-2">
-              <div className="h-11 flex-1 rounded-2xl bg-white/[0.12]" />
-              <div className="h-11 w-24 rounded-2xl bg-white/[0.08]" />
-            </div>
+      <section ref={sectionRef} className="relative min-h-[520px] overflow-hidden sm:hidden">
+        <div className="absolute inset-0 animate-pulse bg-[#0e0e10]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050506] via-[#050506]/35 to-transparent" />
+        <div className="absolute inset-x-4 bottom-6">
+          <div className="h-[90px] w-[60%] rounded-md bg-white/[0.08]" />
+          <div className="mt-4 h-3 w-2/3 rounded-full bg-white/[0.07]" />
+          <div className="mt-4 flex gap-2.5">
+            <div className="h-12 flex-1 rounded bg-white/[0.1]" />
+            <div className="h-12 w-12 rounded bg-white/[0.07]" />
           </div>
         </div>
       </section>
@@ -290,72 +268,95 @@ export function MobileHeroBanner({ items = [], loading }: { items?: Anime[]; loa
 
   const id = animeId(current);
   const title = titleOf(current);
+  const malId = String(current.mal_id || current.anime_id || current.id || "");
+  const cr = crData[malId];
   const poster = posterOf(current, "poster-md");
   const banner = bannerOf(current, "banner-sm");
+  const bgSrc = cr?.detail_banner || banner || poster;
+  const titleLogo = cr?.title_logo || "";
+  const count = episodeCount(current);
+  const genres = current.genres?.slice(0, 3) ?? [];
 
   return (
-    <section ref={sectionRef} className="relative -mt-1 min-h-[286px] overflow-hidden pb-3 sm:hidden">
-      <div className="absolute inset-0 bg-[#080a12]">
-        {banner || poster ? (
+    <section ref={sectionRef} className="relative min-h-[520px] overflow-hidden bg-[#050506] sm:hidden">
+      {/* Full-bleed keyart — character framed to the right, like Crunchyroll mobile */}
+      <div className="absolute inset-0">
+        {bgSrc ? (
           <Image
             key={`${id}-${index}`}
-            src={banner || poster}
+            src={bgSrc}
             alt=""
             fill
             priority={index === 0}
             fetchPriority={index === 0 ? "high" : "auto"}
             loading={index === 0 ? undefined : "lazy"}
             sizes="100vw"
-            className="object-cover opacity-100 contrast-[1.04] saturate-[1.12]"
+            className="animate-[fadeIn_0.4s_ease] object-cover object-[62%_center]"
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#06070d]/82 via-[#06070d]/16 to-transparent" />
-        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#06070d]/46 to-transparent" />
+        {/* Bottom-heavy gradient so the title/CTA stays readable */}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(5,5,6,0.12) 0%, rgba(5,5,6,0.05) 32%, rgba(5,5,6,0.78) 78%, #050506 100%)" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(5,5,6,0.55) 0%, rgba(5,5,6,0.08) 55%, rgba(5,5,6,0) 100%)" }} />
       </div>
 
-      <div className="relative flex min-h-[286px] items-end px-4 pb-2">
-        <div className="w-[74%] max-w-[270px] rounded-xl border border-white/[0.045] bg-[#090b13]/10 p-2 shadow-md shadow-black/10">
-          <h1 className="line-clamp-2 text-base font-bold leading-tight text-white drop-shadow-lg">
+      {/* Bottom-left content — lifted above the bottom nav for breathing room */}
+      <div className="absolute inset-x-5 bottom-24 z-10">
+        {titleLogo ? (
+          <img
+            src={titleLogo}
+            alt={`${title} logo`}
+            loading="eager"
+            className="mb-3 max-h-[120px] w-auto max-w-[62vw] object-contain object-left drop-shadow-[0_3px_18px_rgba(0,0,0,0.7)]"
+            style={{ width: "min(62vw, 260px)" }}
+          />
+        ) : (
+          <h1 className="mb-3 line-clamp-2 text-[26px] font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
             {title}
           </h1>
+        )}
 
-          <div className="mt-2 flex gap-1.5">
-            <Link
-              href={watchPath(current, id, 1)}
-              className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#cf2442] text-xs font-bold text-white shadow-md shadow-[#cf2442]/16"
-            >
-              <Play size={13} fill="currentColor" />
-              Watch
-            </Link>
-            <Link
-              href={animePath(current, id)}
-              aria-label={`View details for ${title}`}
-              className="inline-flex h-8 items-center justify-center rounded-lg border border-white/[0.09] bg-black/10 px-2.5 text-xs font-semibold text-white/88"
-            >
-              Details
-            </Link>
-          </div>
-
-          {items.length > 1 ? (
-            <div className="mt-2 flex gap-1">
-              {items.slice(0, 5).map((_, i) => (
-                <button
-                  key={i}
-                  aria-label={`Hero slide ${i + 1}`}
-                  onClick={() => setIndex(i)}
-                  className="grid h-6 w-7 place-items-center rounded-full"
-                >
-                  <span
-                    className={`h-1.5 rounded-full transition-all ${
-                      i === index ? "w-5 bg-[#f43f5e]" : "w-1.5 bg-white/55"
-                    }`}
-                  />
-                </button>
-              ))}
-            </div>
-          ) : null}
+        {/* Short metadata — one line */}
+        <div className="mb-3.5 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] font-medium text-white/70">
+          <span>Sub | Dub</span>
+          {count > 0 ? <><span className="text-white/35">·</span><span>{count} Ep</span></> : null}
+          {genres.length ? <><span className="text-white/35">·</span><span className="truncate text-white/55">{genres.join(", ")}</span></> : null}
         </div>
+
+        {/* Primary CTA + watchlist icon */}
+        <div className="flex items-center gap-2.5">
+          <Link
+            href={watchPath(current, id, 1)}
+            className="inline-flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[2px] bg-[#c4182a] text-[14px] font-extrabold uppercase tracking-[0.02em] text-white"
+          >
+            <Play size={16} fill="currentColor" />
+            Start Watching
+          </Link>
+          <Link
+            href={animePath(current, id)}
+            aria-label={`View details for ${title}`}
+            className="grid h-[52px] w-[52px] place-items-center rounded-[2px] border border-white/[0.22] bg-white/[0.04] text-white/75"
+          >
+            <Bookmark size={18} />
+          </Link>
+        </div>
+
+        {/* Dots */}
+        {items.length > 1 ? (
+          <div className="mt-4 flex gap-1.5">
+            {items.slice(0, 6).map((_, i) => (
+              <button
+                key={i}
+                aria-label={`Hero slide ${i + 1}`}
+                onClick={() => setIndex(i)}
+                className="grid h-5 place-items-center"
+              >
+                <span className={`h-[6px] rounded-full transition-all ${i === index ? "w-7 bg-[#c4182a]" : "w-[6px] bg-white/40"}`} />
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );
 }
+

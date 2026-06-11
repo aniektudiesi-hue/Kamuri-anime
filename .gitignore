@@ -45,3 +45,13 @@ lh-*.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local dev artifacts
+.next-*/
+*.log
+.claude/
+
+# local image caches (not for git, served via CDN)
+public/cr-img/
+public/cr-keyart/
+public/image-cache/

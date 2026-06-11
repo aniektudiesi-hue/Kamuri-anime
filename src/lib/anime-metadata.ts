@@ -1,4 +1,5 @@
 import type { Anime } from "./types";
+import { catalogServerGet, mapCatalogAnime } from "./catalog-api";
 
 type AniListMedia = {
   idMal: number | null;
@@ -6,6 +7,10 @@ type AniListMedia = {
   title: { romaji: string; english: string | null; native?: string | null };
   coverImage: { large?: string; extraLarge?: string };
   bannerImage?: string | null;
+  description?: string | null;
+  genres?: string[];
+  studios?: { nodes?: Array<{ name?: string | null }> };
+  source?: string | null;
   averageScore: number | null;
   episodes: number | null;
   status: string;
@@ -35,12 +40,37 @@ const ANILIST_STATUS: Record<string, string> = {
   HIATUS: "finished_airing",
 };
 
+const ENABLE_EXTERNAL_METADATA_FALLBACK = process.env.NEXT_PUBLIC_EXTERNAL_METADATA_FALLBACK === "1";
+
 export async function fetchAnimeMetadataByMalId(malId: string | number): Promise<Anime | undefined> {
   const id = Number(malId);
   if (!Number.isFinite(id) || id <= 0) return undefined;
 
+  // Resolve by exact mal_id only — never fall back to items[0], which used to
+  // return a title-substring match (e.g. id 21 -> "21 Emon" instead of One Piece).
+  const searchCatalog = await catalogServerGet<{ items?: Record<string, unknown>[] }>(`/api/search?q=${id}&limit=25&page=1`, 300);
+  const searchHit = searchCatalog?.items?.find((item) => String(item.mal_id ?? "") === String(id));
+  const catalogAnime = searchHit ? mapCatalogAnime(searchHit as Parameters<typeof mapCatalogAnime>[0]) : undefined;
+  if (catalogAnime && catalogAnime.mal_id && catalogAnime.title !== "Untitled") return catalogAnime;
+
+  const catalog = await catalogServerGet<{ anime?: Record<string, unknown> }>(`/api/streams/${id}`, 300);
+  const streamAnime = catalog?.anime ? mapCatalogAnime(catalog.anime as Parameters<typeof mapCatalogAnime>[0]) : undefined;
+  if (streamAnime && streamAnime.mal_id && streamAnime.title !== "Untitled") return streamAnime;
+  if (!ENABLE_EXTERNAL_METADATA_FALLBACK) return streamAnime || catalogAnime || undefined;
+
   const anilist = await fetchAniListAnime(id);
-  if (anilist) return anilist;
+  if (streamAnime || anilist) {
+    return {
+      ...(streamAnime ?? {}),
+      ...(anilist ?? {}),
+      banner: anilist?.banner || streamAnime?.banner,
+      image_url: streamAnime?.image_url || anilist?.image_url,
+      poster: streamAnime?.poster || anilist?.poster,
+      episodes: streamAnime?.episodes || anilist?.episodes,
+      episode_count: streamAnime?.episode_count || anilist?.episode_count,
+      num_episodes: streamAnime?.num_episodes || anilist?.num_episodes,
+    };
+  }
   return fetchJikanAnime(id);
 }
 
@@ -52,6 +82,10 @@ async function fetchAniListAnime(malId: number): Promise<Anime | undefined> {
         title { romaji english native }
         coverImage { large extraLarge }
         bannerImage
+        description(asHtml: false)
+        genres
+        studios { nodes { name } }
+        source
         averageScore episodes status
         startDate { year month day }
       }
@@ -94,6 +128,10 @@ function mapAniList(item: AniListMedia): Anime {
     title_jp: item.title.native || undefined,
     image_url: item.coverImage.extraLarge || item.coverImage.large,
     banner: item.bannerImage || undefined,
+    overview: item.description || undefined,
+    genres: item.genres?.length ? item.genres : undefined,
+    studios: item.studios?.nodes?.map((studio) => studio.name || "").filter(Boolean) || undefined,
+    source: item.source || undefined,
     score: item.averageScore ? item.averageScore / 10 : undefined,
     episodes: item.episodes ?? undefined,
     status: ANILIST_STATUS[item.status] || item.status.toLowerCase(),

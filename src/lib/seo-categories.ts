@@ -1,8 +1,6 @@
 import type { Anime } from "@/lib/types";
-import { fetchAniListDiscovery, fetchJikanDiscovery, mergeAnimeSources, resolveDiscoveryIntent } from "@/lib/anime-discovery";
-import { listFromPayload, rankAnimeForSearch } from "@/lib/utils";
-
-const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
+import { fetchCatalogSection } from "@/lib/catalog-api";
+import { rankAnimeForSearch } from "@/lib/utils";
 
 export type SeoCategorySlug = "popular" | "new-releases" | "top-rated" | "airing" | "free-anime";
 
@@ -72,44 +70,29 @@ export function getSeoCategory(slug: SeoCategorySlug) {
 
 export async function getSeoCategoryAnime(slug: SeoCategorySlug) {
   if (slug === "airing") {
-    const intent = resolveDiscoveryIntent("airing");
-    const [anilist, jikan, recent] = await Promise.all([
-      fetchAniListDiscovery(intent, 1),
-      fetchJikanDiscovery(intent, 1),
-      fetchHomeList("/home/recently-added", 900),
-    ]);
-    return rankAnimeForSearch(mergeAnimeSources(anilist.media, jikan.media, recent), "airing").slice(0, 48);
+    return fetchHomeList("/api/anime/airing", 1800);
   }
 
   if (slug === "free-anime") {
     const [popular, recent, topRated] = await Promise.all([
-      fetchHomeList("/home/thumbnails", 1800),
-      fetchHomeList("/home/recently-added", 900),
-      fetchHomeList("/home/top-rated", 1800),
+      fetchHomeList("/api/anime/season/2026/spring", 1800),
+      fetchHomeList("/api/anime/new-releases", 900),
+      fetchHomeList("/api/anime/top-rated", 1800),
     ]);
-    return rankAnimeForSearch(mergeAnimeSources(recent, popular, topRated), "airing").slice(0, 48);
+    return rankAnimeForSearch([...recent, ...popular, ...topRated], "airing").slice(0, 48);
   }
 
   const path =
     slug === "top-rated"
-      ? "/home/top-rated"
+      ? "/api/anime/top-rated"
       : slug === "new-releases"
-        ? "/home/recently-added"
-        : "/home/thumbnails";
+        ? "/api/anime/new-releases"
+        : "/api/anime/popular";
 
   const list = await fetchHomeList(path, slug === "new-releases" ? 900 : 1800);
   return slug === "new-releases" ? rankAnimeForSearch(list, "airing") : list;
 }
 
 async function fetchHomeList(path: string, revalidate: number) {
-  try {
-    const response = await fetch(`${API_BASE}${path}`, {
-      headers: { Accept: "application/json" },
-      next: { revalidate },
-    });
-    if (!response.ok) return [];
-    return listFromPayload<Anime>(await response.json());
-  } catch {
-    return [];
-  }
+  return fetchCatalogSection(path, 48, 1, revalidate) as Promise<Anime[]>;
 }

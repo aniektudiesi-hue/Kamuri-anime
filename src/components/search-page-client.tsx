@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, ChevronDown, Loader2, RefreshCw, Search, WifiOff } from "lucide-react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AnimeCard } from "@/components/anime-card";
 import { SearchBox } from "@/components/search-box";
@@ -13,14 +13,14 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
   DISCOVERY_CHIPS,
+  type DiscoveryFacets,
   fetchAniListDiscovery,
-  fetchJikanDiscovery,
-  mergeAnimeSources,
   resolveDiscoveryIntent,
 } from "@/lib/anime-discovery";
-import { localSearchAnime, mergeSearchResults, rememberSearchCatalog } from "@/lib/search-index";
+import { KairoState } from "@/components/mascot/kairo";
+import { localSearchAnime, rememberSearchCatalog } from "@/lib/search-index";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { HISTORY_UPDATED_EVENT, animeId, rawPosterOf, rememberedHistory, titleOf } from "@/lib/utils";
+import { HISTORY_UPDATED_EVENT, animeId, posterOf, rememberedHistory, titleOf } from "@/lib/utils";
 
 const GENRE_LINKS = new Set([
   "Action",
@@ -46,6 +46,8 @@ const GENRE_LINKS = new Set([
   "Demons",
 ]);
 
+const DISCOVERY_QUERY_VERSION = "v2";
+
 export function SearchPageClient() {
   return (
     <Suspense fallback={<SearchFallback />}>
@@ -54,14 +56,16 @@ export function SearchPageClient() {
   );
 }
 
-function GridSkeleton({ count = 20 }: { count?: number }) {
+const SEARCH_GRID = "grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6";
+
+function GridSkeleton({ count = 24 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
+    <div className={SEARCH_GRID}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i}>
-          <div className="aspect-[2/3] animate-pulse rounded-xl bg-[#141828]" style={{ animationDelay: `${i * 25}ms` }} />
-          <div className="mt-2 h-3 w-4/5 animate-pulse rounded-full bg-[#141828]" style={{ animationDelay: `${i * 25 + 80}ms` }} />
-          <div className="mt-1.5 h-2.5 w-2/5 animate-pulse rounded-full bg-[#0d1020]" style={{ animationDelay: `${i * 25 + 120}ms` }} />
+          <div className="aspect-[2/3] animate-pulse rounded-lg bg-[#1b1b1f]" style={{ animationDelay: `${i * 20}ms` }} />
+          <div className="mt-2 h-3 w-4/5 animate-pulse rounded bg-[#1b1b1f]" style={{ animationDelay: `${i * 20 + 70}ms` }} />
+          <div className="mt-1.5 h-2.5 w-2/5 animate-pulse rounded bg-[#141417]" style={{ animationDelay: `${i * 20 + 110}ms` }} />
         </div>
       ))}
     </div>
@@ -70,31 +74,62 @@ function GridSkeleton({ count = 20 }: { count?: number }) {
 
 function SearchContent() {
   const params = useSearchParams();
-  const q = params.get("q")?.trim() ?? "";
-  const intentKey = resolveDiscoveryIntent(q).key;
-  return <SearchContentBody key={intentKey} q={q} />;
+  const urlQ = params.get("q")?.trim() ?? "";
+  const [text, setText] = useState(urlQ);
+  const [debouncedQ, setDebouncedQ] = useState(urlQ);
+
+  // External URL changes (header search submit, category links) sync into the live box.
+  useEffect(() => {
+    setText(urlQ);
+    setDebouncedQ(urlQ);
+  }, [urlQ]);
+
+  // Live typing -> results update in ~150ms, no full navigation/reload.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const next = text.trim();
+      setDebouncedQ(next);
+      const url = next ? `/search?q=${encodeURIComponent(next)}` : "/search";
+      window.history.replaceState(window.history.state, "", url);
+    }, 150);
+    return () => clearTimeout(id);
+  }, [text]);
+
+  return <SearchContentBody q={debouncedQ} liveText={text} onLiveText={setText} />;
 }
 
-function SearchContentBody({ q }: { q: string }) {
+function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: string; onLiveText: (value: string) => void }) {
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const intent = useMemo(() => resolveDiscoveryIntent(q), [q]);
   const instantResults = useMemo(() => localSearchAnime(q, 30), [q]);
-  const slowTimer = useRef<number | undefined>(undefined);
-  const [isSlow, setIsSlow] = useState(false);
+  const resultsScrollRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [discoveryPage, setDiscoveryPage] = useState(1);
   const [allAnilist, setAllAnilist] = useState<Anime[]>([]);
-  const [allJikan, setAllJikan] = useState<Anime[]>([]);
-  const [visibleCount, setVisibleCount] = useState(40);
-  const [fetchAllSources, setFetchAllSources] = useState(false);
+  const [resultTotal, setResultTotal] = useState(0);
   const [localHistory, setLocalHistory] = useState<LibraryItem[]>([]);
+  // The result count is fully client-derived (instant cache + AniList), so the
+  // SSR value never matches the post-fetch value. Render it only after mount to
+  // avoid a hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Filter UI: format facet + collapsible panel. CR-mapped titles always rank
+  // first regardless of facet, so the on-brand catalog leads every genre/search.
+  const [formatFilter, setFormatFilter] = useState<FormatKey>("ALL");
+  const [facets, setFacets] = useState<DiscoveryFacets | undefined>(undefined);
+  useEffect(() => setFormatFilter("ALL"), [intent.key]);
 
+  // On a new query/intent, drop the previous query's accumulated results and
+  // total immediately. Without this the grid keeps showing the OLD query's
+  // cards (and the header/count can diverge from the grid) until the new fetch
+  // lands — the "UI dhoka" / phone "count updates but page doesn't" bug. The
+  // instant local-cache results (instantResults) fill the gap with no flash.
   useEffect(() => {
     setDiscoveryPage(1);
     setAllAnilist([]);
-    setAllJikan([]);
-    setVisibleCount(40);
-    setFetchAllSources(false);
-  }, [intent.key]);
+    setResultTotal(0);
+  }, [intent.key, formatFilter]);
 
   useEffect(() => {
     const refresh = () => setLocalHistory(rememberedHistory(12));
@@ -115,94 +150,122 @@ function SearchContentBody({ q }: { q: string }) {
     [localHistory, serverHistory.data],
   );
 
-  const results = useQuery({
-    queryKey: ["search", q],
-    queryFn: () => api.search(q),
-    enabled: q.length > 0 && intent.useBackend && fetchAllSources,
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 90,
-    retry: 1,
-    retryDelay: 2000,
-  });
-
   const anilistQ = useQuery({
-    queryKey: ["anilist-discovery", intent.key, q, discoveryPage],
-    queryFn: () => fetchAniListDiscovery(intent, discoveryPage),
-    enabled: q.length > 0,
+    queryKey: ["anilist-discovery", DISCOVERY_QUERY_VERSION, intent.key, q, formatFilter, discoveryPage],
+    queryFn: async () => ({ intentKey: intent.key, fmtKey: formatFilter, ...(await fetchAniListDiscovery(intent, discoveryPage, formatFilter)) }),
+    enabled: true,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
-  });
-
-  const jikanQ = useQuery({
-    queryKey: ["jikan-discovery", intent.key, q, discoveryPage],
-    queryFn: () => fetchJikanDiscovery(intent, discoveryPage),
-    enabled: q.length > 0 && fetchAllSources,
-    staleTime: 1000 * 60 * 45,
-    gcTime: 1000 * 60 * 120,
+    placeholderData: keepPreviousData,
   });
 
   useEffect(() => {
     if (!anilistQ.data) return;
+    if (anilistQ.data.intentKey !== intent.key || anilistQ.data.fmtKey !== formatFilter) return;
     const { media } = anilistQ.data;
+    setResultTotal(Number(anilistQ.data.total || media.length || 0));
+    if (anilistQ.data.facets) setFacets(anilistQ.data.facets);
     setAllAnilist((prev) => {
       if (discoveryPage === 1) return media;
       const existingIds = new Set(prev.map((anime) => animeId(anime)));
       return [...prev, ...media.filter((anime) => !existingIds.has(animeId(anime)))];
     });
-  }, [anilistQ.data, discoveryPage]);
+  }, [anilistQ.data, discoveryPage, intent.key, formatFilter]);
 
-  useEffect(() => {
-    if (!jikanQ.data) return;
-    const { media } = jikanQ.data;
-    setAllJikan((prev) => {
-      if (discoveryPage === 1) return media;
-      const existingIds = new Set(prev.map((anime) => animeId(anime)));
-      return [...prev, ...media.filter((anime) => !existingIds.has(animeId(anime)))];
-    });
-  }, [jikanQ.data, discoveryPage]);
-
-  useEffect(() => {
-    if (slowTimer.current) window.clearTimeout(slowTimer.current);
-    const reset = window.setTimeout(() => setIsSlow(false), 0);
-    if (anilistQ.isLoading || (fetchAllSources && (results.isLoading || jikanQ.isLoading))) {
-      slowTimer.current = window.setTimeout(() => setIsSlow(true), 1200);
-    }
-    return () => {
-      window.clearTimeout(reset);
-      if (slowTimer.current) window.clearTimeout(slowTimer.current);
-    };
-  }, [fetchAllSources, results.isLoading, anilistQ.isLoading, jikanQ.isLoading]);
-
-  const backendResults = useMemo(() => intent.useBackend ? (results.data ?? []) : [], [intent.useBackend, results.data]);
-  const mergedRaw = fetchAllSources
-    ? intent.useBackend
-      ? mergeSearchResults(q, allAnilist, instantResults, backendResults, allJikan)
-      : mergeAnimeSources(allAnilist, instantResults, allJikan)
-    : allAnilist;
+  // Instant local-cache results render in <1ms while the live query loads.
+  const mergedRaw = allAnilist.length ? allAnilist : instantResults;
   const merged = mergedRaw;
-  const visibleMerged = merged.slice(0, visibleCount);
-  const hasMore = Boolean(anilistQ.data?.hasNextPage || jikanQ.data?.hasNextPage);
-  const isTimeout = results.error instanceof Error && results.error.message === "timeout";
+
+  // Authoritative per-format counts from the backend (computed over the WHOLE
+  // result set in one response) — fixed numbers that never grow as pages load.
+  const formatCounts: Record<FormatKey, number> = facets ?? { ALL: resultTotal, TV: 0, MOVIE: 0, OVA: 0, ONA: 0, SPECIAL: 0 };
+
+  // Backend already applies the format facet (fmt=) + total/pagination. Here we
+  // only re-rank within the loaded page: CR-mapped first, then TV-first for text
+  // queries, preserving backend relevance order within each bucket.
+  const visibleMerged = useMemo(() => {
+    return merged
+      .map((a, i) => ({ a, i }))
+      .sort((x, y) => {
+        const cr = crRank(x.a) - crRank(y.a);
+        if (cr) return cr;
+        if (q) {
+          const fr = formatRank(x.a) - formatRank(y.a);
+          if (fr) return fr;
+        }
+        return x.i - y.i;
+      })
+      .map((o) => o.a);
+  }, [merged, q]);
+  const hasMore = Boolean(anilistQ.data?.hasNextPage);
   const hasRenderableResults = merged.length > 0;
-  const isLoading = !hasRenderableResults && (anilistQ.isLoading || (fetchAllSources && (results.isLoading || jikanQ.isLoading))) && discoveryPage === 1;
-  const isLoadingMore = discoveryPage > 1 && (anilistQ.isLoading || (fetchAllSources && jikanQ.isLoading));
+  const isLoading = !hasRenderableResults && anilistQ.isLoading && discoveryPage === 1;
+  const isLoadingMore = discoveryPage > 1 && anilistQ.isFetching;
+  const shownTotal = resultTotal || merged.length;
+  const canLoadMore = hasMore;
+
+  function loadMoreResults() {
+    if (isLoading || isLoadingMore) return;
+    if (hasMore) setDiscoveryPage((page) => page + 1);
+  }
 
   useEffect(() => {
-    const items = [...backendResults, ...allAnilist, ...allJikan];
-    if (items.length) rememberSearchCatalog(items);
-  }, [backendResults, allAnilist, allJikan]);
+    if (!anilistQ.data?.hasNextPage || anilistQ.isFetching) return;
+    const nextPage = discoveryPage + 1;
+    queryClient.prefetchQuery({
+      queryKey: ["anilist-discovery", DISCOVERY_QUERY_VERSION, intent.key, q, formatFilter, nextPage],
+      queryFn: async () => ({ intentKey: intent.key, fmtKey: formatFilter, ...(await fetchAniListDiscovery(intent, nextPage, formatFilter)) }),
+      staleTime: 1000 * 60 * 30,
+      gcTime: 1000 * 60 * 90,
+    });
+  }, [anilistQ.data?.hasNextPage, anilistQ.isFetching, discoveryPage, intent, q, formatFilter, queryClient]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || isLoading || isLoadingMore) return;
+    if (visibleMerged.length === 0) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        loadMoreResults();
+      },
+      { root: resultsScrollRef.current, rootMargin: "700px 0px 900px 0px", threshold: 0.01 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, isLoading, isLoadingMore, merged.length, visibleMerged.length]);
+
+  useEffect(() => {
+    if (!canLoadMore || isLoading || isLoadingMore) return;
+    const onScroll = () => {
+      const distance = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+      if (distance < 900) loadMoreResults();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canLoadMore, isLoading, isLoadingMore, merged.length, visibleMerged.length]);
+
+  useEffect(() => {
+    if (allAnilist.length) rememberSearchCatalog(allAnilist);
+  }, [allAnilist]);
 
   useEffect(() => {
     if (!visibleMerged.length) return;
     const links: HTMLLinkElement[] = [];
-    for (const [index, anime] of visibleMerged.slice(0, 12).entries()) {
-      const poster = rawPosterOf(anime);
+    for (const [index, anime] of visibleMerged.slice(0, 30).entries()) {
+      const poster = posterOf(anime, index < 6 ? "poster-lg" : "poster-md");
       if (!poster) continue;
+      const warm = new window.Image();
+      warm.decoding = "async";
+      warm.src = poster;
+
       const link = document.createElement("link");
-      link.rel = index < 6 ? "preload" : "prefetch";
+      link.rel = index < 10 ? "preload" : "prefetch";
       link.as = "image";
       link.href = poster;
-      if (index < 6) link.fetchPriority = "high";
+      if (index < 10) link.fetchPriority = "high";
       document.head.appendChild(link);
       links.push(link);
     }
@@ -213,36 +276,89 @@ function SearchContentBody({ q }: { q: string }) {
 
   return (
     <AppShell>
-      <SidebarLayout>
-        <div className="py-6">
-          <div className="mb-5 sm:hidden">
-            <SearchBox />
+      <div className="mx-auto max-w-screen-2xl px-4 lg:px-6">
+        <div className="min-h-[calc(100vh-96px)] py-6">
+          <div className="mb-6">
+            <div className="relative flex items-center border-b-2 border-white/15 transition focus-within:border-[#c4182a]">
+              <Search size={20} className="pointer-events-none shrink-0 text-white/40" />
+              <input
+                autoFocus
+                value={liveText}
+                onChange={(event) => onLiveText(event.target.value)}
+                placeholder="Search anime..."
+                aria-label="Search anime"
+                className="w-full bg-transparent px-3 py-2.5 text-xl font-medium text-white placeholder:text-white/30 focus:outline-none sm:text-2xl"
+              />
+              {liveText ? (
+                <button type="button" onClick={() => onLiveText("")} aria-label="Clear search" className="shrink-0 px-1 text-white/40 transition hover:text-white">
+                  <X size={20} />
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {q ? (
             <div className="mb-5">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-white/70">{intent.sourceLabel}</p>
-              <h1 className="flex items-baseline gap-3 text-2xl font-black text-white">
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/70">{intent.sourceLabel}</p>
+              <h1 className="flex items-baseline gap-3 text-2xl font-semibold text-white">
                 {intent.label}
-                {!isLoading && merged.length > 0 && (
-                  <span className="text-lg font-semibold text-white/70">{merged.length} titles</span>
+                {mounted && shownTotal > 0 && (
+                  <span className="text-lg font-medium text-white/70">{shownTotal.toLocaleString()} titles available</span>
                 )}
               </h1>
             </div>
           ) : (
-            <div className="mb-5">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-white/70">Discover</p>
-              <h1 className="text-2xl font-black text-white">Browse Anime</h1>
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/70">Full Database</p>
+                <h1 className="flex items-baseline gap-3 text-2xl font-bold tracking-tight text-white sm:text-[28px]">
+                  Explore Anime
+                  {mounted && shownTotal > 0 ? <span className="text-base font-medium text-white/55">{shownTotal.toLocaleString()} titles</span> : null}
+                </h1>
+              </div>
+              <div className="flex items-center gap-1.5 text-[12px] font-medium text-white/40">
+                <SlidersHorizontal size={14} />
+                <span>Crunchyroll titles first</span>
+              </div>
             </div>
           )}
+
+          {mounted && merged.length > 0 ? (
+            <div className="no-scrollbar -mx-4 mb-5 flex items-center gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0">
+              {FORMAT_FACETS.map((facet) => {
+                const n = formatCounts[facet.key] ?? 0;
+                if (facet.key !== "ALL" && n === 0) return null;
+                const active = formatFilter === facet.key;
+                return (
+                  <button
+                    key={facet.key}
+                    type="button"
+                    onClick={() => setFormatFilter(facet.key)}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-[4px] border px-3 py-1.5 text-[12px] font-semibold transition-colors duration-[160ms] ${
+                      active
+                        ? "border-[#c4182a]/60 bg-[#c4182a]/16 text-white"
+                        : "border-white/[0.08] bg-[#0c0c0e] text-white/55 hover:border-[#c4182a]/35 hover:text-white/85"
+                    }`}
+                  >
+                    {facet.label}
+                    <span className={active ? "text-white/70" : "text-white/35"}>{n.toLocaleString()}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
 
           {!q && (
             <div className="no-scrollbar -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-wrap lg:px-0">
               {DISCOVERY_CHIPS.map((chip) => (
                 <a
                   key={chip}
-                  href={GENRE_LINKS.has(chip) ? `/genre/${encodeURIComponent(chip)}` : `/search?q=${encodeURIComponent(chip)}`}
-                  className="shrink-0 rounded-xl border border-white/[0.07] bg-[#0d1020] px-3.5 py-1.5 text-[12px] font-semibold text-white/50 transition-colors hover:border-[#cf2442]/30 hover:bg-[#cf2442]/10 hover:text-[#ff6f86]"
+                  href={chip === "Explore" ? "/search" : GENRE_LINKS.has(chip) ? `/genre/${encodeURIComponent(chip)}` : `/search?q=${encodeURIComponent(chip)}`}
+                  className={`shrink-0 rounded-[4px] border px-3.5 py-1.5 text-[12px] font-medium transition-colors duration-[160ms] ${
+                    chip === "Explore"
+                      ? "border-[#c4182a]/50 bg-[#c4182a]/14 text-white"
+                      : "border-white/[0.08] bg-[#0c0c0e] text-white/50 hover:border-[#c4182a]/35 hover:bg-[#c4182a]/10 hover:text-white/80"
+                  }`}
                 >
                   {chip}
                 </a>
@@ -250,130 +366,88 @@ function SearchContentBody({ q }: { q: string }) {
             </div>
           )}
 
-          <HistorySuggestions queries={suggestionQueries} />
+          {q && !isLoading && merged.length > 0 ? (
+            <h2 className="mb-4 text-xl font-bold tracking-tight text-white">Results</h2>
+          ) : null}
 
-          {results.isError && merged.length === 0 ? (
-            <div className="flex flex-col items-center gap-5 py-16 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#141828]">
-                {isTimeout ? <WifiOff size={28} className="text-amber-400" /> : <AlertCircle size={28} className="text-red-400" />}
-              </span>
-              <div>
-                <p className="text-base font-bold text-white">{isTimeout ? "Server is waking up" : "Search failed"}</p>
-                <p className="mt-1.5 max-w-xs text-sm text-white/40">
-                  {isTimeout ? "The server was asleep. This takes 10-20 seconds. Try again." : "Something went wrong. Check your connection or try a different query."}
-                </p>
-              </div>
-              <button
-                onClick={() => results.refetch()}
-                className="flex items-center gap-2 rounded-xl bg-white/[0.07] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/[0.12]"
-              >
-                <RefreshCw size={14} />
-                Retry search
-              </button>
-            </div>
-          ) : isLoading && isSlow ? (
-            <>
-              <div className="mb-5 flex items-center gap-3 rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-3">
-                <Loader2 size={15} className="shrink-0 animate-spin text-amber-400" />
-                <div>
-                  <p className="text-sm font-medium text-amber-300">Loading AniList results</p>
-                  <p className="text-xs text-amber-400/60">AniList is loading the fast first page.</p>
+          <div ref={resultsScrollRef} className={q ? "min-h-[720px]" : ""} style={{ overflowAnchor: "none" }}>
+            {isLoading ? (
+              <GridSkeleton count={24} />
+            ) : merged.length > 0 ? (
+              <>
+                <div className={SEARCH_GRID}>
+                  {visibleMerged.map((anime, i) => (
+                    <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 12} fastImage className="w-full" />
+                  ))}
                 </div>
-              </div>
-              <GridSkeleton count={18} />
-            </>
-          ) : isLoading ? (
-            <GridSkeleton count={18} />
-          ) : merged.length > 0 ? (
-            <>
-              <div className="content-visibility-auto grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
-                {visibleMerged.map((anime, i) => (
-                  <AnimeCard
-                    key={`${animeId(anime)}-${i}`}
-                    anime={anime}
-                    className="w-full"
-                    priority={i < 10}
-                    fastImage
-                    posterOverride={rawPosterOf(anime)}
-                  />
-                ))}
-              </div>
 
-              {q && !fetchAllSources ? (
-                <div className="mt-8 flex justify-center">
-                  <button
-                    onClick={() => setFetchAllSources(true)}
-                    className="flex items-center gap-2 rounded-2xl border border-[#cf2442]/25 bg-[#cf2442]/12 px-8 py-3 text-sm font-bold text-white transition-colors hover:border-[#cf2442]/45 hover:bg-[#cf2442]/18"
-                  >
-                    <Search size={16} />
-                    Fetch all sources
-                  </button>
-                </div>
-              ) : null}
-
-              {isLoadingMore ? (
-                <div className="mt-6">
-                  <GridSkeleton count={12} />
-                </div>
-              ) : visibleMerged.length < merged.length ? (
-                <div className="mt-8 flex justify-center">
-                  <button
-                    onClick={() => setVisibleCount((count) => count + 24)}
-                    className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1020] px-8 py-3 text-sm font-bold text-white/60 transition-colors hover:border-white/[0.15] hover:text-white"
-                  >
-                    <ChevronDown size={16} />
-                    Show More Results
-                  </button>
-                </div>
-              ) : hasMore ? (
-                <div className="mt-8 flex justify-center">
-                  <button
-                    onClick={() => setDiscoveryPage((page) => page + 1)}
-                    className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-[#0d1020] px-8 py-3 text-sm font-bold text-white/60 transition-colors hover:border-white/[0.15] hover:text-white"
-                  >
-                    <ChevronDown size={16} />
-                    Load More Results
-                  </button>
-                </div>
-              ) : (
-                <p className="mt-8 text-center text-xs text-white/20">All {merged.length} results shown</p>
-              )}
-            </>
-          ) : !q ? (
-            <div className="flex flex-col items-center gap-4 py-16 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#141828]">
-                <Search size={28} className="text-white/20" />
-              </span>
-              <div>
-                <p className="font-bold text-white">Start searching</p>
-                <p className="mt-1 text-sm text-white/40">Use the search bar above or browse a real discovery category.</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-4 py-16 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#141828]">
-                <Search size={28} className="text-white/20" />
-              </span>
-              <div>
-                <p className="font-bold text-white">No results for &ldquo;{q}&rdquo;</p>
-                <p className="mt-1 text-sm text-white/40">Try a title, genre, seasonal query, or discovery keyword.</p>
-              </div>
-            </div>
-          )}
+                {isLoadingMore ? (
+                  <div className="mt-6">
+                    <GridSkeleton count={12} />
+                  </div>
+                ) : visibleMerged.length >= merged.length && !hasMore ? (
+                  <p className="mt-8 text-center text-xs text-white/20">All {shownTotal.toLocaleString()} results shown</p>
+                ) : null}
+                {canLoadMore && !isLoadingMore ? (
+                  <div ref={loadMoreRef} className="mt-8 flex min-h-20 items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={loadMoreResults}
+                      className="rounded-[4px] border border-white/[0.08] bg-[#0c0c0e] px-5 py-2.5 text-sm font-semibold text-white/70 transition-colors duration-[160ms] hover:border-[#c4182a]/35 hover:bg-[#c4182a]/10 hover:text-white"
+                    >
+                      Load more results
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : q && anilistQ.isFetching ? (
+              <GridSkeleton count={12} />
+            ) : q ? (
+              <KairoState
+                mood="notfound"
+                title={`Kairo couldn't find "${q}" yet`}
+                subtitle="Try another title, check the spelling, or explore a genre instead."
+                action={{ label: "Explore anime", href: "/search" }}
+              />
+            ) : null}
+          </div>
         </div>
-      </SidebarLayout>
+      </div>
     </AppShell>
   );
+}
+
+// TV first, then ONA, then unknowns, then specials/OVAs/movies/music last.
+const FORMAT_RANK: Record<string, number> = { TV: 0, ONA: 1, SPECIAL: 3, OVA: 4, MOVIE: 5, MUSIC: 6 };
+function formatRank(anime: Anime) {
+  const fmt = (anime.format || "").toUpperCase();
+  return fmt in FORMAT_RANK ? FORMAT_RANK[fmt] : 2;
+}
+
+// Filter facets. MUSIC + unknowns collapse into SPECIAL so every title lands in
+// exactly one bucket (no anime disappears when a facet is active).
+type FormatKey = "ALL" | "TV" | "MOVIE" | "OVA" | "ONA" | "SPECIAL";
+const FORMAT_FACETS: { key: FormatKey; label: string }[] = [
+  { key: "ALL", label: "All" },
+  { key: "TV", label: "Series" },
+  { key: "MOVIE", label: "Movies" },
+  { key: "OVA", label: "OVA" },
+  { key: "ONA", label: "ONA" },
+  { key: "SPECIAL", label: "Specials" },
+];
+// CR-mapped titles sort ahead of everything else.
+function crRank(anime: Anime) {
+  return anime.cr_mapped ? 0 : 1;
 }
 
 function HistorySuggestions({ queries }: { queries: string[] }) {
   if (!queries.length) return null;
   return (
-    <section className="mb-6 rounded-2xl border border-white/[0.06] bg-[#0d1020]/72 p-3">
+    <section className="mb-6 rounded-md border border-white/[0.06] bg-[#0d1020]/72 p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#cf2442]">Suggested for you</p>
-          <p className="mt-1 text-xs font-semibold text-white/42">Based on what you were watching</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#c4182a]">Suggested for you</p>
+          <p className="mt-1 text-xs font-medium text-white/42">Based on what you were watching</p>
         </div>
       </div>
       <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
@@ -381,7 +455,7 @@ function HistorySuggestions({ queries }: { queries: string[] }) {
           <Link
             key={query}
             href={GENRE_LINKS.has(query) ? `/genre/${encodeURIComponent(query)}` : `/search?q=${encodeURIComponent(query)}`}
-            className="shrink-0 rounded-xl border border-white/[0.075] bg-white/[0.045] px-3 py-2 text-xs font-black text-white/72 transition hover:border-[#cf2442]/35 hover:bg-[#cf2442]/12 hover:text-white"
+            className="shrink-0 rounded-md border border-white/[0.075] bg-white/[0.045] px-3 py-2 text-xs font-medium text-white/72 transition hover:border-[#c4182a]/35 hover:bg-[#c4182a]/12 hover:text-white"
           >
             {query}
           </Link>
@@ -410,7 +484,7 @@ function SearchFallback() {
         <div className="py-6">
           <div className="mb-5">
             <div className="h-3 w-24 animate-pulse rounded-full bg-[#141828]" />
-            <div className="mt-2 h-8 w-56 animate-pulse rounded-xl bg-[#141828]" />
+            <div className="mt-2 h-8 w-56 animate-pulse rounded-md bg-[#141828]" />
           </div>
           <GridSkeleton count={20} />
         </div>

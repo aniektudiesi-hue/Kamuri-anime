@@ -5,25 +5,26 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Core backgrounds — layered depth */
-  --background-2: #090b13;
-  --muted: #8a93a5;
-  --subtle: #3a4050;
+  /* Core backgrounds — PURE BLACK frame (no visible containers) */
+  --background-2: #000000;
+  --muted: #9a9aa3;
+  --subtle: #1c1c1f;
 
-  /* Surfaces — glass-like layering */
-  --panel: #0d1020;
-  --panel-strong: #141828;
-  --surface-3: #1b2036;
+  /* Surfaces — pure black so cards/sections blend into one black frame.
+     Only "needed" surfaces (popover/dropdown/input/modal) stay slightly raised. */
+  --panel: #000000;
+  --panel-strong: #060607;
+  --surface-3: #121214;
 
-  /* Borders */
-  --border: rgba(255,255,255,0.075);
-  --border-hover: rgba(255,255,255,0.11);
+  /* Borders — near-invisible (boxes shouldn't show until truly needed) */
+  --border: rgba(255,255,255,0.045);
+  --border-hover: rgba(255,255,255,0.10);
 
   /* Brand accents */
-  --accent: #e11d48;          /* cinematic ruby */
-  --accent-hover: #f43f5e;
-  --accent-dim: rgba(225,29,72,0.14);
-  --accent-glow: rgba(225,29,72,0.35);
+  --accent: #c4182a;          /* deep muted red — premium, not childish */
+  --accent-hover: #d42040;
+  --accent-dim: rgba(196,24,42,0.14);
+  --accent-glow: rgba(196,24,42,0.30);
   --accent-2: #c8ced8;        /* soft silver */
   --accent-2-dim: rgba(200,206,216,0.12);
   --accent-2-glow: rgba(200,206,216,0.18);
@@ -31,28 +32,28 @@
   --ruby-deep-dim: rgba(143,38,56,0.14);
   --gold: #d8b56a;
   --gold-dim: rgba(216,181,106,0.15);
-  --background: #05060b;
+  --background: #000000;
   --foreground: #f2f4f8;
-  --card: #0d1020;
+  --card: #000000;
   --card-foreground: #f2f4f8;
-  --popover: #0b0d18;
+  --popover: #0b0b0f;
   --popover-foreground: #f2f4f8;
-  --primary: #e11d48;
+  --primary: #c4182a;
   --primary-foreground: #ffffff;
-  --secondary: #151a2b;
+  --secondary: #111113;
   --secondary-foreground: #e8ecf4;
   --muted-foreground: #8a93a5;
   --accent-foreground: #ffffff;
   --destructive: #ef4444;
   --input: rgba(255,255,255,0.105);
-  --ring: rgba(225,29,72,0.58);
+  --ring: rgba(196,24,42,0.50);
   --chart-1: #e11d48;
   --chart-2: #c8ced8;
   --chart-3: #d8b56a;
   --chart-4: #8f2638;
   --chart-5: #5d6678;
-  --radius: 0.625rem;
-  --sidebar: #0d1020;
+  --radius: 0.125rem;
+  --sidebar: #0a0a0c;
   --sidebar-foreground: #f2f4f8;
   --sidebar-primary: #e11d48;
   --sidebar-primary-foreground: #ffffff;
@@ -106,10 +107,10 @@
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) * 1.2);
+  --radius-2xl: calc(var(--radius) * 1.35);
+  --radius-3xl: calc(var(--radius) * 1.5);
+  --radius-4xl: calc(var(--radius) * 1.65);
 }
 
 /* ── Base ─────────────────────────────────────────────── */
@@ -119,12 +120,8 @@ html {
 }
 
 body {
-  background:
-    radial-gradient(circle at top right, rgba(225,29,72,0.12), transparent 30%),
-    radial-gradient(circle at 18% -10%, rgba(225,29,72,0.09), transparent 34%),
-    radial-gradient(circle at 82% 0%, rgba(200,206,216,0.07), transparent 28%),
-    linear-gradient(180deg, #08090f 0%, #05060a 100%);
-  background-color: #05060a;
+  background: #000000;
+  background-color: #000000;
   color: var(--foreground);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -185,14 +182,26 @@ html[data-theme="light"] footer {
 
 button, a, input { outline-color: var(--accent); }
 
+/* ── Neutralize legacy navy container fills → deep black ── */
+html:not([data-theme="light"]) [class*="bg-[#141828]"] { background-color: #0e0e10 !important; }
+html:not([data-theme="light"]) [class*="bg-[#0d1020]"] { background-color: #0a0a0c !important; }
+html:not([data-theme="light"]) [class*="bg-[#090b13]"] { background-color: #080809 !important; }
+html:not([data-theme="light"]) [class*="bg-[#171b2d]"] { background-color: #0e0e10 !important; }
+html:not([data-theme="light"]) [class*="bg-[#11131d]"] { background-color: #0b0b0d !important; }
+html:not([data-theme="light"]) [class*="bg-[#151a2b]"] { background-color: #0e0e10 !important; }
+html:not([data-theme="light"]) [class*="bg-[#0a0c16]"] { background-color: #080809 !important; }
+html:not([data-theme="light"]) [class*="bg-[#1b2036]"] { background-color: #111113 !important; }
+
 /* ── Scrollbars ───────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #252a42;
+  background: rgba(255,255,255,0.18);
   border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover { background: #323859; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); background-clip: content-box; }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -203,18 +212,18 @@ button, a, input { outline-color: var(--accent); }
 
 /* ── Glass panel ─────────────────────────────────────── */
 .glass {
-  background: rgba(13,16,32,0.96);
+  background: rgba(10,10,12,0.96);
   border: 1px solid var(--border);
 }
 
 .glass-strong {
-  background: rgba(20,24,40,0.98);
+  background: rgba(14,14,16,0.98);
   border: 1px solid var(--border-hover);
 }
 
 /* ── Gradient text ───────────────────────────────────── */
 .gradient-text {
-  background: linear-gradient(135deg, #f1f3f6 0%, #cf2442 100%);
+  background: linear-gradient(135deg, #f1f3f6 0%, #e21d48 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -235,7 +244,7 @@ button, a, input { outline-color: var(--accent); }
   inset: 0;
   padding: 1px;
   border-radius: inherit;
-  background: linear-gradient(135deg, #cf2442, #7b1426, #c8ced8);
+  background: linear-gradient(135deg, #e21d48, #7b1426, #c8ced8);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -251,10 +260,11 @@ button, a, input { outline-color: var(--accent); }
   transform: translate3d(0,-4px,0) scale(1.012);
 }
 
+/* NOTE: content-visibility:auto was removed here — on fast scroll it un-painted
+   offscreen sections and flashed the black page background ("sab black ho jata
+   hai"). Light containment keeps most of the perf without the blanking. */
 .content-visibility-auto {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 760px;
-  contain: layout paint style;
+  contain: layout style;
 }
 
 .scroll-card {
@@ -327,12 +337,8 @@ button, a, input { outline-color: var(--accent); }
   cursor: grabbing;
 }
 
-@supports (content-visibility: auto) {
-  .scroll-card {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 280px;
-  }
-}
+/* content-visibility:auto on cards removed — it blanked individual cards during
+   fast scroll. Card containment stays via the base .scroll-card rule. */
 
 /* ── Shine overlay on hover ──────────────────────────── */
 .shine {
@@ -619,7 +625,7 @@ body.ro-player-locked {
   }
 
   body {
-    background: #05060b;
+    background: #000000;
   }
 
   .card-lift,

@@ -12,16 +12,24 @@ const PUBLIC_API_PREFIXES = [
   "/suggest/",
 ];
 const PUBLIC_API_PATHS = ["/api/v1/banners"];
-const MOON_CACHE_TTL = 1800;
-const MANIFEST_CACHE_TTL = 30;
-const MANIFEST_STALE_TTL = 60;
+const MOON_CACHE_TTL = 3600;
+const MANIFEST_CACHE_TTL = 600;
+const MANIFEST_STALE_TTL = 1800;
 const SEGMENT_CACHE_TTL = 86400;
 const MOON_SEGMENT_CACHE_TTL = SEGMENT_CACHE_TTL;
-const STREAM_API_MEMORY_TTL = 10 * 60 * 1000;
+const STREAM_API_MEMORY_TTL = 30 * 60 * 1000;
 const IMAGE_CACHE_TTL = 60 * 60 * 24 * 30;
-const MOON_WARM_DEFAULT_SEGMENTS = 12;
-const MOON_WARM_MAX_SEGMENTS = 24;
+const STREAM_CACHE_VERSION = "v5";
+const GENERIC_WARM_DEFAULT_SEGMENTS = 18;
+const GENERIC_WARM_MAX_SEGMENTS = 36;
+const GENERIC_WARM_STARTUP_SEGMENTS = 6;
+const MOON_WARM_DEFAULT_SEGMENTS = 18;
+const MOON_WARM_MAX_SEGMENTS = 36;
+const MOON_WARM_STARTUP_SEGMENTS = 6;
+const WARM_CONCURRENCY = 4;
 const moonInflight = new Map();
+const moonPlaybackMemoryCache = new Map();
+const genericInflight = new Map();
 const streamApiMemoryCache = new Map();
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -185,7 +193,9 @@ async function proxyM3u8(request, env, ctx) {
 
   if (!upstream.ok) return upstreamError(upstream);
 
-  const rewritten = rewriteM3u8(await upstream.text(), src, new URL(request.url).origin);
+  const upstreamText = await upstream.text();
+  ctx.waitUntil(warmGenericPipeline(src, upstreamText, env, GENERIC_WARM_STARTUP_SEGMENTS));
+  const rewritten = rewriteM3u8(upstreamText, src, new URL(request.url).origin);
   const response = new Response(rewritten, {
     status: 200,
     headers: {
@@ -203,10 +213,21 @@ async function warmMoon(request, env, ctx) {
   const url = new URL(request.url);
   const videoId = url.pathname.split("/")[3];
   if (!/^[A-Za-z0-9_-]+$/.test(videoId || "")) return json({ error: "Invalid Moon video id" }, 400);
-  const segments = clampInt(url.searchParams.get("segments"), 1, MOON_WARM_MAX_SEGMENTS, MOON_WARM_DEFAULT_SEGMENTS);
+  const segments = clampInt(url.searchParams.get("segments"), MOON_WARM_STARTUP_SEGMENTS, MOON_WARM_MAX_SEGMENTS, MOON_WARM_DEFAULT_SEGMENTS);
+  const cache = caches.default;
+  const cacheKey = new Request(`${url.origin}${url.pathname}?segments=${segments}`);
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+
   const seededPlayback = moonSeedPlaybackFromUrl(url);
   ctx.waitUntil(warmMoonPipeline(videoId, env, segments, seededPlayback));
-  return json({ ok: true, video_id: videoId, warming: true, segments }, 202, cacheHeaders("no-store"));
+  const response = json(
+    { ok: true, video_id: videoId, warming: true, segments },
+    202,
+    cacheHeaders("public, max-age=120, stale-while-revalidate=300"),
+  );
+  ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
 }
 
 async function proxyMoonM3u8(request, env, ctx) {
@@ -237,7 +258,7 @@ async function proxyMoonM3u8(request, env, ctx) {
     const variantUrl = findPlaylistEntry(master.text, playback.url, variant);
     if (!variantUrl) return json({ error: "Moon variant missing", variant }, 404, cacheHeaders("no-store"));
     const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${variant}`);
-    ctx.waitUntil(warmMoonSegments(videoId, variant, child.text, variantUrl, env, MOON_WARM_DEFAULT_SEGMENTS));
+    ctx.waitUntil(warmMoonSegments(videoId, variant, child.text, variantUrl, env, MOON_WARM_STARTUP_SEGMENTS));
     const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, new URL(request.url).origin, videoId, variant);
     return cacheMoonManifest(ctx, cacheKey, new Response(rewrittenChild, {
       status: 200,
@@ -254,7 +275,7 @@ async function proxyMoonM3u8(request, env, ctx) {
     if (variantUrl) {
       const fastVariant = new URL(variantUrl).pathname.split("/").pop() || "index-v1-a1.m3u8";
       const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${fastVariant}`);
-      ctx.waitUntil(warmMoonSegments(videoId, fastVariant, child.text, variantUrl, env, MOON_WARM_DEFAULT_SEGMENTS));
+      ctx.waitUntil(warmMoonSegments(videoId, fastVariant, child.text, variantUrl, env, MOON_WARM_STARTUP_SEGMENTS));
       const rewrittenChild = rewriteMoonVariant(child.text, variantUrl, url.origin, videoId, fastVariant);
       return cacheMoonManifest(ctx, cacheKey, new Response(rewrittenChild, {
         status: 200,
@@ -266,7 +287,7 @@ async function proxyMoonM3u8(request, env, ctx) {
       }));
     }
     const directVariant = "direct.m3u8";
-    ctx.waitUntil(warmMoonSegments(videoId, directVariant, master.text, playback.url, env, MOON_WARM_DEFAULT_SEGMENTS));
+    ctx.waitUntil(warmMoonSegments(videoId, directVariant, master.text, playback.url, env, MOON_WARM_STARTUP_SEGMENTS));
     const rewrittenDirect = rewriteMoonVariant(master.text, playback.url, url.origin, videoId, directVariant);
     return cacheMoonManifest(ctx, cacheKey, new Response(rewrittenDirect, {
       status: 200,
@@ -278,7 +299,7 @@ async function proxyMoonM3u8(request, env, ctx) {
     }));
   }
 
-  ctx.waitUntil(warmMoonPipeline(videoId, env, MOON_WARM_DEFAULT_SEGMENTS, playback, master.text));
+  ctx.waitUntil(warmMoonPipeline(videoId, env, MOON_WARM_STARTUP_SEGMENTS, playback, master.text));
   if (!firstMoonVariantUrl(master.text, playback.url)) {
     const directVariant = "direct.m3u8";
     const rewrittenDirect = rewriteMoonVariant(master.text, playback.url, url.origin, videoId, directVariant);
@@ -342,17 +363,22 @@ async function proxyChunk(request, env, ctx) {
     if (cached) return streamUpstream(cached, detectMime(src));
   }
 
-  const upstream = await fetch(src, {
-    method: "GET",
-    headers,
-    redirect: "follow",
-    cf: { cacheTtl: range ? 0 : SEGMENT_CACHE_TTL, cacheEverything: !range },
-  });
+  const upstream = range
+    ? await fetchGenericSegment(src, headers, range)
+    : await genericInflightDedupe(`chunk:${src}`, async () => {
+        const cached = await cache.match(cacheKey);
+        if (cached) return cached;
+        const fetched = await fetchGenericSegment(src, headers, "");
+        if (fetched.status === 200) {
+          const cacheable = streamUpstream(fetched, detectMime(src), `public, max-age=${SEGMENT_CACHE_TTL}, immutable`);
+          await cache.put(cacheKey, cacheable.clone());
+          return cacheable;
+        }
+        return fetched;
+      });
 
   if (!upstream.ok && upstream.status !== 206) return upstreamError(upstream);
-  const response = streamUpstream(upstream, detectMime(src), range ? undefined : `public, max-age=${SEGMENT_CACHE_TTL}, immutable`);
-  if (!range && upstream.status === 200) ctx.waitUntil(cache.put(cacheKey, response.clone()));
-  return response;
+  return streamUpstream(upstream, detectMime(src), range ? undefined : `public, max-age=${SEGMENT_CACHE_TTL}, immutable`);
 }
 
 async function proxyVtt(request, env, ctx) {
@@ -372,6 +398,144 @@ async function proxyVtt(request, env, ctx) {
   const response = streamUpstream(upstream, "text/vtt; charset=utf-8", "public, max-age=3600, stale-while-revalidate=86400");
   ctx.waitUntil(cache.put(cacheKey, response.clone()));
   return response;
+}
+
+async function fetchGenericSegment(src, headers, range = "") {
+  const requestHeaders = new Headers(headers);
+  if (range) requestHeaders.set("range", range);
+  return fetch(src, {
+    method: "GET",
+    headers: requestHeaders,
+    redirect: "follow",
+    cf: { cacheTtl: range ? 0 : SEGMENT_CACHE_TTL, cacheEverything: !range },
+  });
+}
+
+async function warmGenericPipeline(playlistUrl, playlistText, env, segmentCount = GENERIC_WARM_DEFAULT_SEGMENTS) {
+  return genericInflightDedupe(`warm:${playlistUrl}`, async () => {
+    try {
+      const variants = genericVariantUrls(playlistText, playlistUrl);
+      if (variants.length) {
+        await Promise.allSettled(variants.map(async (variant, index) => {
+          const variantText = await fetchGenericTextCached(variant.url, env);
+          const depth = index === 0 ? segmentCount : GENERIC_WARM_STARTUP_SEGMENTS;
+          await warmGenericSegments(variant.url, variantText, env, depth);
+        }));
+        return;
+      }
+      await warmGenericSegments(playlistUrl, playlistText, env, segmentCount);
+    } catch {
+      // Best-effort warming only; playback request path must never wait on this.
+    }
+  });
+}
+
+async function warmGenericSegments(playlistUrl, playlistText, env, segmentCount = GENERIC_WARM_DEFAULT_SEGMENTS) {
+  const safeSegmentCount = Math.max(1, Math.min(GENERIC_WARM_MAX_SEGMENTS, segmentCount));
+  const entries = [
+    ...genericKeyUrls(playlistText, playlistUrl),
+    ...genericSegmentUrls(playlistText, playlistUrl).slice(0, safeSegmentCount),
+  ];
+  await runWarmQueue(entries, (entry) => warmGenericResource(entry.url, env));
+}
+
+async function warmGenericResource(url, env) {
+  return genericInflightDedupe(`resource:${url}`, async () => {
+    const cache = caches.default;
+    const key = streamCacheRequest("chunk", url);
+    if (await cache.match(key)) return;
+    const upstream = await fetchGenericSegment(url, upstreamHeaders(url, env));
+    if (upstream.status !== 200) return;
+    await cache.put(key, streamUpstream(upstream, detectMime(url), `public, max-age=${SEGMENT_CACHE_TTL}, immutable`));
+  });
+}
+
+async function fetchGenericTextCached(url, env) {
+  const cache = caches.default;
+  const key = streamCacheRequest("m3u8-raw", url);
+  const cached = await cache.match(key);
+  if (cached) return cached.text();
+  const upstream = await fetch(url, {
+    headers: upstreamHeaders(url, env),
+    redirect: "follow",
+    cf: { cacheTtl: MANIFEST_CACHE_TTL, cacheEverything: true },
+  });
+  if (!upstream.ok) throw new Error(`CDN ${upstream.status}`);
+  const text = await upstream.text();
+  await cache.put(key, new Response(text, {
+    status: 200,
+    headers: {
+      ...corsHeaders(),
+      "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
+      "cache-control": `public, s-maxage=${MANIFEST_CACHE_TTL}, stale-while-revalidate=${MANIFEST_STALE_TTL}`,
+    },
+  }));
+  return text;
+}
+
+function firstGenericVariantUrl(text, baseUrl) {
+  return genericVariantUrls(text, baseUrl)[0]?.url || "";
+}
+
+function genericVariantUrls(text, baseUrl) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const variants = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!lines[i].startsWith("#EXT-X-STREAM-INF")) continue;
+    const bandwidth = Number((lines[i].match(/BANDWIDTH=(\d+)/i) || [])[1] || 0);
+    const next = lines.slice(i + 1).find((line) => line && !line.startsWith("#"));
+    if (next) variants.push({ url: new URL(next, baseUrl).toString(), bandwidth });
+  }
+  return variants.sort((a, b) => b.bandwidth - a.bandwidth);
+}
+
+function genericSegmentUrls(text, baseUrl) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !/\.m3u8(?:$|[?#])/i.test(line))
+    .map((line) => {
+      const url = new URL(line, baseUrl).toString();
+      return { url, segment: new URL(url).pathname.split("/").pop() || line };
+    });
+}
+
+function genericKeyUrls(text, baseUrl) {
+  const urls = [];
+  const keyPattern = /#EXT-X-KEY:[^\n\r]*URI=(?:"([^"]+)"|([^,\s]+))/gi;
+  let match;
+  while ((match = keyPattern.exec(text))) {
+    const raw = match[1] || match[2];
+    if (!raw) continue;
+    const url = new URL(raw, baseUrl).toString();
+    urls.push({ url, segment: new URL(url).pathname.split("/").pop() || raw });
+  }
+  return urls;
+}
+
+function genericInflightDedupe(key, factory) {
+  const existing = genericInflight.get(key);
+  if (existing) return existing;
+  if (genericInflight.size > 500) genericInflight.clear();
+  const promise = factory().finally(() => genericInflight.delete(key));
+  genericInflight.set(key, promise);
+  return promise;
+}
+
+async function runWarmQueue(entries, worker) {
+  const queue = entries.slice();
+  const workers = Array.from({ length: Math.min(WARM_CONCURRENCY, queue.length) }, async () => {
+    while (queue.length) {
+      const entry = queue.shift();
+      if (!entry) return;
+      try {
+        await worker(entry);
+      } catch {
+        // Warming is best effort; a bad segment must not abort the rest.
+      }
+    }
+  });
+  await Promise.allSettled(workers);
 }
 
 function sourceUrl(request) {
@@ -446,37 +610,26 @@ function rewriteStreamPayload(value, workerOrigin) {
 }
 
 async function fetchMoonPlayback(videoId) {
-  const headers = {
-    "Accept": "*/*",
-    "Accept-Language": "en-US,en;q=0.9,en-IN;q=0.8",
-    "Content-Type": "application/json",
-    "Origin": "https://398fitus.com",
-    "Referer": `https://398fitus.com/ed4/${videoId}`,
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-origin",
-    "Sec-Fetch-Storage-Access": "active",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 Edg/147.0.0.0",
-    "X-Embed-Origin": "9animetv.org.lv",
-    "X-Embed-Parent": `https://bysesayeveum.com/e/${videoId}`,
-    "X-Embed-Referer": "https://9animetv.org.lv/",
-    "sec-ch-ua": "\"Microsoft Edge\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"Windows\"",
-  };
-  const fingerprint = {
-    token: crypto.randomUUID().replaceAll("-", ""),
-    viewer_id: crypto.randomUUID().replaceAll("-", ""),
-    device_id: crypto.randomUUID().replaceAll("-", ""),
-    confidence: 1,
-  };
+  const headers = moonPlaybackHeaders(videoId);
+  const fingerprint = makeMoonFingerprint();
 
-  const response = await fetch(`https://398fitus.com/api/videos/${videoId}/embed/playback`, {
+  let response = await fetch(`https://398fitus.com/api/videos/${videoId}/embed/playback`, {
     method: "POST",
     headers,
     body: JSON.stringify({ fingerprint }),
   });
-  const text = await response.text();
+  let text = await response.text();
+
+  if (response.status === 428 && text.includes("captcha_required")) {
+    const token = await fetchMoonCaptchaToken(videoId, headers, fingerprint);
+    response = await fetch(`https://398fitus.com/api/videos/${videoId}/embed/playback`, {
+      method: "POST",
+      headers: { ...headers, "X-Captcha-Token": token },
+      body: JSON.stringify({ fingerprint }),
+    });
+    text = await response.text();
+  }
+
   if (!response.ok) throw new Error(`Moon playback ${response.status}: ${text.slice(0, 120)}`);
 
   const playback = (JSON.parse(text).playback || {});
@@ -495,6 +648,169 @@ async function fetchMoonPlayback(videoId) {
     }
   }
   throw new Error("Moon playback decrypt failed");
+}
+
+function moonPlaybackHeaders(videoId) {
+  return {
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.9,en-IN;q=0.8",
+    "Content-Type": "application/json",
+    "Origin": "https://398fitus.com",
+    "Referer": `https://398fitus.com/ed4/${videoId}`,
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-Storage-Access": "active",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 Edg/147.0.0.0",
+    "X-Embed-Origin": "9animetv.org.lv",
+    "X-Embed-Parent": `https://bysesayeveum.com/e/${videoId}`,
+    "X-Embed-Referer": "https://9animetv.org.lv/",
+    "sec-ch-ua": "\"Microsoft Edge\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+  };
+}
+
+function makeMoonFingerprint() {
+  return {
+    token: crypto.randomUUID().replaceAll("-", ""),
+    viewer_id: crypto.randomUUID().replaceAll("-", ""),
+    device_id: crypto.randomUUID().replaceAll("-", ""),
+    confidence: 1,
+  };
+}
+
+async function fetchMoonCaptchaToken(videoId, headers, fingerprint) {
+  const challengeResponse = await fetch(`https://398fitus.com/api/videos/${videoId}/embed/captcha`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ fingerprint }),
+  });
+  const challengeText = await challengeResponse.text();
+  if (!challengeResponse.ok) {
+    throw new Error(`Moon captcha ${challengeResponse.status}: ${challengeText.slice(0, 120)}`);
+  }
+  const challenge = JSON.parse(challengeText);
+  const solution = await solveMoonPow(challenge.pow_nonce, Number(challenge.pow_difficulty || 0));
+  if (!solution) throw new Error("Moon captcha pow solve timed out");
+
+  const verifyResponse = await fetch(`https://398fitus.com/api/videos/${videoId}/embed/captcha/verify`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      pow_token: challenge.pow_token,
+      solution,
+      fingerprint,
+    }),
+  });
+  const verifyText = await verifyResponse.text();
+  if (!verifyResponse.ok) throw new Error(`Moon captcha verify ${verifyResponse.status}: ${verifyText.slice(0, 120)}`);
+  const verified = JSON.parse(verifyText);
+  if (verified.status !== "ok" || !verified.token) {
+    throw new Error(`Moon captcha verify failed: ${verified.reason || "missing token"}`);
+  }
+  return verified.token;
+}
+
+async function solveMoonPow(nonce, difficulty, timeoutMs = 12000) {
+  if (!nonce || !Number.isFinite(difficulty)) return null;
+  if (difficulty <= 0) return "0";
+  const prefix = `${nonce}:`;
+  const started = Date.now();
+  for (let solution = 0; ; solution += 1) {
+    const words = moonPowHash(`${prefix}${solution}`);
+    if (moonLeadingZeroBits(words) >= difficulty) return String(solution);
+    if (solution % 1024 === 0) {
+      if (Date.now() - started > timeoutMs) return null;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+}
+
+const MOON_POW_BUFFER = 512;
+const MOON_POW_MASK = MOON_POW_BUFFER - 1;
+const MOON_POW_ROUNDS = 2;
+const MOON_POW_MUL_A = 2654435761;
+const MOON_POW_MUL_B = 2246822519;
+
+function moonPowHash(text) {
+  const state = new Uint32Array([1779033703, 3144134277, 1013904242, 2773480762]);
+  const input = moonPowBytes(text);
+  for (const byte of input) {
+    state[0] = (state[0] + byte) >>> 0;
+    state[0] = moonRotateLeft(state[0], 7);
+    moonPowMix(state);
+  }
+  for (let i = 0; i < 8; i += 1) moonPowMix(state);
+
+  const scratch = new Uint32Array(MOON_POW_BUFFER);
+  for (let i = 0; i < MOON_POW_BUFFER; i += 1) {
+    moonPowMix(state);
+    scratch[i] = (state[0] ^ state[2]) >>> 0;
+  }
+
+  for (let round = 0; round < MOON_POW_ROUNDS; round += 1) {
+    for (let index = 0; index < MOON_POW_BUFFER; index += 1) {
+      const selected = scratch[index] & MOON_POW_MASK;
+      let value = (scratch[index] + scratch[selected]) >>> 0;
+      value = moonRotateLeft(value, 13);
+      value = (value ^ Math.imul(scratch[(index + 1) & MOON_POW_MASK], MOON_POW_MUL_A)) >>> 0;
+      scratch[index] = value;
+      state[0] = (state[0] ^ value) >>> 0;
+      moonPowMix(state);
+    }
+  }
+
+  const output = new Uint32Array(8);
+  const chunk = MOON_POW_BUFFER / 8;
+  for (let i = 0; i < 8; i += 1) {
+    moonPowMix(state);
+    let value = state[0];
+    const offset = i * chunk;
+    for (let cursor = 0; cursor < chunk; cursor += 1) {
+      const entry = scratch[offset + cursor];
+      value = (value + entry) >>> 0;
+      value = moonRotateLeft(value, 5);
+      value = (value ^ Math.imul(entry, MOON_POW_MUL_B)) >>> 0;
+    }
+    output[i] = (value ^ state[2]) >>> 0;
+  }
+  return output;
+}
+
+function moonPowMix(state) {
+  state[0] = (state[0] + state[1]) >>> 0;
+  state[3] = moonRotateLeft(state[3] ^ state[0], 16);
+  state[2] = (state[2] + state[3]) >>> 0;
+  state[1] = moonRotateLeft(state[1] ^ state[2], 12);
+  state[0] = (state[0] + state[1]) >>> 0;
+  state[3] = moonRotateLeft(state[3] ^ state[0], 8);
+  state[2] = (state[2] + state[3]) >>> 0;
+  state[1] = moonRotateLeft(state[1] ^ state[2], 7);
+}
+
+function moonRotateLeft(value, bits) {
+  return ((value << bits) | (value >>> (32 - bits))) >>> 0;
+}
+
+function moonLeadingZeroBits(words) {
+  let count = 0;
+  for (const word of words) {
+    if (word === 0) {
+      count += 32;
+      continue;
+    }
+    return count + Math.clz32(word);
+  }
+  return count;
+}
+
+function moonPowBytes(text) {
+  const bytes = new Uint8Array(text.length);
+  for (let index = 0; index < text.length; index += 1) {
+    bytes[index] = text.charCodeAt(index) & 255;
+  }
+  return bytes;
 }
 
 function selectMoonKeyParts(playback) {
@@ -532,11 +848,19 @@ async function fetchMoonPlaybackCachedInner(videoId, fresh = false) {
   const cache = caches.default;
   const key = moonCacheRequest(`playback:${videoId}`);
   if (!fresh) {
+    const hot = moonPlaybackMemoryGet(videoId);
+    if (hot) return hot;
+
     const cached = await cache.match(key);
-    if (cached) return cached.json();
+    if (cached) {
+      const payload = await cached.json();
+      moonPlaybackMemorySet(videoId, payload);
+      return payload;
+    }
   }
 
   const playback = await fetchMoonPlayback(videoId);
+  moonPlaybackMemorySet(videoId, playback);
   await cacheMoonPlayback(videoId, playback);
   return playback;
 }
@@ -679,11 +1003,14 @@ async function warmMoonPipeline(videoId, env, segmentCount = MOON_WARM_DEFAULT_S
   try {
     const cachedPlayback = playback || await fetchMoonPlaybackCached(videoId);
     const master = masterText ? { text: masterText } : await fetchMoonTextCached(cachedPlayback.url, env, `moon-master:${videoId}`);
-    const variantUrl = firstMoonVariantUrl(master.text, cachedPlayback.url);
-    if (!variantUrl) return;
-    const variant = new URL(variantUrl).pathname.split("/").pop() || "index-v1-a1.m3u8";
-    const child = await fetchMoonTextCached(variantUrl, env, `moon-variant:${videoId}:${variant}`);
-    await warmMoonSegments(videoId, variant, child.text, variantUrl, env, segmentCount);
+    const variants = moonVariantUrls(master.text, cachedPlayback.url);
+    if (!variants.length) return;
+    await Promise.allSettled(variants.map(async (variantEntry, index) => {
+      const variant = new URL(variantEntry.url).pathname.split("/").pop() || "index-v1-a1.m3u8";
+      const child = await fetchMoonTextCached(variantEntry.url, env, `moon-variant:${videoId}:${variant}`);
+      const depth = index === 0 ? segmentCount : MOON_WARM_STARTUP_SEGMENTS;
+      await warmMoonSegments(videoId, variant, child.text, variantEntry.url, env, depth);
+    }));
   } catch (error) {
     logMoonError("moon_warm_failed", videoId, error);
   }
@@ -695,7 +1022,7 @@ async function warmMoonSegments(videoId, variant, playlistText, playlistUrl, env
     ...moonKeyUrls(playlistText, playlistUrl),
     ...moonSegmentUrls(playlistText, playlistUrl).slice(0, safeSegmentCount),
   ];
-  await Promise.allSettled(entries.map((entry) => warmMoonResource(videoId, variant, entry.segment, entry.url, env)));
+  await runWarmQueue(entries, (entry) => warmMoonResource(videoId, variant, entry.segment, entry.url, env));
 }
 
 async function warmMoonResource(videoId, variant, segment, url, env) {
@@ -718,13 +1045,19 @@ async function warmMoonResourceInner(videoId, variant, segment, url, env) {
 }
 
 function firstMoonVariantUrl(text, baseUrl) {
+  return moonVariantUrls(text, baseUrl)[0]?.url || "";
+}
+
+function moonVariantUrls(text, baseUrl) {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const variants = [];
   for (let index = 0; index < lines.length; index += 1) {
     if (!lines[index].startsWith("#EXT-X-STREAM-INF")) continue;
+    const bandwidth = Number((lines[index].match(/BANDWIDTH=(\d+)/i) || [])[1] || 0);
     const next = lines.slice(index + 1).find((line) => line && !line.startsWith("#"));
-    return next ? new URL(next, baseUrl).toString() : "";
+    if (next) variants.push({ url: new URL(next, baseUrl).toString(), bandwidth });
   }
-  return "";
+  return variants.sort((a, b) => b.bandwidth - a.bandwidth);
 }
 
 function moonSegmentUrls(text, baseUrl) {
@@ -1051,7 +1384,7 @@ function json(payload, status = 200, headers = corsHeaders()) {
 }
 
 function streamCacheRequest(kind, src, range = "") {
-  return new Request(`https://anime-tv-stream-proxy.local/${kind}/${encodeURIComponent(src)}${range ? `?range=${encodeURIComponent(range)}` : ""}`);
+  return new Request(`https://anime-tv-stream-proxy.local/${STREAM_CACHE_VERSION}/${kind}/${encodeURIComponent(src)}${range ? `?range=${encodeURIComponent(range)}` : ""}`);
 }
 
 function originApiTtl(pathname) {
@@ -1091,4 +1424,25 @@ function streamApiMemorySet(key, payload) {
     if (firstKey) streamApiMemoryCache.delete(firstKey);
   }
   streamApiMemoryCache.set(key, { payload, expiresAt: Date.now() + STREAM_API_MEMORY_TTL });
+}
+
+function moonPlaybackMemoryGet(videoId) {
+  const entry = moonPlaybackMemoryCache.get(videoId);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    moonPlaybackMemoryCache.delete(videoId);
+    return null;
+  }
+  return entry.payload;
+}
+
+function moonPlaybackMemorySet(videoId, payload) {
+  if (moonPlaybackMemoryCache.size > 200) {
+    const firstKey = moonPlaybackMemoryCache.keys().next().value;
+    if (firstKey) moonPlaybackMemoryCache.delete(firstKey);
+  }
+  moonPlaybackMemoryCache.set(videoId, {
+    payload,
+    expiresAt: Date.now() + MOON_CACHE_TTL * 1000,
+  });
 }

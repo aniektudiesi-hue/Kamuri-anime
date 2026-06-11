@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
+import { MaintenanceGate } from "@/components/maintenance-gate";
 import { absoluteUrl, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -21,12 +22,16 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
-      { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
-      { url: "/logo.svg", type: "image/svg+xml", sizes: "any" },
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-64x64.png", type: "image/png", sizes: "64x64" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
     ],
-    shortcut: "/favicon.svg",
-    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml", sizes: "180x180" }],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
+    ],
   },
   openGraph: {
     type: "website",
@@ -99,8 +104,8 @@ const organizationJsonLd = {
   legalName: "animeTVplus",
   alternateName: ["animetvplus", "anime tv plus", "animetvplus.xyz"],
   url: SITE_URL,
-  logo: absoluteUrl("/logo.svg"),
-  image: absoluteUrl("/logo.svg"),
+  logo: absoluteUrl("/logo-full.png"),
+  image: absoluteUrl("/logo-full.png"),
   sameAs: [SITE_URL, `${SITE_URL}/licensing`, `${SITE_URL}/schedule`, `${SITE_URL}/free-anime`],
   publishingPrinciples: absoluteUrl("/licensing"),
   knowsAbout: [
@@ -214,6 +219,24 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://cdn.animetvplus.xyz" />
         <link rel="preconnect" href="https://s4.anilist.co" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://cdn.myanimelist.net" />
+        {/* AdMaven placement verification */}
+        <meta name="admaven-placement" content="Bqjg8rdw8" />
+        {/* Google AdSense */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5284738130230191"
+          crossOrigin="anonymous"
+        ></script>
+        {/* Google Analytics (GA4) */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-G3YG35B59E"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-G3YG35B59E');`,
+          }}
+        />
       </head>
       <body className="min-h-full bg-background text-foreground">
         <script
@@ -223,6 +246,7 @@ export default function RootLayout({
           }}
         />
         <Providers>{children}</Providers>
+        <MaintenanceGate />
       </body>
     </html>
   );

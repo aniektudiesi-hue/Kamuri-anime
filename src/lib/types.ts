@@ -16,6 +16,10 @@ export type Anime = {
   img_url?: string;
   banner?: string;
   cover?: string;
+  overview?: string;
+  genres?: string[];
+  studios?: string[];
+  source?: string;
   images?: {
     jpg?: Record<string, string | undefined>;
     webp?: Record<string, string | undefined>;
@@ -27,11 +31,18 @@ export type Anime = {
   status?: string;
   start_date?: string;
   year?: number;
+  format?: string;        // TV | MOVIE | OVA | SPECIAL | ONA
+  season_count?: number;  // number of seasons in the franchise (root only)
+  cr_mapped?: boolean;    // true when this title has Crunchyroll keyart/poster mapped
 };
 
 export type Episode = {
-  episode_number: number;
+  episode_number: number; // number used to fetch the stream (owner MAL's real episode)
+  display_number?: number; // number shown to the user (restarts at 1 each season)
   title?: string;
+  thumbnail?: string;
+  duration_ms?: number;
+  has_stream?: boolean;
 };
 
 export type EpisodeResponse = {
@@ -96,9 +107,13 @@ export type AiringScheduleItem = {
 
 export type HomeInitialData = {
   banners: Anime[];
-  thumbnails: Anime[];
-  recent: Anime[];
-  topRated: Anime[];
+  thumbnails: Anime[];      // April / Spring 2026 season
+  recent: Anime[];          // New Episodes
+  topRated: Anime[];        // Top Picks
+  popular: Anime[];         // Most Popular
+  romance: Anime[];         // Rom-com / harem
+  isekai: Anime[];          // Isekai
+  healing: Anime[];         // Healing / slice-of-life
   schedule: AiringScheduleItem[];
   generatedAt: string;
 };

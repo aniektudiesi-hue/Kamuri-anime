@@ -39,11 +39,8 @@ function Footer() {
       <div className="mx-auto max-w-screen-2xl px-4 py-10 lg:px-6">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-1">
-            <Link href="/" className="inline-flex items-center gap-2.5">
-              <Image src="/logo.svg" alt="animeTVplus logo" width={28} height={28} />
-              <span className="text-sm font-black tracking-tight text-white">
-                animeTV<span className="text-[#ff4f70]">plus</span>
-              </span>
+            <Link href="/" className="inline-flex items-center">
+              <Image src="/logo-full.png" alt="animeTVplus" width={1495} height={402} className="h-7 w-auto object-contain" />
             </Link>
             <p className="mt-3 max-w-[230px] text-[12px] leading-relaxed text-white/72">
               animeTVplus, searched as animetvplus, animetv plus, anime tv plus, and anime tvplus, offers safe, secure anime streaming over HTTPS with fast HD playback, sub &amp; dub discovery, and personal watch history.

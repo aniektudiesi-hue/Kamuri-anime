@@ -1,5 +1,6 @@
 import type { Anime } from "./types";
 import { animeId } from "./utils";
+import { catalogClientGet, mapCatalogList } from "./catalog-api";
 
 type AniListMedia = {
   idMal: number | null;
@@ -50,6 +51,7 @@ export type DiscoveryIntent = {
 };
 
 export const DISCOVERY_CHIPS = [
+  "Explore",
   "Popular",
   "Top Rated",
   "Airing",
@@ -130,6 +132,17 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
   const query = rawQuery.trim();
   const normalized = normalize(query);
 
+  if (["", "explore", "browse", "browse anime", "all anime", "database", "catalogue", "catalog"].includes(normalized)) {
+    return {
+      key: "browse:database",
+      label: "Explore Anime",
+      sourceLabel: "Full animeTVplus database",
+      useBackend: false,
+      sort: "START_DATE_DESC",
+      jikanOrderBy: "start_date",
+    };
+  }
+
   const seasonMatch = normalized.match(/\b(winter|spring|summer|fall|autumn)\s*(20\d{2})?\b/);
   if (seasonMatch) {
     const season = seasonMatch[1] === "autumn" ? "FALL" : seasonMatch[1].toUpperCase();
@@ -137,7 +150,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: `season:${season}:${year}`,
       label: `${toTitleCase(season.toLowerCase())} ${year}`,
-      sourceLabel: "Fast AniList results",
+      sourceLabel: "animeTVplus catalog",
       useBackend: false,
       season: season as MediaSeason,
       seasonYear: year,
@@ -147,11 +160,11 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     };
   }
 
-  if (["trending", "popular", "popular today", "browse", "most popular"].includes(normalized)) {
+  if (["trending", "popular", "popular today", "most popular"].includes(normalized)) {
     return {
       key: "browse:popular",
       label: "Popular Anime",
-      sourceLabel: "Fast AniList results",
+      sourceLabel: "animeTVplus catalog",
       useBackend: false,
       sort: "TRENDING_DESC",
       jikanOrderBy: "popularity",
@@ -162,18 +175,31 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: "browse:top-rated",
       label: "Top Rated Anime",
-      sourceLabel: "Fast AniList results",
+      sourceLabel: "animeTVplus catalog",
       useBackend: false,
       sort: "SCORE_DESC",
       jikanOrderBy: "score",
     };
   }
 
-  if (["airing", "new releases", "new release", "new", "latest", "recent launches", "currently airing"].includes(normalized)) {
+  if (["new releases", "new release", "new", "latest", "recent launches"].includes(normalized)) {
+    return {
+      key: "browse:new-releases",
+      label: "New Releases",
+      sourceLabel: "animeTVplus catalog",
+      useBackend: false,
+      status: "RELEASING",
+      sort: "START_DATE_DESC",
+      jikanOrderBy: "start_date",
+      jikanStatus: "airing",
+    };
+  }
+
+  if (["airing", "currently airing"].includes(normalized)) {
     return {
       key: "browse:airing",
       label: "Currently Airing",
-      sourceLabel: "Fast AniList results",
+      sourceLabel: "animeTVplus catalog",
       useBackend: false,
       status: "RELEASING",
       sort: "START_DATE_DESC",
@@ -187,7 +213,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: `genre:${genre}`,
       label: genre,
-      sourceLabel: "Fast AniList results",
+      sourceLabel: "animeTVplus catalog",
       useBackend: false,
       genre,
       sort: "POPULARITY_DESC",
@@ -201,7 +227,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
     return {
       key: `tag:${tag}`,
       label: tag,
-      sourceLabel: "Fast AniList results",
+      sourceLabel: "animeTVplus catalog",
       useBackend: false,
       tag,
       sort: "POPULARITY_DESC",
@@ -213,7 +239,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
   return {
     key: `search:${normalized}`,
     label: query,
-    sourceLabel: "Fast AniList results",
+    sourceLabel: "animeTVplus catalog",
     useBackend: true,
     search: query,
     sort: "POPULARITY_DESC",
@@ -221,75 +247,57 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
   };
 }
 
+// Our enriched search backend — root-only (no S2/S3 dupes), CR metadata, synonyms.
+const SEARCH_DISCOVERY_BASE =
+  process.env.SEARCH_API_BASE ||
+  process.env.NEXT_PUBLIC_SEARCH_API_BASE ||
+  "http://127.0.0.1:5001";
+
+function searchParamsForIntent(intent: DiscoveryIntent, page: number, fmt = ""): string {
+  const params = new URLSearchParams({ limit: "60", page: String(page) });
+  const genre = intent.genre || intent.tag;
+  if (intent.search) {
+    params.set("q", intent.search);
+  } else if (genre) {
+    params.set("genre", genre);
+  }
+  if (fmt && fmt !== "ALL") params.set("fmt", fmt);
+  // Sort hint so browse intents are genuinely sorted (Top Rated by score, New
+  // Releases by date) instead of the whole catalog by popularity.
+  if (intent.key === "browse:top-rated") params.set("sort", "score");
+  else if (intent.key === "browse:new-releases" || intent.key === "browse:airing") params.set("sort", "new");
+  // Browse intents (popular/top-rated/database/airing/new-releases) and the
+  // bare "Explore" land here with neither q nor genre → backend browse mode
+  // (root anime sorted by popularity).
+  return params.toString();
+}
+
+export type DiscoveryFacets = { ALL: number; TV: number; MOVIE: number; OVA: number; ONA: number; SPECIAL: number };
+
 export async function fetchAniListDiscovery(
   intent: DiscoveryIntent,
   page: number,
-): Promise<{ media: Anime[]; hasNextPage: boolean }> {
-  const gql = `
-    query DiscoverAnime(
-      $page: Int!,
-      $perPage: Int!,
-      $search: String,
-      $genre: String,
-      $tag: String,
-      $status: MediaStatus,
-      $season: MediaSeason,
-      $seasonYear: Int,
-      $sort: [MediaSort]
-    ) {
-      Page(page: $page, perPage: $perPage) {
-        pageInfo { hasNextPage }
-        media(
-          type: ANIME,
-          search: $search,
-          genre: $genre,
-          tag: $tag,
-          status: $status,
-          season: $season,
-          seasonYear: $seasonYear,
-          sort: $sort
-        ) {
-          idMal id
-          title { romaji english native }
-          coverImage { large extraLarge }
-          bannerImage
-          averageScore episodes status
-          startDate { year month day }
-        }
-      }
-    }
-  `;
-
+  fmt = "",
+): Promise<{ media: Anime[]; hasNextPage: boolean; total: number; count: number; page: number; facets?: DiscoveryFacets }> {
   try {
-    const response = await fetch("https://graphql.anilist.co", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        query: gql,
-        variables: {
-          page,
-          perPage: 30,
-          search: intent.search,
-          genre: intent.genre,
-          tag: intent.tag,
-          status: intent.status,
-          season: intent.season,
-          seasonYear: intent.seasonYear,
-          sort: [intent.sort],
-        },
-      }),
-    });
-    if (!response.ok) return { media: [], hasNextPage: false };
-    const json = await response.json() as {
-      data?: { Page?: { pageInfo: { hasNextPage: boolean }; media: AniListMedia[] } };
-    };
-    const pageData = json.data?.Page;
+    const qs = searchParamsForIntent(intent, page, fmt);
+    // Server-side hits the backend directly; client-side goes through the proxy
+    // route to stay same-origin.
+    const base = typeof window === "undefined" ? `${SEARCH_DISCOVERY_BASE}/api/search` : "/api/search-proxy/api/search";
+    const json = await fetch(`${base}?${qs}`, {
+      headers: { Accept: "application/json" },
+      ...(typeof window === "undefined" ? { next: { revalidate: 30 } } : {}),
+    }).then((r) => (r.ok ? (r.json() as Promise<Parameters<typeof mapCatalogList>[0] & { total?: number; count?: number; page?: number; facets?: DiscoveryFacets }>) : undefined));
     return {
-      media: (pageData?.media ?? []).filter((item) => item.idMal || item.id).map(mapAniList),
-      hasNextPage: pageData?.pageInfo?.hasNextPage ?? false,
+      media: mapCatalogList(json),
+      hasNextPage: Boolean(json?.has_more),
+      total: Number(json?.total || 0),
+      count: Number(json?.count || 0),
+      page: Number(json?.page || page),
+      facets: json?.facets,
     };
   } catch {
-    return { media: [], hasNextPage: false };
+    return { media: [], hasNextPage: false, total: 0, count: 0, page };
   }
 }
 
@@ -297,32 +305,9 @@ export async function fetchJikanDiscovery(
   intent: DiscoveryIntent,
   page: number,
 ): Promise<{ media: Anime[]; hasNextPage: boolean }> {
-  try {
-    const params = new URLSearchParams({
-      page: String(page),
-      limit: "25",
-      sfw: "true",
-      sort: "desc",
-    });
-    if (intent.jikanOrderBy) params.set("order_by", intent.jikanOrderBy);
-    if (intent.jikanStatus) params.set("status", intent.jikanStatus);
-    if (intent.jikanQuery) params.set("q", intent.jikanQuery);
-
-    const response = await fetch(`https://api.jikan.moe/v4/anime?${params.toString()}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) return { media: [], hasNextPage: false };
-    const json = await response.json() as {
-      data?: JikanAnime[];
-      pagination?: { has_next_page?: boolean };
-    };
-    return {
-      media: (json.data ?? []).map(mapJikan),
-      hasNextPage: Boolean(json.pagination?.has_next_page),
-    };
-  } catch {
-    return { media: [], hasNextPage: false };
-  }
+  void intent;
+  void page;
+  return { media: [], hasNextPage: false };
 }
 
 export function mergeAnimeSources(...sources: Anime[][]) {
@@ -337,6 +322,36 @@ export function mergeAnimeSources(...sources: Anime[][]) {
     }
   }
   return merged;
+}
+
+function catalogPathForIntent(intent: DiscoveryIntent, page: number) {
+  const limit = "60";
+  if (!intent.label && !intent.search && !intent.genre && !intent.tag && !intent.seasonYear) {
+    return `/api/anime/database?limit=${limit}&page=${page}`;
+  }
+  if (intent.key === "browse:top-rated") {
+    return `/api/anime/top-rated?limit=${limit}&page=${page}`;
+  }
+  if (intent.key === "browse:airing") {
+    return `/api/anime/airing?limit=${limit}&page=${page}`;
+  }
+  if (intent.key === "browse:new-releases") {
+    return `/api/anime/new-releases?limit=${limit}&page=${page}`;
+  }
+  if (intent.key === "browse:popular") {
+    return `/api/anime/popular?limit=${limit}&page=${page}`;
+  }
+  if (intent.key === "browse:database") {
+    return `/api/anime/database?limit=${limit}&page=${page}`;
+  }
+  if (intent.seasonYear && intent.season) {
+    return `/api/anime/season/${intent.seasonYear}/${intent.season.toLowerCase()}?limit=${limit}&page=${page}`;
+  }
+  if (intent.genre || intent.tag) {
+    return `/api/anime/genre/${encodeURIComponent(intent.genre || intent.tag || "")}?limit=${limit}&page=${page}`;
+  }
+  const query = intent.search || intent.genre || intent.tag || intent.jikanQuery || intent.label;
+  return `/api/search?q=${encodeURIComponent(query)}&limit=${limit}&page=${page}`;
 }
 
 function mapAniList(item: AniListMedia): Anime {
