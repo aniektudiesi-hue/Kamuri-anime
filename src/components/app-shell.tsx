@@ -61,6 +61,7 @@ function Footer() {
                 { label: "Currently Airing", href: "/airing" },
                 { label: "Free Anime", href: "/free-anime" },
                 { label: "Schedule", href: "/schedule" },
+                { label: "Android App", href: "/android-app" },
                 { label: "Movies", href: "/search?q=movie" },
               ].map((link) => (
                 <li key={link.label}>
@@ -96,6 +97,7 @@ function Footer() {
                 { label: "Watch History", href: "/history" },
                 { label: "Sign In", href: "/login" },
                 { label: "Register", href: "/register" },
+                { label: "Download Android App", href: "/android-app" },
               ].map((link) => (
                 <li key={link.label}>
                   <Link href={link.href} className="text-[12px] text-white/72 transition-colors hover:text-white">

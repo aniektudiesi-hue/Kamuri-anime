@@ -7,6 +7,7 @@ const nav = [
   { href: "/search?q=New%20Releases", label: "New" },
   { href: "/search?q=Top%20Rated", label: "Popular" },
   { href: "/schedule", label: "Simulcast" },
+  { href: "/android-app", label: "Android App" },
 ];
 
 // Genres backed by our catalog (anime_catalog.genres_json)
