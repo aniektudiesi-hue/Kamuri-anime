@@ -3,9 +3,9 @@ import { Kairo } from "@/components/mascot/kairo";
 
 /**
  * MaintenanceGate — full-screen "under maintenance" overlay.
- * ON by default; set NEXT_PUBLIC_MAINTENANCE="0" (Vercel env) to turn it OFF.
+ * OFF by default; set NEXT_PUBLIC_MAINTENANCE="1" (Vercel env) to turn it ON.
  */
-const MAINTENANCE_ON = (process.env.NEXT_PUBLIC_MAINTENANCE ?? "1") !== "0";
+const MAINTENANCE_ON = (process.env.NEXT_PUBLIC_MAINTENANCE ?? "0") === "1";
 
 export function MaintenanceGate() {
   if (!MAINTENANCE_ON) return null;
