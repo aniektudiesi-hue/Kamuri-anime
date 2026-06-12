@@ -3,8 +3,7 @@ import { getHomeInitialData } from "@/lib/home-server";
 import { buildPageMetadata } from "@/lib/seo";
 import { SITE_DESCRIPTION } from "@/lib/site";
 
-export const revalidate = 0;
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 export const metadata = buildPageMetadata({
   title: `animetvplus - animeTVplus Official Site | Watch Anime Online in HD`,
   description: SITE_DESCRIPTION,
