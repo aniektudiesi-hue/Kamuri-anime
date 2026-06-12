@@ -3,9 +3,9 @@ import { Kairo } from "@/components/mascot/kairo";
 
 /**
  * MaintenanceGate — full-screen "under maintenance" overlay.
- * OFF by default; set NEXT_PUBLIC_MAINTENANCE="1" (Vercel env) to turn it ON.
+ * ON by default during the Turso DB migration; set NEXT_PUBLIC_MAINTENANCE="0" (Vercel env) to turn it OFF.
  */
-const MAINTENANCE_ON = (process.env.NEXT_PUBLIC_MAINTENANCE ?? "0") === "1";
+const MAINTENANCE_ON = (process.env.NEXT_PUBLIC_MAINTENANCE ?? "1") !== "0";
 
 export function MaintenanceGate() {
   if (!MAINTENANCE_ON) return null;
