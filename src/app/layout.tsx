@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Providers } from "@/components/providers";
 import { MaintenanceGate } from "@/components/maintenance-gate";
 import { AdNoticeBanner } from "@/components/ad-notice-banner";
@@ -222,22 +223,6 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://cdn.myanimelist.net" />
         {/* AdMaven placement verification */}
         <meta name="admaven-placement" content="Bqjg8rdw8" />
-        {/* Google AdSense */}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5284738130230191"
-          crossOrigin="anonymous"
-        ></script>
-        {/* Google Analytics (GA4) */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-G3YG35B59E"></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'G-G3YG35B59E');`,
-          }}
-        />
       </head>
       <body className="min-h-full bg-background text-foreground">
         <script
@@ -249,6 +234,25 @@ gtag('config', 'G-G3YG35B59E');`,
         <Providers>{children}</Providers>
         <AdNoticeBanner />
         <MaintenanceGate />
+        {/* Google AdSense */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5284738130230191"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+        {/* Google Analytics (GA4) */}
+        <Script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=G-G3YG35B59E"
+          strategy="afterInteractive"
+        />
+        <Script id="ga4-init" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-G3YG35B59E');`}
+        </Script>
       </body>
     </html>
   );

@@ -5,3 +5,11 @@
 node_modules
 lh-*.json
 dev-server*.log
+public/cr-img
+public/cr-keyart
+public/image-cache
+.next-3042
+.next-catalog-check
+.next-image-check
+.claude
+*.log

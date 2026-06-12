@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 
 // Server-side proxy for the VAST ad tag. Keeps the ad network endpoint flexible,
 // avoids browser CORS issues, and lets us swap/disable ads from one place.
-const VAST_TAG = "https://s.magsrv.com/v1/vast.php?idz=5947422&ex_av=name";
+const VAST_TAG = "https://s.magsrv.com/v1/vast.php?idz=5947876";
 
 export const dynamic = "force-dynamic";
 

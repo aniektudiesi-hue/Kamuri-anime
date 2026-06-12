@@ -42,12 +42,43 @@ const HOP_BY_HOP_HEADERS = new Set([
   "upgrade",
 ]);
 
+// Hotlink / scraping protection: stream proxy routes only serve requests that
+// present a Referer or Origin from our own site (or have no Referer at all,
+// e.g. native players). Cross-site embedding / bulk scrapers that spoof a
+// browser fetch but send a foreign Referer/Origin get a 403.
+const ALLOWED_HOSTS = new Set(["animetvplus.xyz", "www.animetvplus.xyz", "localhost", "127.0.0.1"]);
+const PROTECTED_PREFIXES = ["/proxy/"];
+
+function isAllowedHost(hostname, env) {
+  if (ALLOWED_HOSTS.has(hostname)) return true;
+  if (hostname.endsWith(".vercel.app")) return true;
+  if (env.ALLOWED_ORIGIN_HOST && hostname === env.ALLOWED_ORIGIN_HOST) return true;
+  return false;
+}
+
+function isAllowedClient(request, env) {
+  const referer = request.headers.get("referer");
+  const origin = request.headers.get("origin");
+  for (const value of [referer, origin]) {
+    if (!value) continue;
+    try {
+      if (!isAllowedHost(new URL(value).hostname, env)) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
 const worker = {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return corsPreflight();
 
     const url = new URL(request.url);
     try {
+      if (PROTECTED_PREFIXES.some((p) => url.pathname.startsWith(p)) && !isAllowedClient(request, env)) {
+        return json({ error: "Forbidden" }, 403, { "cache-control": "no-store" });
+      }
       if (url.pathname === "/health") return json({ ok: true, worker: "anime-tv-stream-proxy" });
       if (url.pathname === "/image") return await proxyImage(request, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/warm")) return await warmMoon(request, env, ctx);
