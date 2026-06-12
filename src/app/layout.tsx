@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
 import { MaintenanceGate } from "@/components/maintenance-gate";
+import { AdNoticeBanner } from "@/components/ad-notice-banner";
 import { absoluteUrl, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -246,6 +247,7 @@ gtag('config', 'G-G3YG35B59E');`,
           }}
         />
         <Providers>{children}</Providers>
+        <AdNoticeBanner />
         <MaintenanceGate />
       </body>
     </html>
