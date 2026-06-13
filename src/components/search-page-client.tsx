@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Suspense, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -100,38 +100,69 @@ function warmAnimePosters(items: Anime[], priorityCount = 0) {
 function SearchContent({ initialData }: { initialData?: SearchInitialData }) {
   const params = useSearchParams();
   const urlQ = params.get("q")?.trim() ?? "";
-  const [text, setText] = useState(urlQ);
-  const [debouncedQ, setDebouncedQ] = useState(urlQ);
+  const [q, setQ] = useState(urlQ);
 
-  // External URL changes (header search submit, category links) sync into the live box.
+  // External URL changes (header search submit, category links) sync into the box.
   useEffect(() => {
-    setText(urlQ);
-    setDebouncedQ(urlQ);
+    setQ(urlQ);
   }, [urlQ]);
 
-  // Live typing -> results update in ~150ms, no full navigation/reload.
-  useEffect(() => {
-    const id = setTimeout(() => {
-      const next = text.trim();
-      setDebouncedQ(next);
-      const url = next ? `/search?q=${encodeURIComponent(next)}` : "/search";
-      window.history.replaceState(window.history.state, "", url);
-    }, 150);
-    return () => clearTimeout(id);
-  }, [text]);
+  // Commit a typed query: update the heavy results view + the URL. The keystrokes
+  // themselves live entirely inside <SearchField> (local state), so typing never
+  // waits on this big component tree to re-render — the search box stays smooth.
+  const onCommit = useCallback((next: string) => {
+    setQ(next);
+    const url = next ? `/search?q=${encodeURIComponent(next)}` : "/search";
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
 
-  return <SearchContentBody q={debouncedQ} liveText={text} onLiveText={setText} initialData={initialData} />;
+  return <SearchContentBody q={q} onCommit={onCommit} initialData={initialData} />;
 }
+
+// Search box with LOCAL state. A child's own state change does not re-render its
+// parent, so typing here never triggers the expensive results-grid render. The
+// committed value is debounced up to the parent.
+const SearchField = memo(function SearchField({
+  initial,
+  onCommit,
+}: {
+  initial: string;
+  onCommit: (value: string) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  // Re-sync when the query changes from outside (chip nav, header submit).
+  useEffect(() => setValue(initial), [initial]);
+  useEffect(() => {
+    const id = setTimeout(() => onCommit(value.trim()), 140);
+    return () => clearTimeout(id);
+  }, [value, onCommit]);
+  return (
+    <div className="relative flex items-center border-b-2 border-white/15 transition focus-within:border-[#c4182a]">
+      <Search size={20} className="pointer-events-none shrink-0 text-white/40" />
+      <input
+        autoFocus
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        placeholder="Search anime..."
+        aria-label="Search anime"
+        className="w-full bg-transparent px-3 py-2.5 text-xl font-medium text-white placeholder:text-white/30 focus:outline-none sm:text-2xl"
+      />
+      {value ? (
+        <button type="button" onClick={() => setValue("")} aria-label="Clear search" className="shrink-0 px-1 text-white/40 transition hover:text-white">
+          <X size={20} />
+        </button>
+      ) : null}
+    </div>
+  );
+});
 
 function SearchContentBody({
   q,
-  liveText,
-  onLiveText,
+  onCommit,
   initialData,
 }: {
   q: string;
-  liveText: string;
-  onLiveText: (value: string) => void;
+  onCommit: (value: string) => void;
   initialData?: SearchInitialData;
 }) {
   const { token } = useAuth();
@@ -337,22 +368,7 @@ function SearchContentBody({
       <div className="mx-auto max-w-screen-2xl px-4 lg:px-6">
         <div className="min-h-[calc(100vh-96px)] py-6">
           <div className="mb-6">
-            <div className="relative flex items-center border-b-2 border-white/15 transition focus-within:border-[#c4182a]">
-              <Search size={20} className="pointer-events-none shrink-0 text-white/40" />
-              <input
-                autoFocus
-                value={liveText}
-                onChange={(event) => onLiveText(event.target.value)}
-                placeholder="Search anime..."
-                aria-label="Search anime"
-                className="w-full bg-transparent px-3 py-2.5 text-xl font-medium text-white placeholder:text-white/30 focus:outline-none sm:text-2xl"
-              />
-              {liveText ? (
-                <button type="button" onClick={() => onLiveText("")} aria-label="Clear search" className="shrink-0 px-1 text-white/40 transition hover:text-white">
-                  <X size={20} />
-                </button>
-              ) : null}
-            </div>
+            <SearchField initial={q} onCommit={onCommit} />
           </div>
 
           {q ? (

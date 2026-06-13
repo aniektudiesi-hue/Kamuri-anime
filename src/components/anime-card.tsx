@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { Play, Star } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ProgressiveImage } from "@/components/progressive-image";
 import { startRouteBuffer } from "@/lib/route-buffer";
+import { fetchCrCard } from "@/lib/catalog-api";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
 import { animeId, animePath, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
 
 const loadedPosterUrls = new Set<string>();
+// Detail data (cr-card) is the slow part of opening a title — on a cold backend
+// it takes 1-3s. Warm it the instant a card is hovered/pressed so the detail
+// page reads from cache and opens instantly. One prefetch per id per session.
+const prefetchedDetailIds = new Set<string>();
 
 const STATUS_DOT: Record<string, string> = {
   currently_airing: "bg-[#c8ced8]",
@@ -45,18 +51,31 @@ export function AnimeCard({
   const synopsis = (anime.overview || "").trim();
   const resume = useResumeHistory(id);
   const href = animePath(anime, id);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     setImageFailed(false);
     setImageLoaded(Boolean(poster && loadedPosterUrls.has(poster)));
   }, [poster]);
 
+  function prefetchDetail() {
+    if (!id || prefetchedDetailIds.has(id)) return;
+    prefetchedDetailIds.add(id);
+    queryClient.prefetchQuery({
+      queryKey: ["cr-card", "canonical-v8", id, 1],
+      queryFn: () => fetchCrCard(id, 1),
+      staleTime: 1000 * 60 * 30,
+    });
+  }
+
   function pressAnime() {
     startRouteBuffer();
+    prefetchDetail();
   }
 
   return (
     <article
+      onPointerEnter={prefetchDetail}
       onPointerDown={pressAnime}
       onTouchStart={pressAnime}
       className={`card-lift scroll-card group ${className ?? "w-[160px] shrink-0 sm:w-[180px]"}`}
