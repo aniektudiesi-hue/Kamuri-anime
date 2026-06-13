@@ -3,11 +3,13 @@ import Link from "next/link";
 import { Header } from "./header";
 import { MobileBottomNavGate } from "./mobile-bottom-nav-gate";
 import { BootLoader } from "./boot-loader";
+import { AnnouncementBanner } from "./announcement-banner";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <BootLoader />
+      <AnnouncementBanner />
       <Header />
       <main className="pb-20 sm:pb-0">{children}</main>
       <Footer />
