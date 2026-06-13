@@ -4,7 +4,7 @@ import { readCachedStream, writeCachedStream } from "./stream-cache";
 import { fetchCatalogEpisodes, fetchCatalogSearch, fetchCatalogStream } from "./catalog-api";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://anime-search-api-burw.onrender.com";
-const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
+const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 const HISTORY_CACHE_PREFIX = "anime-tv-server-history:";
 const HISTORY_CACHE_TTL = 1000 * 60 * 15;
 const EPISODE_CACHE_PREFIX = "anime-tv-episodes:";
@@ -210,6 +210,25 @@ export const api = {
   },
   stream: (malId: string, episode: string | number, type: "sub" | "dub") =>
     fetchCatalogStream(malId, episode, type),
+  megaplay: async (malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> => {
+    const key = `megaplay:${malId}:${episode}:${type}`;
+    const cached = readCachedStream(key);
+    if (cached) return cached;
+    try {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 12_000);
+      const res = await fetch(
+        `https://anime-search-api-burw.onrender.com/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(String(episode))}?type=${type}`,
+        { headers: { Accept: "application/json" }, signal: controller.signal },
+      ).finally(() => window.clearTimeout(timeout));
+      if (!res.ok) return { mal_id: malId, episode_num: String(episode) };
+      const data = await res.json() as StreamResponse;
+      writeCachedStream(key, data);
+      return data;
+    } catch {
+      return { mal_id: malId, episode_num: String(episode) };
+    }
+  },
   moon: (malId: string, episode: string | number) =>
     cachedStreamRequest(`moon-fast:${malId}:${episode}`, `/api/moon/${malId}/${episode}`),
   hd1: (malId: string, episode: string | number) =>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -47,11 +47,23 @@ const GENRE_LINKS = new Set([
 ]);
 
 const DISCOVERY_QUERY_VERSION = "v2";
+const warmedSearchPosters = new Set<string>();
 
-export function SearchPageClient() {
+export type SearchInitialData = {
+  intentKey: string;
+  fmtKey: FormatKey;
+  page: number;
+  media: Anime[];
+  hasNextPage: boolean;
+  total: number;
+  count: number;
+  facets?: DiscoveryFacets;
+};
+
+export function SearchPageClient({ initialData }: { initialData?: SearchInitialData }) {
   return (
     <Suspense fallback={<SearchFallback />}>
-      <SearchContent />
+      <SearchContent initialData={initialData} />
     </Suspense>
   );
 }
@@ -72,7 +84,20 @@ function GridSkeleton({ count = 24 }: { count?: number }) {
   );
 }
 
-function SearchContent() {
+function warmAnimePosters(items: Anime[], priorityCount = 0) {
+  if (typeof window === "undefined" || !items.length) return;
+  for (const [index, anime] of items.slice(0, 48).entries()) {
+    const poster = posterOf(anime, index < priorityCount ? "poster-md" : "poster-sm");
+    if (!poster || warmedSearchPosters.has(poster)) continue;
+    warmedSearchPosters.add(poster);
+    const image = new window.Image();
+    image.decoding = "async";
+    (image as HTMLImageElement & { fetchPriority?: string }).fetchPriority = index < priorityCount ? "high" : "low";
+    image.src = poster;
+  }
+}
+
+function SearchContent({ initialData }: { initialData?: SearchInitialData }) {
   const params = useSearchParams();
   const urlQ = params.get("q")?.trim() ?? "";
   const [text, setText] = useState(urlQ);
@@ -95,10 +120,20 @@ function SearchContent() {
     return () => clearTimeout(id);
   }, [text]);
 
-  return <SearchContentBody q={debouncedQ} liveText={text} onLiveText={setText} />;
+  return <SearchContentBody q={debouncedQ} liveText={text} onLiveText={setText} initialData={initialData} />;
 }
 
-function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: string; onLiveText: (value: string) => void }) {
+function SearchContentBody({
+  q,
+  liveText,
+  onLiveText,
+  initialData,
+}: {
+  q: string;
+  liveText: string;
+  onLiveText: (value: string) => void;
+  initialData?: SearchInitialData;
+}) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const intent = useMemo(() => resolveDiscoveryIntent(q), [q]);
@@ -106,8 +141,9 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
   const resultsScrollRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [discoveryPage, setDiscoveryPage] = useState(1);
-  const [allAnilist, setAllAnilist] = useState<Anime[]>([]);
-  const [resultTotal, setResultTotal] = useState(0);
+  const initialMatches = initialData?.intentKey === intent.key && initialData?.fmtKey === "ALL" && initialData.page === 1;
+  const [allAnilist, setAllAnilist] = useState<Anime[]>(() => (initialMatches ? initialData.media : []));
+  const [resultTotal, setResultTotal] = useState(() => (initialMatches ? initialData.total : 0));
   const [localHistory, setLocalHistory] = useState<LibraryItem[]>([]);
   // The result count is fully client-derived (instant cache + AniList), so the
   // SSR value never matches the post-fetch value. Render it only after mount to
@@ -117,7 +153,9 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
   // Filter UI: format facet + collapsible panel. CR-mapped titles always rank
   // first regardless of facet, so the on-brand catalog leads every genre/search.
   const [formatFilter, setFormatFilter] = useState<FormatKey>("ALL");
-  const [facets, setFacets] = useState<DiscoveryFacets | undefined>(undefined);
+  const [facets, setFacets] = useState<DiscoveryFacets | undefined>(() => (initialMatches ? initialData.facets : undefined));
+  const [, startFilterTransition] = useTransition();
+  const resetGuardRef = useRef(true);
   useEffect(() => setFormatFilter("ALL"), [intent.key]);
 
   // On a new query/intent, drop the previous query's accumulated results and
@@ -126,10 +164,20 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
   // lands — the "UI dhoka" / phone "count updates but page doesn't" bug. The
   // instant local-cache results (instantResults) fill the gap with no flash.
   useEffect(() => {
+    if (resetGuardRef.current) {
+      resetGuardRef.current = false;
+      if (initialMatches && initialData) {
+        setDiscoveryPage(1);
+        setAllAnilist(initialData.media);
+        setResultTotal(initialData.total);
+        setFacets(initialData.facets);
+        return;
+      }
+    }
     setDiscoveryPage(1);
     setAllAnilist([]);
     setResultTotal(0);
-  }, [intent.key, formatFilter]);
+  }, [intent.key, formatFilter, initialData, initialMatches]);
 
   useEffect(() => {
     const refresh = () => setLocalHistory(rememberedHistory(12));
@@ -156,6 +204,18 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
     enabled: true,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
+    initialData: initialMatches && formatFilter === "ALL" && discoveryPage === 1 && initialData
+      ? {
+        intentKey: initialData.intentKey,
+        fmtKey: initialData.fmtKey,
+        media: initialData.media,
+        hasNextPage: initialData.hasNextPage,
+        total: initialData.total,
+        count: initialData.count,
+        page: initialData.page,
+        facets: initialData.facets,
+      }
+      : undefined,
     placeholderData: keepPreviousData,
   });
 
@@ -184,7 +244,7 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
   // only re-rank within the loaded page: CR-mapped first, then TV-first for text
   // queries, preserving backend relevance order within each bucket.
   const visibleMerged = useMemo(() => {
-    return merged
+    const sorted = merged
       .map((a, i) => ({ a, i }))
       .sort((x, y) => {
         const cr = crRank(x.a) - crRank(y.a);
@@ -196,6 +256,17 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
         return x.i - y.i;
       })
       .map((o) => o.a);
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+    return sorted.filter((a) => {
+      const id = animeId(a);
+      if (id && seenIds.has(id)) return false;
+      const normalTitle = (a.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (normalTitle.length > 3 && seenTitles.has(normalTitle)) return false;
+      if (id) seenIds.add(id);
+      if (normalTitle.length > 3) seenTitles.add(normalTitle);
+      return true;
+    });
   }, [merged, q]);
   const hasMore = Boolean(anilistQ.data?.hasNextPage);
   const hasRenderableResults = merged.length > 0;
@@ -209,15 +280,20 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
     if (hasMore) setDiscoveryPage((page) => page + 1);
   }
 
+  function chooseFormatFilter(key: FormatKey) {
+    startFilterTransition(() => setFormatFilter(key));
+  }
+
   useEffect(() => {
     if (!anilistQ.data?.hasNextPage || anilistQ.isFetching) return;
-    const nextPage = discoveryPage + 1;
-    queryClient.prefetchQuery({
-      queryKey: ["anilist-discovery", DISCOVERY_QUERY_VERSION, intent.key, q, formatFilter, nextPage],
-      queryFn: async () => ({ intentKey: intent.key, fmtKey: formatFilter, ...(await fetchAniListDiscovery(intent, nextPage, formatFilter)) }),
-      staleTime: 1000 * 60 * 30,
-      gcTime: 1000 * 60 * 90,
-    });
+    for (const nextPage of [discoveryPage + 1, discoveryPage + 2]) {
+      queryClient.ensureQueryData({
+        queryKey: ["anilist-discovery", DISCOVERY_QUERY_VERSION, intent.key, q, formatFilter, nextPage],
+        queryFn: async () => ({ intentKey: intent.key, fmtKey: formatFilter, ...(await fetchAniListDiscovery(intent, nextPage, formatFilter)) }),
+        staleTime: 1000 * 60 * 30,
+        gcTime: 1000 * 60 * 90,
+      }).then((data) => warmAnimePosters(data.media, 4)).catch(() => undefined);
+    }
   }, [anilistQ.data?.hasNextPage, anilistQ.isFetching, discoveryPage, intent, q, formatFilter, queryClient]);
 
   useEffect(() => {
@@ -229,7 +305,7 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
         if (!entry.isIntersecting) return;
         loadMoreResults();
       },
-      { root: resultsScrollRef.current, rootMargin: "700px 0px 900px 0px", threshold: 0.01 },
+      { root: resultsScrollRef.current, rootMargin: "1800px 0px 2200px 0px", threshold: 0.01 },
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -240,7 +316,7 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
     if (!canLoadMore || isLoading || isLoadingMore) return;
     const onScroll = () => {
       const distance = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
-      if (distance < 900) loadMoreResults();
+      if (distance < 2200) loadMoreResults();
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -253,25 +329,7 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
 
   useEffect(() => {
     if (!visibleMerged.length) return;
-    const links: HTMLLinkElement[] = [];
-    for (const [index, anime] of visibleMerged.slice(0, 30).entries()) {
-      const poster = posterOf(anime, index < 6 ? "poster-lg" : "poster-md");
-      if (!poster) continue;
-      const warm = new window.Image();
-      warm.decoding = "async";
-      warm.src = poster;
-
-      const link = document.createElement("link");
-      link.rel = index < 10 ? "preload" : "prefetch";
-      link.as = "image";
-      link.href = poster;
-      if (index < 10) link.fetchPriority = "high";
-      document.head.appendChild(link);
-      links.push(link);
-    }
-    return () => {
-      links.forEach((link) => link.remove());
-    };
+    warmAnimePosters(visibleMerged, 8);
   }, [visibleMerged]);
 
   return (
@@ -333,7 +391,7 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
                   <button
                     key={facet.key}
                     type="button"
-                    onClick={() => setFormatFilter(facet.key)}
+                    onClick={() => chooseFormatFilter(facet.key)}
                     className={`flex shrink-0 items-center gap-1.5 rounded-[4px] border px-3 py-1.5 text-[12px] font-semibold transition-colors duration-[160ms] ${
                       active
                         ? "border-[#c4182a]/60 bg-[#c4182a]/16 text-white"
@@ -377,7 +435,7 @@ function SearchContentBody({ q, liveText, onLiveText }: { q: string; liveText: s
               <>
                 <div className={SEARCH_GRID}>
                   {visibleMerged.map((anime, i) => (
-                    <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 12} fastImage className="w-full" />
+                    <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 6} fastImage className="w-full" />
                   ))}
                 </div>
 

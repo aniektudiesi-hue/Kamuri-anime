@@ -1,17 +1,18 @@
 import type { AiringScheduleItem, Anime, EpisodeResponse, StreamResponse, Subtitle } from "./types";
+import { catalogRegionHeaders } from "./edge-region";
 
 // Single backend = the 5001 season-mapping gateway (authoritative seasons +
 // internal stream/section proxy). The UI never calls 3058 directly.
 export const CATALOG_API_BASE =
   process.env.CATALOG_API_BASE ||
   process.env.NEXT_PUBLIC_CATALOG_API_BASE ||
-  "http://127.0.0.1:5001";
+  "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 
 // Our enriched search backend (has synonyms, correct grouping)
 const SEARCH_API_BASE =
   process.env.SEARCH_API_BASE ||
   process.env.NEXT_PUBLIC_SEARCH_API_BASE ||
-  "http://127.0.0.1:5001";
+  "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 
 export const CATALOG_PROXY_BASE = "/api/catalog-proxy";
 const CLIENT_CACHE_TTL = 1000 * 60 * 5;
@@ -29,6 +30,9 @@ type CatalogAnime = {
   cover_image?: string;
   cr_poster?: string;
   cr_hero?: string;
+  detail_banner?: string;
+  title_logo?: string;
+  synopsis?: string;
   thumbnail_4k_url?: string;
   thumbnail_1080_url?: string;
   local_banner_webp?: string;
@@ -109,7 +113,7 @@ export async function catalogClientGet<T>(path: string, cacheMs = CLIENT_CACHE_T
     if (cached && cached.expiresAt > Date.now()) return cached.promise as Promise<T>;
   }
   const promise = fetch(`${base}${path}`, {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
   }).then(async (response) => {
     if (!response.ok) throw new Error(await response.text().catch(() => `${response.status}`));
     return (await response.json()) as T;
@@ -128,6 +132,11 @@ export function mapCatalogAnime(item: CatalogAnime | undefined): Anime {
   const currentEpisodes = Number(item?.current_episodes || 0);
   const totalEpisodes = Number(item?.episodes_total || 0);
   const episodes = Math.max(streamEpisodes, currentEpisodes) || totalEpisodes || 0;
+  const format = (item?.format || "").toUpperCase();
+  const useSeriesCrArt = format === "TV" || format === "ONA";
+  const crPoster = useSeriesCrArt ? item?.cr_poster || undefined : undefined;
+  const crHero = useSeriesCrArt ? item?.cr_hero || undefined : undefined;
+  const anilistCover = item?.local_cover_webp || item?.cover_image || item?.local_thumbnail_1080_webp || item?.thumbnail_1080_url || item?.local_thumbnail_4k_webp || item?.thumbnail_4k_url || item?.local_banner_webp || item?.banner_image || undefined;
   return {
     mal_id: id,
     anime_id: id,
@@ -137,10 +146,15 @@ export function mapCatalogAnime(item: CatalogAnime | undefined): Anime {
     title_jp: item?.native_title || undefined,
     // Prefer the Crunchyroll vertical poster (1560x2340) when this title has CR
     // metadata — sharper, on-brand thumbnails. Fall back to AniList covers.
-    image_url: item?.cr_poster || item?.local_cover_webp || item?.cover_image || item?.local_thumbnail_1080_webp || item?.thumbnail_1080_url || item?.local_thumbnail_4k_webp || item?.thumbnail_4k_url || item?.local_banner_webp || item?.banner_image || undefined,
-    poster: item?.cr_poster || item?.local_cover_webp || item?.cover_image || item?.local_thumbnail_1080_webp || item?.thumbnail_1080_url || undefined,
-    banner: item?.local_banner_webp || item?.banner_image || item?.local_thumbnail_4k_webp || item?.thumbnail_4k_url || undefined,
-    overview: item?.overview || undefined,
+    image_url: crPoster || anilistCover,
+    poster: crPoster || anilistCover,
+    banner: item?.detail_banner || crHero || item?.local_banner_webp || item?.banner_image || undefined,
+    cr_poster: crPoster,
+    cr_hero: crHero,
+    detail_banner: item?.detail_banner || crHero || undefined,
+    title_logo: item?.title_logo || undefined,
+    synopsis: item?.synopsis || undefined,
+    overview: item?.synopsis || item?.overview || undefined,
     genres: parseStringArray(item?.genres_json),
     studios: parseStringArray(item?.studios_json),
     source: item?.source || undefined,
@@ -151,10 +165,10 @@ export function mapCatalogAnime(item: CatalogAnime | undefined): Anime {
     status: normalizeCatalogStatus(item?.airing_status || item?.status),
     start_date: item?.start_date || (item?.season_year ? `${item.season_year}-01-01` : undefined),
     year: Number(item?.season_year || 0) || undefined,
-    format: (item?.format || "").toUpperCase() || undefined,
+    format: format || undefined,
     season_count: Number(item?.cr_season_count || item?.season_count || 0) || undefined,
     // CR-mapped = has any Crunchyroll keyart/poster. Used to rank CR titles first.
-    cr_mapped: Boolean(item?.cr_poster || item?.cr_hero || item?.cr_season_count),
+    cr_mapped: Boolean(useSeriesCrArt && (item?.cr_poster || item?.cr_hero || item?.cr_season_count)),
   };
 }
 
@@ -183,7 +197,7 @@ export async function fetchCatalogSearch(query: string, limit = 40, page = 1) {
   // Use our enriched search backend (synonyms + correct season grouping)
   const base = typeof window === "undefined" ? SEARCH_API_BASE : "/api/search-proxy";
   const payload = await fetch(`${base}/api/search?${params.toString()}`, {
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
     ...(typeof window === "undefined" ? { next: { revalidate: 30 } } : {}),
   })
     .then((r) => (r.ok ? (r.json() as Promise<CatalogListPayload>) : undefined))
@@ -222,17 +236,20 @@ export type CrCard = {
   season_count?: number;
   total_episodes?: number;
   seasons: CrSeason[];
+  selected_season?: CrSeason;
 };
 
-export async function fetchCrCard(malId: string): Promise<CrCard | null> {
+export async function fetchCrCard(malId: string, season?: number): Promise<CrCard | null> {
   try {
     // Use our enriched backend (single source of truth — correct season grouping
     // + synopsis, matches the season-review app). Server-side hits it directly,
     // client-side via the proxy route to stay same-origin.
     const base = typeof window === "undefined" ? SEARCH_API_BASE : "/api/search-proxy";
-    const card = await fetch(`${base}/api/cr/card/${encodeURIComponent(malId)}`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
+    const params = new URLSearchParams({ v: "canonical-v8" });
+    if (season && season > 0) params.set("season", String(season));
+    const card = await fetch(`${base}/api/cr/card/${encodeURIComponent(malId)}?${params.toString()}`, {
+      headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
+      ...(typeof window === "undefined" ? { next: { revalidate: 1800 } } : {}),
     }).then((r) => (r.ok ? (r.json() as Promise<CrCard>) : null));
     // React Query rejects undefined — always return a value (null when missing).
     return card ?? null;
@@ -274,20 +291,41 @@ export async function fetchCatalogEpisodes(malId: string, hint = 0): Promise<Epi
   };
 }
 
+// DUB is always served via the megaplay.buzz embed iframe.
+const MEGAPLAY_EMBED_BASE = "https://megaplay.buzz/stream/mal";
+// SUB fallback when an episode exists but has no m3u8 in our own DB.
+const ANIME_SEARCH_STREAM_BASE = "https://anime-search-api-burw.onrender.com";
+
+function hasPlayable(row: { m3u8_url?: string; iframe_url?: string } | undefined) {
+  return Boolean(row && (row.m3u8_url || row.iframe_url));
+}
+
 export async function fetchCatalogStream(malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> {
+  const epNum = String(episode);
+
+  // DUB → always the megaplay.buzz iframe embed (no DB lookup).
+  if (type === "dub") {
+    return {
+      iframe_url: `${MEGAPLAY_EMBED_BASE}/${encodeURIComponent(malId)}/${encodeURIComponent(epNum)}/dub`,
+      mal_id: malId,
+      episode_num: epNum,
+    };
+  }
+
+  // SUB → try our own backend DB FIRST (single-stream endpoint, then the streams list).
   const params = new URLSearchParams({ stream_type: type });
   const single = await catalogClientGet<{ stream?: CatalogStreamRow; anime?: CatalogAnime }>(
-    `/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(String(episode))}?${params.toString()}`,
+    `/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(epNum)}?${params.toString()}`,
     1000 * 60 * 5,
   ).catch(() => undefined);
-  if (single?.stream) {
+  if (hasPlayable(single?.stream)) {
     return {
-      m3u8_url: single.stream.m3u8_url,
-      iframe_url: single.stream.iframe_url,
-      subtitles: normalizeSubtitles(single.stream.subtitles),
-      server_id: Number(single.stream.server_id || 0) || undefined,
+      m3u8_url: single!.stream!.m3u8_url,
+      iframe_url: single!.stream!.iframe_url,
+      subtitles: normalizeSubtitles(single!.stream!.subtitles),
+      server_id: Number(single!.stream!.server_id || 0) || undefined,
       mal_id: malId,
-      episode_num: String(single.stream.episode || episode),
+      episode_num: String(single!.stream!.episode || episode),
     };
   }
   const payload = await fetchCatalogStreams(malId, type);
@@ -296,15 +334,50 @@ export async function fetchCatalogStream(malId: string, episode: string | number
   const row = rows.find((item) => Number(item.episode) === target && item.stream_type === type)
     || rows.find((item) => Number(item.episode) === target)
     || rows[0];
-  if (!row) return { mal_id: malId, episode_num: String(episode) };
-  return {
-    m3u8_url: row.m3u8_url,
-    iframe_url: row.iframe_url,
-    subtitles: normalizeSubtitles(row.subtitles),
-    server_id: Number(row.server_id || 0) || undefined,
-    mal_id: malId,
-    episode_num: String(row.episode || episode),
-  };
+  if (hasPlayable(row)) {
+    return {
+      m3u8_url: row!.m3u8_url,
+      iframe_url: row!.iframe_url,
+      subtitles: normalizeSubtitles(row!.subtitles),
+      server_id: Number(row!.server_id || 0) || undefined,
+      mal_id: malId,
+      episode_num: String(row!.episode || episode),
+    };
+  }
+
+  // SUB fallback → episode exists but our DB has no m3u8: pull it directly from
+  // the anime-search API (https://anime-search-api-burw.onrender.com/api/stream/<mal>/<ep>).
+  const fallback = await fetchAnimeSearchStream(malId, epNum);
+  if (fallback) return fallback;
+
+  return { mal_id: malId, episode_num: epNum };
+}
+
+async function fetchAnimeSearchStream(malId: string, episode: string): Promise<StreamResponse | undefined> {
+  try {
+    const res = await fetch(
+      `${ANIME_SEARCH_STREAM_BASE}/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return undefined;
+    const data = (await res.json()) as {
+      m3u8_url?: string; url?: string; stream_url?: string;
+      iframe_url?: string; subtitles?: string | Subtitle[]; subtitle_url?: string; server_id?: number | string;
+    };
+    const m3u8 = data.m3u8_url || data.url || data.stream_url;
+    if (!m3u8 && !data.iframe_url) return undefined;
+    return {
+      m3u8_url: m3u8,
+      iframe_url: data.iframe_url,
+      subtitles: normalizeSubtitles(data.subtitles),
+      subtitle_url: data.subtitle_url,
+      server_id: Number(data.server_id || 0) || undefined,
+      mal_id: malId,
+      episode_num: episode,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export function catalogScheduleFromAnime(items: Anime[]): AiringScheduleItem[] {

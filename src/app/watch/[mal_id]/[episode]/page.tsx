@@ -17,14 +17,17 @@ import { shareWatching } from "@/lib/chat";
 import { historySocketUrl } from "@/lib/history-realtime";
 import { clearCachedStream, readCachedStream } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
+import { imageCdnUrl } from "@/lib/image-cdn";
 import {
   DEFAULT_STREAM_PROVIDER_ID,
   STREAM_PROVIDERS,
   fetchStreamProvider,
   hasPlayableStream,
+  iframeUrlOf,
   streamProviderCacheKey,
   streamProviderIndex,
   streamProviderQueryKey,
+  streamUrlOf,
   warmStreamProvider,
   type StreamProviderId,
 } from "@/lib/stream-providers";
@@ -117,7 +120,7 @@ export default function WatchPage({
       enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
         provider.id === DEFAULT_STREAM_PROVIDER_ID || secondaryDataEnabled
       ) && (
-        type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID
+        type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID || provider.id === "megaplay"
       ),
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,
@@ -132,7 +135,7 @@ export default function WatchPage({
   const megaHasPlayableStream = hasPlayableStream(megaQuery?.data);
   const showAudioControls = megaHasPlayableStream;
   const playableServers = STREAM_PROVIDERS.filter((provider, i) => {
-    if (type === "dub") return provider.id === DEFAULT_STREAM_PROVIDER_ID && hasPlayableStream(streamQueries[i]?.data);
+    if (type === "dub") return (provider.id === DEFAULT_STREAM_PROVIDER_ID || provider.id === "megaplay") && hasPlayableStream(streamQueries[i]?.data);
     return hasPlayableStream(streamQueries[i]?.data);
   });
   const availableServers = playableServers;
@@ -499,6 +502,18 @@ export default function WatchPage({
                   }}
                 />
               </div>
+            ) : iframeUrlOf(selectedStreamForPlayer) && !streamUrlOf(selectedStreamForPlayer) ? (
+              <div className="relative aspect-video w-full overflow-hidden bg-black">
+                <iframe
+                  key={playerEpisodeKey}
+                  src={iframeUrlOf(selectedStreamForPlayer)}
+                  className="absolute inset-0 h-full w-full border-0"
+                  allowFullScreen
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  referrerPolicy="no-referrer"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                />
+              </div>
             ) : (
               <VideoPlayer
                 key={playerEpisodeKey}
@@ -643,7 +658,7 @@ export default function WatchPage({
                         key={a}
                         onClick={() => {
                           setType(a);
-                          if (a === "dub") setServer(DEFAULT_STREAM_PROVIDER_ID);
+                          if (a === "dub" && server !== DEFAULT_STREAM_PROVIDER_ID && server !== "megaplay") setServer(DEFAULT_STREAM_PROVIDER_ID);
                         }}
                         className={`rounded-xl px-4 py-2 text-sm font-bold uppercase transition ${
                           type === a
@@ -742,7 +757,7 @@ function getRanges(total: number) {
 function EpisodeSidebar({
   episodesData, isLoading, maxEpisode, malId, currentEp, animePoster, playedEps, mobile = false,
 }: {
-  episodesData?: { episode_number: number; title?: string }[];
+  episodesData?: { episode_number: number; title?: string; thumbnail?: string }[];
   isLoading: boolean;
   maxEpisode: number;
   malId: string;
@@ -876,7 +891,7 @@ function EpisodeSidebar({
               const isPlayed = playedEps.includes(ep.episode_number);
               return (
                 <Link
-                  key={ep.episode_number}
+                  key={`${ep.episode_number}-${ep.thumbnail || ""}`}
                   href={watchPath(undefined, malId, ep.episode_number)}
                   ref={isActive ? currentRef : null}
                   onMouseEnter={() => prefetchEpisode(ep.episode_number)}
@@ -893,9 +908,13 @@ function EpisodeSidebar({
                 >
                   {/* Thumbnail */}
                   <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-xl bg-[#141828]">
-                    {animePoster ? (
-                      <Image src={animePoster} alt="" fill sizes="112px" className="object-cover" />
-                    ) : null}
+                    {ep.thumbnail ? (
+                      <Image src={imageCdnUrl(ep.thumbnail, "thumb")} alt="" fill sizes="112px" className="object-cover" />
+                    ) : (
+                      <div className="absolute inset-0 grid place-items-center bg-[#121318] text-[10px] font-black uppercase text-white/35">
+                        EP {ep.episode_number}
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/30" />
                     {/* Play overlay on hover */}
                     <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${

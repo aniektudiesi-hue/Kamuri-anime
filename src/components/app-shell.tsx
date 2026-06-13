@@ -2,10 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { Header } from "./header";
 import { MobileBottomNavGate } from "./mobile-bottom-nav-gate";
+import { BootLoader } from "./boot-loader";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <BootLoader />
       <Header />
       <main className="pb-20 sm:pb-0">{children}</main>
       <Footer />

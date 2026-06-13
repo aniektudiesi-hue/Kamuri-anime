@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
     unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "cdn.animetvplus.xyz" },
-      { protocol: "https", hostname: "anime-tv-stream-proxy.kamuri-anime.workers.dev" },
+      { protocol: "https", hostname: "anime-tv-stream-proxy.animetvplus-stream.workers.dev" },
       { protocol: "https", hostname: "myanimelist.net" },
       { protocol: "https", hostname: "cdn.myanimelist.net" },
       { protocol: "https", hostname: "s4.anilist.co" },
@@ -19,6 +19,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "media.kitsu.io" },
       { protocol: "https", hostname: "img.youtube.com" },
       { protocol: "https", hostname: "anime-search-api-burw.onrender.com" },
+      { protocol: "https", hostname: "www.crunchyroll.com" },
+      { protocol: "https", hostname: "imgsrv.crunchyroll.com" },
     ],
     formats: ["image/avif", "image/webp"],
     deviceSizes: [360, 414, 640, 768, 1024, 1280, 1536],

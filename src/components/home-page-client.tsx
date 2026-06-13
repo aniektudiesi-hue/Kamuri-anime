@@ -17,8 +17,9 @@ import { rememberSearchCatalog } from "@/lib/search-index";
 import type { AiringScheduleItem, Anime, HomeInitialData, LibraryItem } from "@/lib/types";
 import { HISTORY_UPDATED_EVENT, animeId, animePath, episodeCount, episodeLabel, posterOf, progressOf, rememberAnime, rememberedAnime, rememberedHistory, titleOf, watchPath } from "@/lib/utils";
 
-const HOME_CACHE_KEY = "animeTVplus-home-cache-v4";
+const HOME_CACHE_KEY = "animeTVplus-home-cache-v5";
 const HOME_CACHE_TTL = 1000 * 60 * 60;
+const warmedHomePosters = new Set<string>();
 
 export function HomePageClient({ initialData }: { initialData: HomeInitialData }) {
   const [homeData, setHomeData] = useState(initialData);
@@ -70,9 +71,24 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
       ...initialData.thumbnails,
       ...initialData.recent,
       ...initialData.topRated,
+      ...(initialData.famousNew ?? []),
+      ...(initialData.sports ?? []),
+      ...(initialData.selfImprovement ?? []),
       ...initialData.schedule.map((item) => item.anime),
     ]);
   }, [initialData]);
+
+  useEffect(() => {
+    warmHomePosters([
+      ...homeData.popular,
+      ...(homeData.famousNew ?? []),
+      ...homeData.thumbnails,
+      ...(homeData.sports ?? []),
+      ...(homeData.selfImprovement ?? []),
+      ...homeData.topRated,
+      ...homeData.recent,
+    ]);
+  }, [homeData]);
 
   // Spring spotlight: a CR-mapped title from the season, rotated daily (stable
   // between server + client render to avoid a hydration mismatch).
@@ -98,6 +114,15 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
           viewAllHref="/search?q=Popular"
         />
 
+        <BigSection
+          title="Famous New Releases"
+          icon={<Radio size={14} className="text-[#c8ced8]" />}
+          items={homeData.famousNew ?? []}
+          viewAllHref="/search?q=New%20Releases"
+        />
+
+        <SpotlightBanner malId="35507" label="Strategy Pick" fallbackTitle="Classroom of the Elite" />
+
         {/* April 2026 / Spring season */}
         <BigSection
           title="April 2026 Releases"
@@ -106,8 +131,22 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
           viewAllHref="/search?q=Spring%202026"
         />
 
+        <BigSection
+          title="Sports Anime"
+          icon={<Trophy size={14} className="text-[#d8b56a]" />}
+          items={homeData.sports ?? []}
+          viewAllHref="/genre/sports"
+        />
+
         {/* Spring 2026 spotlight */}
         {springSpotlightId ? <SpotlightBanner malId={springSpotlightId} label="Spring 2026" /> : null}
+
+        <BigSection
+          title="Self Improvement Anime"
+          icon={<Star size={14} className="text-[#c4182a]" />}
+          items={homeData.selfImprovement ?? []}
+          viewAllHref="/search?q=self%20improvement"
+        />
 
         {loadRest ? (
           <>
@@ -127,7 +166,7 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
               viewAllHref="/search?q=New%20Releases"
             />
 
-            <SpotlightBanner malId="57658" label="Now Streaming" fallbackTitle="Jujutsu Kaisen: The Culling Game" />
+            <SpotlightBanner malId="38000" label="Isekai Feature" fallbackTitle="That Time I Got Reincarnated as a Slime" />
 
             {/* Rom-Com & Harem */}
             <BigSection
@@ -137,8 +176,6 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
               viewAllHref="/genre/romance"
             />
 
-            <SpotlightBanner malId="35507" label="Editor's Pick" fallbackTitle="Classroom of the Elite" />
-
             {/* Isekai */}
             <BigSection
               title="Isekai Worlds"
@@ -146,6 +183,10 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
               items={homeData.isekai}
               viewAllHref="/genre/isekai"
             />
+
+            <SpotlightBanner malId="40748" label="Hero Feature" fallbackTitle="Jujutsu Kaisen" />
+
+            <SpotlightBanner malId="31964" label="Training Arc" fallbackTitle="My Hero Academia" />
 
             {/* Best Healing / Slice of Life */}
             <BigSection
@@ -177,13 +218,31 @@ function ResponsiveHero({ homeData }: { homeData: HomeInitialData }) {
     () => bannerItems.slice(0, 8).map((a) => String(a.mal_id || a.anime_id || a.id || "")).filter(Boolean),
     [bannerItems],
   );
+  const initialCrData = useMemo(() => {
+    const data: HeroCrData = {};
+    for (const anime of bannerItems.slice(0, 8)) {
+      const id = String(anime.mal_id || anime.anime_id || anime.id || "");
+      const detailBanner = anime.detail_banner || anime.cr_hero || anime.banner;
+      if (!id || !detailBanner) continue;
+      data[id] = {
+        detail_banner: detailBanner,
+        title_logo: anime.title_logo,
+        synopsis: anime.synopsis || anime.overview,
+      };
+    }
+    return data;
+  }, [bannerItems]);
+  const missingCrIds = useMemo(
+    () => malIds.filter((id) => !initialCrData[id]?.detail_banner || !initialCrData[id]?.title_logo),
+    [malIds, initialCrData],
+  );
 
   const crCards = useQuery({
-    queryKey: ["hero-cr-cards", malIds.join(",")],
+    queryKey: ["hero-cr-cards", missingCrIds.join(",")],
     queryFn: async () => {
       const results: HeroCrData = {};
       await Promise.allSettled(
-        malIds.map(async (mid) => {
+        missingCrIds.map(async (mid) => {
           const card = await fetchCrCard(mid);
           if (card?.detail_banner) {
             results[mid] = { detail_banner: card.detail_banner, title_logo: card.title_logo, synopsis: card.synopsis };
@@ -192,22 +251,19 @@ function ResponsiveHero({ homeData }: { homeData: HomeInitialData }) {
       );
       return results;
     },
-    enabled: malIds.length > 0,
+    enabled: missingCrIds.length > 0,
     staleTime: 1000 * 60 * 60,
   });
 
-  const crData = crCards.data;
+  const crData = useMemo(() => ({ ...initialCrData, ...(crCards.data || {}) }), [initialCrData, crCards.data]);
   // The desktop hero is reserved for titles that have real Crunchyroll keyart
-  // (wide detail banner + title logo). Filter the banners down to those; while
-  // the CR lookup is still resolving we show the skeleton, and if none come back
-  // (e.g. the backend is down) we fall back to the raw banners so it never
-  // renders empty.
+  // (wide detail banner). Filter the banners down to those, and fall back to
+  // raw banners so the hero never waits on late CR detail calls.
   const crBanners = useMemo(() => {
-    if (!crData) return [] as Anime[];
     return homeData.banners.filter((a) => crData[String(a.mal_id || a.anime_id || a.id || "")]?.detail_banner);
   }, [homeData.banners, crData]);
-  const heroItems = crData ? (crBanners.length ? crBanners : homeData.banners) : [];
-  const heroLoading = !homeData.banners.length || (malIds.length > 0 && crCards.isLoading);
+  const heroItems = crBanners.length ? crBanners : (homeData.banners.length ? homeData.banners : bannerItems);
+  const heroLoading = !heroItems.length;
 
   return (
     <>
@@ -255,6 +311,23 @@ function useIdleMount() {
   }, [ready]);
 
   return ready;
+}
+
+function warmHomePosters(items: Anime[]) {
+  if (typeof window === "undefined" || !items.length) return;
+  const warm = () => {
+    for (const [index, anime] of items.slice(0, 72).entries()) {
+      const poster = posterOf(anime, index < 8 ? "poster-md" : "poster-sm");
+      if (!poster || warmedHomePosters.has(poster)) continue;
+      warmedHomePosters.add(poster);
+      const image = new window.Image();
+      image.decoding = "async";
+      (image as HTMLImageElement & { fetchPriority?: string }).fetchPriority = index < 8 ? "high" : "low";
+      image.src = poster;
+    }
+  };
+  if ("requestIdleCallback" in window) window.requestIdleCallback(warm, { timeout: 1000 });
+  else globalThis.setTimeout(warm, 400);
 }
 
 function DeferredSectionsSkeleton() {
@@ -390,7 +463,7 @@ function ContinueCard({ item }: { item: LibraryItem }) {
       className="group grid w-[245px] shrink-0 grid-cols-[72px_1fr] gap-3 rounded-2xl border border-white/[0.06] bg-[#111421]/76 p-2 transition hover:border-[#c4182a]/30 hover:bg-[#171b2a] sm:w-[280px]"
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
-        {poster ? <Image src={poster} alt={title} fill sizes="72px" className="object-cover" loading="lazy" /> : <PosterFallback title={title} />}
+        {poster ? <Image src={poster} alt={title} fill sizes="72px" className="object-cover" loading="lazy" unoptimized /> : <PosterFallback title={title} />}
       </div>
       <div className="min-w-0 py-1">
         <p className="line-clamp-2 text-sm font-black leading-5 text-white/88 group-hover:text-white">{title}</p>
@@ -478,7 +551,7 @@ function BigSection({
 
 function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }) {
   const id = animeId(anime);
-  const poster = posterOf(anime, "poster-md");
+  const poster = posterOf(anime, priority ? "poster-md" : "poster-sm");
   const title = titleOf(anime);
   const count = episodeCount(anime);
   const statusKey = (anime.status || "").toLowerCase();
@@ -494,6 +567,9 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
               fill
               sizes="(max-width:640px) 45vw, (max-width:1024px) 28vw, 222px"
               priority={priority}
+              unoptimized
+              fetchPriority={priority ? "high" : "auto"}
+              decoding="async"
               loading={priority ? undefined : "lazy"}
               className="object-cover transition duration-500 group-hover:scale-105"
             />
@@ -576,7 +652,7 @@ function ScheduleCard({ item }: { item: AiringScheduleItem }) {
     >
       <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-xl bg-[#141828]">
         {poster ? (
-          <Image src={poster} alt={title} fill sizes="72px" className="object-cover" loading="lazy" />
+          <Image src={poster} alt={title} fill sizes="72px" className="object-cover" loading="lazy" unoptimized />
         ) : (
           <PosterFallback title={title} />
         )}

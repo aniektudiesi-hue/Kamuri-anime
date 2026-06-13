@@ -4,14 +4,37 @@ const DESKTOP_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 const STREAM_API_PREFIXES = ["/api/stream/", "/api/moon/", "/api/hd1/"];
+const CATALOG_API_PREFIXES = [
+  "/api/catalog",
+  "/api/search",
+  "/api/streams/",
+  "/api/stream/",
+  "/api/episodes/",
+  "/api/cr/",
+  "/api/image-transform",
+  "/api/anime/",
+  "/api/image-db/",
+  "/api/images/",
+];
+const CATALOG_API_PATHS = ["/", "/api/status"];
 const PUBLIC_API_PREFIXES = [
   ...STREAM_API_PREFIXES,
+  ...CATALOG_API_PREFIXES,
   "/home/",
   "/anime/episode/",
   "/search/",
   "/suggest/",
 ];
-const PUBLIC_API_PATHS = ["/api/v1/banners"];
+const PUBLIC_API_PATHS = ["/api/v1/banners", ...CATALOG_API_PATHS];
+const REGIONAL_CATALOG_ORIGINS = {
+  india: "https://animetvplus-stream-backup-india.onrender.com",
+  usWest: "https://animetvplus-catalog-api-us-west.onrender.com",
+  usEast: "https://animetvplus-catalog-api-usa-east.onrender.com",
+  europe: "https://animetvplus-catalog-api-europe.onrender.com",
+};
+const CATALOG_FAILOVER_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
+const CATALOG_CR_ENRICH_PREFIXES = ["/api/search", "/api/anime/", "/api/catalog"];
+const CATALOG_CACHE_VERSION = "catalog-v4";
 const MOON_CACHE_TTL = 3600;
 const MANIFEST_CACHE_TTL = 600;
 const MANIFEST_STALE_TTL = 1800;
@@ -80,6 +103,7 @@ const worker = {
         return json({ error: "Forbidden" }, 403, { "cache-control": "no-store" });
       }
       if (url.pathname === "/health") return json({ ok: true, worker: "anime-tv-stream-proxy" });
+      if (url.pathname === "/api/edge-session") return edgeSession(request, env);
       if (url.pathname === "/image") return await proxyImage(request, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/warm")) return await warmMoon(request, env, ctx);
       if (url.pathname.startsWith("/proxy/moon/") && url.pathname.endsWith("/m3u8")) return await proxyMoonM3u8(request, env, ctx);
@@ -98,57 +122,265 @@ export default worker;
 
 async function proxyOrigin(request, env, ctx) {
   const incoming = new URL(request.url);
-  const origin = new URL(env.ORIGIN_BASE);
-  const target = new URL(incoming.pathname + incoming.search, origin);
-  const headers = copyRequestHeaders(request.headers);
-
-  headers.set("host", origin.host);
-  headers.set("x-forwarded-host", incoming.host);
-  headers.set("x-forwarded-proto", incoming.protocol.replace(":", ""));
-  headers.set("x-forwarded-for", request.headers.get("cf-connecting-ip") || "");
-
-  const streamApi = STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix));
+  const catalogApi = isCatalogApiPath(incoming.pathname);
+  const streamApi = STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)) && !catalogApi;
   const canCache =
     request.method === "GET" &&
     (PUBLIC_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)) || PUBLIC_API_PATHS.includes(incoming.pathname));
   const apiCacheControl = originApiCacheControl(incoming.pathname);
   const cache = caches.default;
-  const cacheKey = new Request(target.toString(), { headers: cacheVaryHeaders(request) });
+  const primaryOrigin = catalogApi ? selectCatalogOrigin(request, env) : env.ORIGIN_BASE;
+  const primaryTarget = new URL(incoming.pathname + incoming.search, primaryOrigin);
+  const cacheKeyUrl = catalogCacheKeyUrl(incoming);
+  const cacheKey = new Request(catalogApi ? cacheKeyUrl : primaryTarget.toString(), { headers: cacheVaryHeaders(request) });
   if (canCache) {
-    const hot = streamApiMemoryGet(target.toString());
+    const hot = streamApi ? streamApiMemoryGet(primaryTarget.toString()) : null;
     if (hot) {
-      const payload = streamApi ? rewriteStreamPayload(hot, incoming.origin) : hot;
+      const payload = rewriteStreamPayload(hot, incoming.origin);
       return json(payload, 200, cacheHeaders(apiCacheControl));
     }
 
     const cached = await cache.match(cacheKey);
     if (cached) return withCors(cached, streamApi);
+    if (catalogApi && incoming.searchParams.get("__cf_cache_only") === "1") {
+      return new Response(null, { status: 204, headers: cacheHeaders("no-store") });
+    }
   }
 
-  const response = await fetch(target, {
-    method: request.method,
-    headers,
-    body: bodyFor(request),
-    redirect: "follow",
-    cf: canCache ? { cacheEverything: true, cacheTtl: originApiTtl(incoming.pathname) } : undefined,
-  });
+  const upstream = await fetchOriginWithFailover(request, incoming, env, catalogApi, canCache);
+  const response = upstream.response;
 
   if (canCache && isJson(response)) {
     const payload = await response.json();
-    const body = streamApi ? rewriteStreamPayload(payload, incoming.origin) : payload;
+    const enriched = catalogApi ? await enrichCatalogPayload(payload, incoming, upstream.origin, env) : payload;
+    const body = streamApi ? rewriteStreamPayload(enriched, incoming.origin) : enriched;
     const rewritten = json(
       body,
       response.status,
-      cacheHeaders(apiCacheControl),
+      originHeaders(apiCacheControl, upstream.origin, upstream.attempts),
     );
     if (canCache && response.ok) {
-      streamApiMemorySet(target.toString(), payload);
+      if (streamApi) streamApiMemorySet(primaryTarget.toString(), payload);
       ctx.waitUntil(cache.put(cacheKey, rewritten.clone()));
     }
     return rewritten;
   }
 
-  return withCors(response, streamApi);
+  return withCatalogDebugHeaders(withCors(response, streamApi), upstream.origin, upstream.attempts);
+}
+
+function catalogCacheKeyUrl(incoming) {
+  const key = new URL(`${incoming.origin}/${CATALOG_CACHE_VERSION}${incoming.pathname}`);
+  for (const [name, value] of incoming.searchParams.entries()) {
+    if (name === "__cf_cache_only" || name === "__cf_warm") continue;
+    key.searchParams.append(name, value);
+  }
+  return key.toString();
+}
+
+function isCatalogApiPath(pathname) {
+  return CATALOG_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || CATALOG_API_PATHS.includes(pathname);
+}
+
+async function fetchOriginWithFailover(request, incoming, env, catalogApi, canCache) {
+  const origins = catalogApi ? catalogOriginPool(request, env) : [env.ORIGIN_BASE];
+  const attempts = [];
+  let lastResponse = null;
+  let lastOrigin = origins[0] || env.ORIGIN_BASE;
+
+  for (const originValue of origins) {
+    const origin = new URL(originValue);
+    const target = new URL(incoming.pathname + incoming.search, origin);
+    const headers = copyRequestHeaders(request.headers);
+    headers.set("host", origin.host);
+    headers.set("x-forwarded-host", incoming.host);
+    headers.set("x-forwarded-proto", incoming.protocol.replace(":", ""));
+    headers.set("x-forwarded-for", request.headers.get("cf-connecting-ip") || "");
+    lastOrigin = origin.toString().replace(/\/$/, "");
+    try {
+      const response = await fetch(target, {
+        method: request.method,
+        headers,
+        body: bodyFor(request),
+        redirect: "follow",
+        cf: canCache ? { cacheEverything: true, cacheTtl: originApiTtl(incoming.pathname) } : undefined,
+      });
+      attempts.push(`${origin.host}:${response.status}`);
+      lastResponse = response;
+      if (catalogApi && request.method === "GET" && response.ok && await isStaleCatalogJson(response, incoming.pathname)) {
+        attempts[attempts.length - 1] = `${origin.host}:${response.status}:STALE`;
+        continue;
+      }
+      if (!catalogApi || !CATALOG_FAILOVER_STATUSES.has(response.status) || request.method !== "GET") {
+        return { response, origin: lastOrigin, attempts };
+      }
+    } catch (error) {
+      attempts.push(`${origin.host}:ERR`);
+      if (!catalogApi || request.method !== "GET") throw error;
+    }
+  }
+
+  if (lastResponse) return { response: lastResponse, origin: lastOrigin, attempts };
+  return { response: json({ error: "All catalog origins failed", attempts }, 502, cacheHeaders("no-store")), origin: lastOrigin, attempts };
+}
+
+function catalogOriginPool(request, env) {
+  const primary = selectCatalogOrigin(request, env);
+  const ordered = [
+    primary,
+    env.CATALOG_ORIGIN_US_EAST || REGIONAL_CATALOG_ORIGINS.usEast,
+    env.CATALOG_ORIGIN_US_WEST || REGIONAL_CATALOG_ORIGINS.usWest,
+    env.CATALOG_ORIGIN_EUROPE || REGIONAL_CATALOG_ORIGINS.europe,
+    env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india,
+  ];
+  return [...new Set(ordered.filter(Boolean).map((value) => value.replace(/\/$/, "")))];
+}
+
+function selectCatalogOrigin(request, env) {
+  const sticky = stickyCatalogRegion(request);
+  if (sticky) return originForRegion(sticky, env);
+
+  const cf = request.cf || {};
+  const country = String(cf.country || "").toUpperCase();
+  const continent = String(cf.continent || "").toUpperCase();
+  const longitude = Number(cf.longitude || 0);
+
+  if (continent === "EU" || continent === "AF") return env.CATALOG_ORIGIN_EUROPE || REGIONAL_CATALOG_ORIGINS.europe;
+  if (continent === "AS" || continent === "OC") return env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india;
+  if (country === "US" || country === "CA" || country === "MX") {
+    return longitude && longitude < -100
+      ? env.CATALOG_ORIGIN_US_WEST || REGIONAL_CATALOG_ORIGINS.usWest
+      : env.CATALOG_ORIGIN_US_EAST || REGIONAL_CATALOG_ORIGINS.usEast;
+  }
+  if (continent === "NA" || continent === "SA") return env.CATALOG_ORIGIN_US_EAST || REGIONAL_CATALOG_ORIGINS.usEast;
+  return env.CATALOG_ORIGIN_US_EAST || REGIONAL_CATALOG_ORIGINS.usEast;
+}
+
+function edgeSession(request, env) {
+  const cf = request.cf || {};
+  const region = stickyCatalogRegion(request) || regionForRequest(request);
+  return json(
+    {
+      region,
+      country: String(cf.country || ""),
+      colo: String(cf.colo || ""),
+      continent: String(cf.continent || ""),
+      origin: originForRegion(region, env),
+    },
+    200,
+    {
+      ...cacheHeaders("private, max-age=21600"),
+      "set-cookie": `atv_catalog_region=${encodeURIComponent(region)}; Path=/; Max-Age=21600; SameSite=None; Secure`,
+    },
+  );
+}
+
+function stickyCatalogRegion(request) {
+  const url = new URL(request.url);
+  const explicit = normalizeRegion(url.searchParams.get("region") || request.headers.get("x-atv-catalog-region"));
+  if (explicit) return explicit;
+  const cookie = request.headers.get("cookie") || "";
+  const match = cookie.match(/(?:^|;\s*)atv_catalog_region=([^;]+)/);
+  return normalizeRegion(match ? decodeURIComponent(match[1]) : "");
+}
+
+function regionForRequest(request) {
+  const cf = request.cf || {};
+  const country = String(cf.country || "").toUpperCase();
+  const continent = String(cf.continent || "").toUpperCase();
+  const longitude = Number(cf.longitude || 0);
+  if (continent === "EU" || continent === "AF") return "europe";
+  if (continent === "AS" || continent === "OC") return "india";
+  if (country === "US" || country === "CA" || country === "MX") return longitude && longitude < -100 ? "usWest" : "usEast";
+  if (continent === "NA" || continent === "SA") return "usEast";
+  return "usEast";
+}
+
+function originForRegion(region, env) {
+  if (region === "india") return env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india;
+  if (region === "usWest") return env.CATALOG_ORIGIN_US_WEST || REGIONAL_CATALOG_ORIGINS.usWest;
+  if (region === "europe") return env.CATALOG_ORIGIN_EUROPE || REGIONAL_CATALOG_ORIGINS.europe;
+  return env.CATALOG_ORIGIN_US_EAST || REGIONAL_CATALOG_ORIGINS.usEast;
+}
+
+function normalizeRegion(value) {
+  const raw = String(value || "").trim().toLowerCase().replace(/[-_\s]+(.)/g, (_m, char) => char.toUpperCase());
+  if (raw === "india" || raw === "usWest" || raw === "usEast" || raw === "europe") return raw;
+  if (raw === "uswest") return "usWest";
+  if (raw === "useast") return "usEast";
+  return "";
+}
+
+async function enrichCatalogPayload(payload, incoming, origin, env) {
+  if (!shouldEnrichCatalogPayload(incoming.pathname) || !payload || typeof payload !== "object") return payload;
+  const items = Array.isArray(payload.items) ? payload.items : null;
+  if (!items?.length) return payload;
+
+  const ids = [...new Set(items
+    .map((item) => String(item?.mal_id || item?.anime_id || item?.id || ""))
+    .filter(Boolean))]
+    .slice(0, 80);
+  if (!ids.length) return payload;
+
+  const posters = await fetchCrPosterMap(origin, ids, env).catch(() => null);
+  if (!posters) return payload;
+
+  return {
+    ...payload,
+    items: items.map((item) => {
+      const id = String(item?.mal_id || item?.anime_id || item?.id || "");
+      const cr = posters[id];
+      if (!cr) return item;
+      return {
+        ...item,
+        cr_poster: cr.poster || item.cr_poster,
+        cr_hero: cr.hero || item.cr_hero,
+        cover_image: cr.poster || item.cover_image,
+        banner_image: cr.hero || item.banner_image,
+        thumbnail_1080_url: cr.poster || item.thumbnail_1080_url,
+        thumbnail_4k_url: cr.hero || item.thumbnail_4k_url,
+        cr_mapped: Boolean(cr.has_cr || cr.poster || cr.hero || item.cr_mapped),
+      };
+    }),
+  };
+}
+
+function shouldEnrichCatalogPayload(pathname) {
+  return CATALOG_CR_ENRICH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+async function isStaleCatalogJson(response, pathname) {
+  if (!isJson(response)) return false;
+  try {
+    const payload = await response.clone().json();
+    if (pathname.startsWith("/api/search")) {
+      return !Object.prototype.hasOwnProperty.call(payload, "has_more")
+        || !Object.prototype.hasOwnProperty.call(payload, "count")
+        || !Object.prototype.hasOwnProperty.call(payload, "page")
+        || !payload.facets;
+    }
+    if (pathname.startsWith("/api/cr/card/")) {
+      const hasCr = Number(payload?.has_cr || 0) === 1;
+      const seasonCount = Number(payload?.season_count || payload?.seasons?.length || 0);
+      const totalEpisodes = Number(payload?.total_episodes || 0);
+      return hasCr && seasonCount <= 1 && totalEpisodes >= 50;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchCrPosterMap(origin, ids, env) {
+  const base = origin || env.CATALOG_ORIGIN_US_EAST || REGIONAL_CATALOG_ORIGINS.usEast;
+  const url = new URL(`/api/cr/posters?ids=${encodeURIComponent(ids.join(","))}`, base);
+  const response = await fetch(url.toString(), {
+    headers: { Accept: "application/json" },
+    cf: { cacheEverything: true, cacheTtl: 1800 },
+  });
+  if (!response.ok || !isJson(response)) return null;
+  const payload = await response.json();
+  return payload?.posters && typeof payload.posters === "object" ? payload.posters : null;
 }
 
 async function proxyImage(request, ctx) {
@@ -1306,6 +1538,8 @@ function isAllowedImageHost(hostname) {
     "media.kitsu.io",
     "img.youtube.com",
     "anime-search-api-burw.onrender.com",
+    "crunchyroll.com",
+    "imgsrv.crunchyroll.com",
   ].some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
 }
 
@@ -1403,6 +1637,21 @@ function cacheHeaders(cacheControl) {
   return { ...corsHeaders(), "cache-control": cacheControl, "vary": "Accept-Encoding" };
 }
 
+function originHeaders(cacheControl, origin, attempts) {
+  return {
+    ...cacheHeaders(cacheControl),
+    "x-catalog-origin": origin || "",
+    "x-catalog-origin-attempts": attempts.join(","),
+  };
+}
+
+function withCatalogDebugHeaders(response, origin, attempts) {
+  const headers = new Headers(response.headers);
+  if (origin) headers.set("x-catalog-origin", origin);
+  if (attempts?.length) headers.set("x-catalog-origin-attempts", attempts.join(","));
+  return new Response(response.body, { status: response.status, headers });
+}
+
 function corsPreflight() {
   return new Response(null, { status: 204, headers: { ...corsHeaders(), "cache-control": "public, max-age=86400" } });
 }
@@ -1419,6 +1668,12 @@ function streamCacheRequest(kind, src, range = "") {
 }
 
 function originApiTtl(pathname) {
+  if (pathname === "/api/status") return 10;
+  if (pathname.startsWith("/api/search")) return 300;
+  if (pathname.startsWith("/api/cr/")) return 1800;
+  if (pathname.startsWith("/api/episodes/") || pathname.startsWith("/api/streams/") || pathname.startsWith("/api/stream/")) return 300;
+  if (pathname.startsWith("/api/anime/") || pathname.startsWith("/api/catalog")) return 900;
+  if (pathname.startsWith("/api/image-transform") || pathname.startsWith("/api/image-db/") || pathname.startsWith("/api/images/")) return IMAGE_CACHE_TTL;
   if (pathname.startsWith("/anime/episode/")) return 3600;
   if (pathname.startsWith("/home/") || pathname === "/api/v1/banners") return 600;
   if (pathname.startsWith("/search/") || pathname.startsWith("/suggest/")) return 300;
@@ -1426,6 +1681,12 @@ function originApiTtl(pathname) {
 }
 
 function originApiCacheControl(pathname) {
+  if (pathname === "/api/status") return "public, s-maxage=10, stale-while-revalidate=60";
+  if (pathname.startsWith("/api/search")) return "public, s-maxage=300, stale-while-revalidate=1800";
+  if (pathname.startsWith("/api/cr/")) return "public, s-maxage=1800, stale-while-revalidate=86400";
+  if (pathname.startsWith("/api/episodes/") || pathname.startsWith("/api/streams/") || pathname.startsWith("/api/stream/")) return "public, s-maxage=300, stale-while-revalidate=1800";
+  if (pathname.startsWith("/api/anime/") || pathname.startsWith("/api/catalog")) return "public, s-maxage=900, stale-while-revalidate=3600";
+  if (pathname.startsWith("/api/image-transform") || pathname.startsWith("/api/image-db/") || pathname.startsWith("/api/images/")) return `public, s-maxage=${IMAGE_CACHE_TTL}, stale-while-revalidate=${IMAGE_CACHE_TTL}`;
   if (pathname.startsWith("/anime/episode/")) return "public, s-maxage=3600, stale-while-revalidate=86400";
   if (pathname.startsWith("/home/") || pathname === "/api/v1/banners") return "public, s-maxage=600, stale-while-revalidate=3600";
   if (pathname.startsWith("/search/") || pathname.startsWith("/suggest/")) return "public, s-maxage=300, stale-while-revalidate=900";

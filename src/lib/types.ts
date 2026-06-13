@@ -15,6 +15,11 @@ export type Anime = {
   image_url?: string;
   img_url?: string;
   banner?: string;
+  cr_poster?: string;
+  cr_hero?: string;
+  detail_banner?: string;
+  title_logo?: string;
+  synopsis?: string;
   cover?: string;
   overview?: string;
   genres?: string[];
@@ -111,8 +116,11 @@ export type HomeInitialData = {
   recent: Anime[];          // New Episodes
   topRated: Anime[];        // Top Picks
   popular: Anime[];         // Most Popular
+  famousNew: Anime[];       // Familiar high-demand recent/famous titles
   romance: Anime[];         // Rom-com / harem
   isekai: Anime[];          // Isekai
+  sports: Anime[];          // Sports
+  selfImprovement: Anime[]; // Growth / self-improvement picks
   healing: Anime[];         // Healing / slice-of-life
   schedule: AiringScheduleItem[];
   generatedAt: string;

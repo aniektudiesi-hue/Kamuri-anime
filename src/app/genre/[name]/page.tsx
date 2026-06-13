@@ -6,10 +6,11 @@ import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AnimeCard } from "@/components/anime-card";
 import { SidebarLayout } from "@/components/sidebar";
-import { catalogClientGet, mapCatalogList } from "@/lib/catalog-api";
+import { mapCatalogList } from "@/lib/catalog-api";
 import { genreDescription } from "@/lib/seo";
 import type { Anime } from "@/lib/types";
 import { animeId } from "@/lib/utils";
+import { catalogRegionHeaders } from "@/lib/edge-region";
 
 type CatalogPage = Parameters<typeof mapCatalogList>[0] & {
   has_more?: boolean;
@@ -17,6 +18,22 @@ type CatalogPage = Parameters<typeof mapCatalogList>[0] & {
 };
 
 const GENRE_QUERY_VERSION = "v3";
+
+async function fetchGenrePage(genre: string, page: number): Promise<CatalogPage> {
+  const params = new URLSearchParams({ genre, limit: "60", page: String(page) });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 4500);
+  try {
+    const response = await fetch(`/api/search-proxy/api/search?${params.toString()}`, {
+      headers: { Accept: "application/json", ...catalogRegionHeaders() },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(await response.text().catch(() => `${response.status}`));
+    return (await response.json()) as CatalogPage;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 export default function GenrePage({ params }: { params: Promise<{ name: string }> }) {
   const { name: rawName } = use(params);
@@ -33,7 +50,7 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
 
   const query = useQuery({
     queryKey: ["catalog-genre", GENRE_QUERY_VERSION, genre, page],
-    queryFn: () => catalogClientGet<CatalogPage>(`/api/anime/genre/${encodeURIComponent(genre)}?limit=60&page=${page}`),
+    queryFn: () => fetchGenrePage(genre, page),
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
     retry: 1,
@@ -61,13 +78,14 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
 
   useEffect(() => {
     if (!hasMore || query.isFetching) return;
-    const nextPage = page + 1;
-    queryClient.prefetchQuery({
-      queryKey: ["catalog-genre", GENRE_QUERY_VERSION, genre, nextPage],
-      queryFn: () => catalogClientGet<CatalogPage>(`/api/anime/genre/${encodeURIComponent(genre)}?limit=60&page=${nextPage}`),
-      staleTime: 1000 * 60 * 30,
-      gcTime: 1000 * 60 * 90,
-    });
+    for (const nextPage of [page + 1, page + 2]) {
+      queryClient.prefetchQuery({
+        queryKey: ["catalog-genre", GENRE_QUERY_VERSION, genre, nextPage],
+        queryFn: () => fetchGenrePage(genre, nextPage),
+        staleTime: 1000 * 60 * 30,
+        gcTime: 1000 * 60 * 90,
+      });
+    }
   }, [genre, hasMore, page, query.isFetching, queryClient]);
 
   useEffect(() => {
@@ -77,7 +95,7 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
       ([entry]) => {
         if (entry.isIntersecting) loadMoreResults();
       },
-      { rootMargin: "700px 0px 900px 0px", threshold: 0.01 },
+      { rootMargin: "1800px 0px 2200px 0px", threshold: 0.01 },
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -90,13 +108,13 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
       const sentinel = loadMoreRef.current;
       if (sentinel) {
         const rect = sentinel.getBoundingClientRect();
-        if (rect.top < window.innerHeight + 1400) {
+        if (rect.top < window.innerHeight + 2200) {
           loadMoreResults();
           return;
         }
       }
       const distance = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
-      if (distance < 1400) loadMoreResults();
+      if (distance < 2200) loadMoreResults();
     };
     const id = window.setTimeout(maybeLoadMore, 120);
     window.addEventListener("scroll", maybeLoadMore, { passive: true });
@@ -161,7 +179,7 @@ export default function GenrePage({ params }: { params: Promise<{ name: string }
             <>
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5">
                 {allAnime.map((anime, i) => (
-                  <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 8} />
+                  <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} className="w-full" priority={i < 8} fastImage />
                 ))}
               </div>
 

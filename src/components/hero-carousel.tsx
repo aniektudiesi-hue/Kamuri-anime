@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Bookmark, ChevronLeft, ChevronRight, Play, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { imageCdnUrl } from "@/lib/image-cdn";
 import type { Anime } from "@/lib/types";
 import { animeId, animePath, bannerOf, episodeCount, posterOf, titleOf, watchPath } from "@/lib/utils";
 
@@ -71,8 +72,8 @@ export function HeroCarousel({ items = [], loading, crData = {} }: { items?: Ani
   const id = animeId(current);
   const malId = String(current.mal_id || current.anime_id || current.id || "");
   const cr = crData[malId];
-  const heroSrc = cr?.detail_banner || bannerOf(current, "banner-lg");
-  const titleLogo = cr?.title_logo || "";
+  const heroSrc = imageCdnUrl(cr?.detail_banner || bannerOf(current, "banner-lg"), "banner-lg");
+  const titleLogo = imageCdnUrl(cr?.title_logo || "", "thumb");
   const synopsis = cr?.synopsis || current.overview || "";
   const genres = current.genres?.slice(0, 4) ?? [];
   const score = current.score ? Number(current.score).toFixed(1) : "";
@@ -92,6 +93,7 @@ export function HeroCarousel({ items = [], loading, crData = {} }: { items?: Ani
             alt=""
             fill
             loading="eager"
+            unoptimized
             fetchPriority={index === 0 ? "high" : "auto"}
             sizes="(max-width: 639px) 1px, 100vw"
             className="object-cover motion-safe:will-change-transform"
@@ -288,6 +290,7 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
             alt=""
             fill
             priority={index === 0}
+            unoptimized
             fetchPriority={index === 0 ? "high" : "auto"}
             loading={index === 0 ? undefined : "lazy"}
             sizes="100vw"
@@ -306,8 +309,8 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
             src={titleLogo}
             alt={`${title} logo`}
             loading="eager"
-            className="mb-3 max-h-[120px] w-auto max-w-[62vw] object-contain object-left drop-shadow-[0_3px_18px_rgba(0,0,0,0.7)]"
-            style={{ width: "min(62vw, 260px)" }}
+            className="mb-3 max-h-[78px] w-auto max-w-[52vw] object-contain object-left drop-shadow-[0_3px_18px_rgba(0,0,0,0.7)]"
+            style={{ width: "min(52vw, 200px)" }}
           />
         ) : (
           <h1 className="mb-3 line-clamp-2 text-[26px] font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
@@ -326,15 +329,15 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
         <div className="flex items-center gap-2.5">
           <Link
             href={watchPath(current, id, 1)}
-            className="inline-flex h-[52px] flex-1 items-center justify-center gap-2 rounded-[2px] bg-[#c4182a] text-[14px] font-extrabold uppercase tracking-[0.02em] text-white"
+            className="inline-flex h-[44px] flex-1 items-center justify-center gap-2 rounded-[2px] bg-[#c4182a] text-[13px] font-extrabold uppercase tracking-[0.02em] text-white"
           >
-            <Play size={16} fill="currentColor" />
+            <Play size={15} fill="currentColor" />
             Start Watching
           </Link>
           <Link
             href={animePath(current, id)}
             aria-label={`View details for ${title}`}
-            className="grid h-[52px] w-[52px] place-items-center rounded-[2px] border border-white/[0.22] bg-white/[0.04] text-white/75"
+            className="grid h-[44px] w-[44px] place-items-center rounded-[2px] border border-white/[0.22] bg-white/[0.04] text-white/75"
           >
             <Bookmark size={18} />
           </Link>
@@ -359,4 +362,3 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
     </section>
   );
 }
-

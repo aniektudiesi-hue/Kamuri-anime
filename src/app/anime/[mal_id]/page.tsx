@@ -7,12 +7,13 @@ import { Bookmark, CheckCircle2, ChevronDown, Loader2, MoreVertical, Play, Share
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
+import { BufferingScreen } from "@/components/buffering-screen";
 import { SidebarLayout } from "@/components/sidebar";
 import { ProgressiveImage } from "@/components/progressive-image";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
 import { fetchCrCard, type CrSeason } from "@/lib/catalog-api";
-import { imageCdnUrl } from "@/lib/image-cdn";
+import { directImageUrl, imageCdnUrl } from "@/lib/image-cdn";
 import { useAuth } from "@/lib/auth";
 import {
   STREAM_PROVIDERS,
@@ -20,7 +21,7 @@ import {
   streamProviderQueryKey,
   warmStreamProvider,
 } from "@/lib/stream-providers";
-import type { Anime, Episode } from "@/lib/types";
+import type { Anime, Episode, EpisodeResponse } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
 import {
   displayStatus, episodeCount, posterOf,
@@ -59,6 +60,8 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const [seasonOpen, setSeasonOpen] = useState(false);
   const [episodeLimit, setEpisodeLimit] = useState(24);
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
+  const [heroImageReady, setHeroImageReady] = useState(false);
+  const [bufferEscape, setBufferEscape] = useState(false);
 
   useEffect(() => {
     setClickedAnime(rememberedAnime(malId));
@@ -91,7 +94,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     if (displayAnime && titleOf(displayAnime) !== "Untitled") rememberAnime(displayAnime);
   }, [displayAnime]);
 
-  const episodes = useQuery({
+  const episodes = useQuery<EpisodeResponse>({
     queryKey: ["episodes", "cr-v2", malId, hint],
     queryFn: () => api.episodes(malId, hint),
     initialData: hint > 0 ? makeEpisodeHint(malId, hint) : undefined,
@@ -162,22 +165,22 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   // a revisit paints the CR hero instantly instead of re-fetching (which forced
   // the AniList backdrop to flash before the CR keyart swapped in).
   const crCard = useQuery({
-    queryKey: ["cr-card", "canonical-v3", malId],
-    queryFn: () => fetchCrCard(malId),
+    queryKey: ["cr-card", "canonical-v8", malId, 1],
+    queryFn: () => fetchCrCard(malId, 1),
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
   });
   // Until the CR lookup settles we don't know whether this title has Crunchyroll
   // keyart, so hold the hero visuals rather than painting the AniList fallback
   // first (the "AniList layout flashes then changes to CR" bug).
-  const crPending = crCard.isLoading;
+  const crPending = crCard.isLoading && !crCard.data;
 
   useEffect(() => {
     const canonical = crCard.data?.canonical_mal_id;
-    if (canonical && canonical !== malId) {
+    if (canonical && canonical !== malId && shouldFollowCanonicalRedirect(displayAnime, crCard.data)) {
       router.replace(`/anime/${canonical}`);
     }
-  }, [crCard.data?.canonical_mal_id, malId, router]);
+  }, [crCard.data, displayAnime, malId, router]);
 
   const crSeasons = useMemo<CrSeason[]>(() => {
     const seasons = crCard.data?.seasons ?? [];
@@ -185,6 +188,30 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   }, [crCard.data]);
   const useSeasons = crSeasons.length > 0;
   const activeSeasonIndex = useSeasons ? Math.min(activeRange, crSeasons.length - 1) : activeRange;
+  const activeSeasonNumber = useSeasons ? (crSeasons[activeSeasonIndex]?.season_number ?? activeSeasonIndex + 1) : 1;
+  const activeCrCard = useQuery({
+    queryKey: ["cr-card", "canonical-v8", malId, activeSeasonNumber],
+    queryFn: () => fetchCrCard(malId, activeSeasonNumber),
+    enabled: useSeasons,
+    initialData: activeSeasonNumber === 1 ? crCard.data : undefined,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
+  });
+  const selectedCrSeason = useMemo(() => {
+    const activeSummary = crSeasons[activeSeasonIndex];
+    const activeSummaryKey = crSeasonKey(activeSummary);
+    const matchesActiveSeason = (season?: CrSeason) => {
+      if (!season) return false;
+      if (Number(season.season_number || 0) === Number(activeSeasonNumber)) return true;
+      return Boolean(activeSummaryKey && crSeasonKey(season) === activeSummaryKey);
+    };
+    const selected = activeCrCard.data?.selected_season;
+    if (matchesActiveSeason(selected)) return selected;
+    if (selected?.episodes?.length) return selected;
+    const initialSelected = crCard.data?.selected_season;
+    if (activeSeasonNumber === 1 && matchesActiveSeason(initialSelected)) return initialSelected;
+    return undefined;
+  }, [activeCrCard.data?.selected_season, activeSeasonIndex, activeSeasonNumber, crCard.data?.selected_season, crSeasons]);
   const crEpisodeTotal = useMemo(
     () => crSeasons.reduce((sum, season) => sum + (season.episodes?.length ?? season.episode_count ?? 0), 0),
     [crSeasons],
@@ -192,14 +219,59 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const visibleEpisodeTotal = useSeasons ? crEpisodeTotal : episodeTotal;
 
   // Prefer the CR detail-page keyart (wide backdrop) > CR hero > AniList backdrop.
-  const heroImage = crCard.data?.detail_banner || crCard.data?.hero_banner || backdrop;
+  const instantHero = displayAnime.detail_banner || displayAnime.cr_hero || backdrop;
+  const heroImage = crCard.data?.detail_banner || crCard.data?.hero_banner || instantHero;
   const titleLogo = crCard.data?.title_logo || "";
   const posterImage = crCard.data?.poster || poster;
   // CR keyart is already a sized CDN URL — use it directly; only route AniList art
   // through the WebP cache.
-  const isCrKeyart = Boolean(crCard.data?.detail_banner);
-  const heroSrc = isCrKeyart ? heroImage : imageCdnUrl(heroImage, "banner-sm");
-  const previewSrc = isCrKeyart ? heroImage : imageCdnUrl(heroImage || posterImage, "banner-sm");
+  const isCrKeyart = Boolean(crCard.data?.detail_banner || crCard.data?.hero_banner || displayAnime.detail_banner || displayAnime.cr_hero);
+  const heroSrc = imageCdnUrl(heroImage, "banner-lg");
+  const previewSrc = imageCdnUrl(heroImage || posterImage, "banner-sm");
+  const initialSeasonReady = !useSeasons || Boolean(crCard.data?.selected_season);
+  const detailDataPending = crPending || (needsMetadataFallback && metadataFallback.isLoading) || !initialSeasonReady;
+  // The buffer clears as soon as the DATA (CR card + season-1) is ready — it must
+  // NOT wait for the heavy hero banner image to finish downloading (that fades in
+  // on its own). A hard escape (below) guarantees the page never hangs forever on
+  // a slow/failing backend or image.
+  const showDetailBuffer = detailDataPending && !bufferEscape;
+  const showHeroSplash = showDetailBuffer;
+
+  const markHeroImageReady = useCallback(() => {
+    setHeroImageReady(true);
+  }, []);
+
+  const markHeroReady = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("atv:hero-ready"));
+    }
+  }, []);
+
+  useEffect(() => {
+    setHeroImageReady(!heroSrc);
+  }, [heroSrc]);
+
+  // Hard safety: never let the detail buffer hang. Reveal the page after 3.5s
+  // even if the backend or hero image is still resolving.
+  useEffect(() => {
+    setBufferEscape(false);
+    const timer = window.setTimeout(() => setBufferEscape(true), 3500);
+    return () => window.clearTimeout(timer);
+  }, [malId]);
+
+  useEffect(() => {
+    if (!showDetailBuffer) markHeroReady();
+  }, [markHeroReady, showDetailBuffer]);
+
+  useEffect(() => {
+    if (!showDetailBuffer) return;
+    document.documentElement.classList.add("atv-boot-lock");
+    document.body.classList.add("atv-boot-lock");
+    return () => {
+      document.documentElement.classList.remove("atv-boot-lock");
+      document.body.classList.remove("atv-boot-lock");
+    };
+  }, [showDetailBuffer]);
 
   const ranges = getRanges(episodeTotal);
   const genres = displayAnime.genres?.length ? displayAnime.genres.slice(0, 4) : [];
@@ -237,7 +309,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
 
   const seasonEpisodes = useMemo<Episode[]>(() => {
     if (!useSeasons) return [];
-    const season = crSeasons[activeSeasonIndex];
+    const season = selectedCrSeason || crSeasons[activeSeasonIndex];
     return (season?.episodes ?? []).map((episode) => ({
       // episode_number drives the watch link/stream fetch (owner MAL's real episode);
       // display_number is what the user sees (restarts at 1 each season).
@@ -247,11 +319,11 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       thumbnail: episode.thumbnail,
       has_stream: episode.has_stream,
     }));
-  }, [useSeasons, crSeasons, activeSeasonIndex]);
+  }, [useSeasons, selectedCrSeason, crSeasons, activeSeasonIndex]);
 
   // Each CR season streams via the MAL id that actually owns its episodes.
   const activeSeasonMal = useSeasons
-    ? crSeasons[activeSeasonIndex]?.owner_mal || malId
+    ? selectedCrSeason?.owner_mal || crSeasons[activeSeasonIndex]?.owner_mal || malId
     : malId;
 
   const rangeEpisodes: Episode[] = useSeasons
@@ -261,6 +333,8 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           (ep) => ep.episode_number >= ranges[activeRange].start && ep.episode_number <= ranges[activeRange].end,
         )
       : allEpisodes;
+  const seasonEpisodesPending = useSeasons && !selectedCrSeason && (activeCrCard.isLoading || activeCrCard.isFetching || crCard.isFetching);
+  const episodeListPending = episodes.isLoading || crPending || seasonEpisodesPending;
   const visibleEpisodes = rangeEpisodes.slice(0, episodeLimit);
 
   function shareAnime() {
@@ -285,7 +359,10 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               fill
               priority
               unoptimized
+              fetchPriority="high"
               sizes="100vw"
+              onLoad={markHeroImageReady}
+              onError={markHeroImageReady}
               className={`animate-[fadeIn_0.45s_ease] ${isCrKeyart
                 ? "object-cover object-[48%_24%]"
                 : "object-cover object-[44%_20%]"}`}
@@ -300,7 +377,9 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           More
         </div>
 
-        <div className="relative z-10 mx-auto grid min-h-[380px] max-w-screen-2xl items-end gap-8 px-5 pb-8 pt-14 md:px-12 md:pb-10 md:pt-16 lg:min-h-[430px] lg:px-20">
+        {showHeroSplash ? <BufferingScreen /> : null}
+
+        <div className={`relative z-10 mx-auto grid min-h-[255px] max-w-screen-2xl items-end gap-4 px-5 pb-4 pt-10 transition-opacity duration-200 sm:min-h-[310px] md:min-h-[380px] md:gap-8 md:px-12 md:pb-10 md:pt-16 lg:min-h-[430px] lg:px-20 ${showHeroSplash ? "opacity-0" : "opacity-100"}`}>
           <div className="max-w-[640px]">
             {crPending ? (
               <div className="mb-5 h-[78px] w-[220px] animate-pulse rounded-md bg-white/[0.06] md:h-[110px] md:w-[320px]" />
@@ -308,22 +387,22 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               <div className="animate-[fadeIn_0.4s_ease]">
                 {titleLogo ? (
                   <img
-                    src={titleLogo}
+                    src={imageCdnUrl(titleLogo, "thumb")}
                     alt={`${title} logo`}
                     loading="eager"
-                    className="mb-5 max-h-[150px] w-auto max-w-[280px] object-contain object-left drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)] md:max-w-[360px] xl:max-w-[420px]"
+                    className="mb-2 block max-h-[62px] w-auto max-w-[min(178px,64vw)] object-contain object-left drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)] sm:mb-3 sm:max-h-[92px] sm:max-w-[220px] md:mb-5 md:max-h-[150px] md:max-w-[360px] xl:max-w-[420px]"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)?.style.removeProperty("display"); }}
                   />
                 ) : null}
                 <h1
-                  className="mb-4 text-[1.75rem] font-bold leading-[1.1] tracking-[-0.03em] text-[#f2f2f2] drop-shadow-xl sm:text-[2rem] lg:text-[2.5rem]"
+                  className="mb-2 text-[1.25rem] font-bold leading-[1.1] text-[#f2f2f2] drop-shadow-xl sm:mb-3 sm:text-[2rem] md:mb-4 lg:text-[2.5rem]"
                   style={titleLogo ? { display: "none" } : undefined}
                 >{title}</h1>
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.9375rem] leading-[1.25rem] font-medium text-[#f2f2f2]/72">
-              <span className="grid h-[26px] w-[26px] place-items-center rounded-sm bg-[#f2f2f2]/16 text-[0.6875rem] font-bold uppercase text-[#f2f2f2]/88">A</span>
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.75rem] leading-[1.125rem] font-medium text-[#f2f2f2]/72 sm:gap-x-2 sm:gap-y-1.5 sm:text-[0.9375rem] sm:leading-[1.25rem]">
+              <span className="grid h-[22px] w-[22px] place-items-center rounded-sm bg-[#f2f2f2]/16 text-[0.625rem] font-bold uppercase text-[#f2f2f2]/88 sm:h-[26px] sm:w-[26px] sm:text-[0.6875rem]">A</span>
               <span>Sub</span>
               <span className="text-[#8c8c8c]">|</span>
               <span>Dub</span>
@@ -346,12 +425,12 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               {visibleEpisodeTotal > 0 ? <span className="inline-flex items-center gap-2"><span className="text-[#8c8c8c]">·</span>{visibleEpisodeTotal} Episodes</span> : null}
             </div>
 
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-3 flex items-center gap-2.5 sm:mt-4 sm:gap-3">
               {score ? (
                 <>
                   <div className="flex items-center gap-0.5">
                     {Array.from({ length: 5 }).map((_, index) => (
-                      <Star key={index} size={17} className={index < Math.round(score / 2) ? "fill-[#f2f2f2] text-[#f2f2f2]" : "fill-[#8c8c8c]/25 text-[#8c8c8c]/35"} />
+                      <Star key={index} size={15} className={index < Math.round(score / 2) ? "fill-[#f2f2f2] text-[#f2f2f2]" : "fill-[#8c8c8c]/25 text-[#8c8c8c]/35"} />
                     ))}
                   </div>
                   <span className="text-[0.875rem] font-bold tracking-[-0.03em] text-[#f2f2f2]">{score.toFixed(1)}</span>
@@ -362,16 +441,16 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
               )}
             </div>
 
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <Link href={resumeHref} className="inline-flex h-[56px] items-center justify-center gap-2.5 bg-[#c4182a] px-7 text-[1rem] font-black uppercase tracking-[-0.01em] text-white transition-all duration-200 ease-in-out hover:bg-[#d42040] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#8c8c8c]">
-                <Play size={20} fill="currentColor" />
+            <div className="mt-4 flex flex-wrap items-center gap-2 md:mt-7 md:gap-3">
+              <Link href={resumeHref} className="inline-flex h-[38px] items-center justify-center gap-1.5 bg-[#c4182a] px-3.5 text-[0.75rem] font-black uppercase text-white transition-all duration-200 ease-in-out hover:bg-[#d42040] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#8c8c8c] md:h-[56px] md:gap-2.5 md:px-7 md:text-[1rem]">
+                <Play size={15} fill="currentColor" />
                 {last ? "Continue Watching" : "Start Watching E1"}
               </Link>
-              <button disabled={!token || inWatchlist || addWatchlist.isPending} onClick={() => addWatchlist.mutate()} className="grid h-[56px] w-[56px] place-items-center border-2 border-[#f2f2f2]/45 bg-[#f2f2f2]/[0.06] text-[#f2f2f2]/85 transition-all duration-200 ease-in-out hover:border-[#f2f2f2]/80 hover:text-[#f2f2f2] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#8c8c8c]" aria-label={inWatchlist ? "Saved to watchlist" : "Add to watchlist"} title={inWatchlist ? "Saved" : "Add to watchlist"}>
-                {addWatchlist.isPending ? <Loader2 size={22} className="animate-spin" /> : inWatchlist ? <CheckCircle2 size={22} /> : <Bookmark size={22} />}
+              <button disabled={!token || inWatchlist || addWatchlist.isPending} onClick={() => addWatchlist.mutate()} className="grid h-[38px] w-[38px] place-items-center border-2 border-[#f2f2f2]/45 bg-[#f2f2f2]/[0.06] text-[#f2f2f2]/85 transition-all duration-200 ease-in-out hover:border-[#f2f2f2]/80 hover:text-[#f2f2f2] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#8c8c8c] md:h-[56px] md:w-[56px]" aria-label={inWatchlist ? "Saved to watchlist" : "Add to watchlist"} title={inWatchlist ? "Saved" : "Add to watchlist"}>
+                {addWatchlist.isPending ? <Loader2 size={18} className="animate-spin" /> : inWatchlist ? <CheckCircle2 size={18} /> : <Bookmark size={18} />}
               </button>
-              <button type="button" onClick={shareAnime} className="grid h-[56px] w-[56px] place-items-center bg-transparent text-[#f2f2f2]/85 transition-all duration-200 ease-in-out hover:bg-[#f2f2f2]/10 hover:text-[#f2f2f2] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#8c8c8c]" aria-label="Share anime" title="Share">
-                <Share2 size={22} />
+              <button type="button" onClick={shareAnime} className="grid h-[38px] w-[38px] place-items-center bg-transparent text-[#f2f2f2]/85 transition-all duration-200 ease-in-out hover:bg-[#f2f2f2]/10 hover:text-[#f2f2f2] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#8c8c8c] md:h-[56px] md:w-[56px]" aria-label="Share anime" title="Share">
+                <Share2 size={18} />
               </button>
             </div>
 
@@ -392,14 +471,11 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
         </div>
 
         {/* Synopsis + details — expandable fade per CR audit Section 28 */}
-        <div className="relative z-10 mx-auto max-w-screen-2xl px-5 pb-10 md:px-12 lg:px-20">
-          <div className="grid max-w-[900px] gap-6 md:grid-cols-[minmax(0,1fr)_minmax(220px,0.45fr)]">
+        <div className={`relative z-10 mx-auto hidden max-w-screen-2xl px-5 pb-7 transition-opacity duration-200 md:block md:px-12 md:pb-10 lg:px-20 ${showHeroSplash ? "opacity-0" : "opacity-100"}`}>
+          <div className="grid max-w-[900px] gap-4 md:grid-cols-[minmax(0,1fr)_minmax(220px,0.45fr)] md:gap-6">
             <div>
               <div className="relative">
                 <p className={`text-[0.875rem] font-normal leading-[1.25rem] text-[#f2f2f2]/80 md:text-[1rem] md:leading-[1.375rem] ${synopsisExpanded ? "" : "line-clamp-3"}`}>{overview}</p>
-                {!synopsisExpanded && overview.length > 200 ? (
-                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#050506] to-transparent" />
-                ) : null}
               </div>
               {overview.length > 200 ? (
                 <button type="button" onClick={() => setSynopsisExpanded((v) => !v)} className="mt-2 text-[0.75rem] font-bold uppercase leading-[1.125rem] tracking-[-0.03em] text-[#f2f2f2] transition-colors duration-200 hover:text-white">
@@ -484,7 +560,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           ) : null}
 
           {/* Episode playback list */}
-          {episodes.isLoading ? (
+          {episodeListPending ? (
             <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i}>
@@ -505,7 +581,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   const href = canPlay ? (!useSeasons && isCurrent ? resumeHref : watchPath(watchAnime, activeSeasonMal, ep.episode_number)) : "#";
                   return (
                     <Link
-                      key={ep.episode_number}
+                      key={`${activeSeasonMal}-${activeSeasonNumber}-${ep.episode_number}`}
                       href={href}
                       aria-disabled={!canPlay}
                       tabIndex={canPlay ? undefined : -1}
@@ -520,15 +596,21 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                       className={`group block text-left ${canPlay ? "" : "cursor-default opacity-55"}`}
                     >
                       <div className={`relative aspect-video w-full overflow-hidden rounded-sm bg-[#151515] transition-shadow duration-200 ${isCurrent ? "shadow-[0_0_0_0.375rem_#c4182a]" : "group-hover:shadow-[0_0_0_0.375rem_#151515]"}`}>
-                        {ep.thumbnail || backdrop ? (
+                        {ep.thumbnail ? (
                           <ProgressiveImage
-                            lowSrc={imageCdnUrl(ep.thumbnail || backdrop, "poster-xs")}
-                            highSrc={imageCdnUrl(ep.thumbnail || backdrop, "thumb")}
+                            highSrc={imageCdnUrl(ep.thumbnail, "episode-thumb")}
+                            fallbackSrc={directImageUrl(ep.thumbnail)}
                             alt={ep.title || `Episode ${ep.episode_number} thumbnail`}
                             sizes="(max-width: 640px) 50vw, 25vw"
                             imgClassName="object-center transition-opacity duration-300"
                           />
-                        ) : null}
+                        ) : (
+                          <div className="absolute inset-0 grid place-items-center bg-[#121318]">
+                            <span className="rounded-sm border border-white/10 bg-black/25 px-2 py-1 text-[0.6875rem] font-black uppercase text-white/35">
+                              EP {displayNum}
+                            </span>
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-white opacity-0 transition-opacity duration-200 group-hover:opacity-[0.08]" />
                         {canPlay ? (
                           <span className="absolute inset-0 grid place-items-center opacity-0 transition-opacity duration-200 group-hover:opacity-100" aria-label={`Play Episode ${displayNum}`}>
@@ -584,6 +666,35 @@ function formatClock(s: number) {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function crSeasonKey(season?: Pick<CrSeason, "title" | "owner_mal" | "episode_count">) {
+  if (!season) return "";
+  return [
+    String(season.title || "").trim().toLowerCase(),
+    String(season.owner_mal || "").trim(),
+    String(season.episode_count || "").trim(),
+  ].join("|");
+}
+
+function shouldFollowCanonicalRedirect(current: Anime, card: { canonical_mal_id?: string; title?: string; selected_season?: CrSeason | undefined; seasons?: CrSeason[] } | null | undefined) {
+  const canonical = String(card?.canonical_mal_id || "");
+  if (!canonical) return false;
+  const currentKey = titleFamilyKey(titleOf(current));
+  const targetKey = titleFamilyKey(card?.title || card?.selected_season?.title || card?.seasons?.[0]?.title || "");
+  if (!currentKey || !targetKey) return false;
+  return currentKey === targetKey || currentKey.includes(targetKey) || targetKey.includes(currentKey);
+}
+
+function titleFamilyKey(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/kimetsu no yaiba/g, "demon slayer")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((part) => part.length > 2 && !["the", "movie", "season", "part", "arc", "episode"].includes(part))
+    .slice(0, 3)
+    .join(" ");
 }
 
 function heroBannerOf(anime: Anime | undefined) {

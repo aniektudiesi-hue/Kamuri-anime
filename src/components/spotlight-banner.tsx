@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bookmark, Play } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchCrCard } from "@/lib/catalog-api";
+import { imageCdnUrl } from "@/lib/image-cdn";
 
 /**
  * SpotlightBanner — a wide Crunchyroll-style promo strip for a single title,
@@ -27,7 +28,7 @@ export function SpotlightBanner({
     gcTime: 1000 * 60 * 120,
   });
 
-  const banner = data?.detail_banner;
+  const banner = imageCdnUrl(data?.detail_banner, "banner-sm");
   const logo = data?.title_logo;
   const synopsis = data?.synopsis || "";
   const title = fallbackTitle || "";
@@ -45,8 +46,10 @@ export function SpotlightBanner({
           alt={title}
           fill
           sizes="100vw"
+          loading="lazy"
+          decoding="async"
           className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-          style={{ objectPosition: "75% center" }}
+          style={{ objectPosition: "82% center" }}
         />
         {/* CR-style scrims: left for text + bottom blend */}
         <div

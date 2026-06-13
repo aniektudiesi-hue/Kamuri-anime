@@ -1,6 +1,7 @@
 import type { Anime } from "./types";
 import { animeId } from "./utils";
 import { catalogClientGet, mapCatalogList } from "./catalog-api";
+import { catalogRegionHeaders } from "./edge-region";
 
 type AniListMedia = {
   idMal: number | null;
@@ -251,7 +252,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
 const SEARCH_DISCOVERY_BASE =
   process.env.SEARCH_API_BASE ||
   process.env.NEXT_PUBLIC_SEARCH_API_BASE ||
-  "http://127.0.0.1:5001";
+  "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 
 function searchParamsForIntent(intent: DiscoveryIntent, page: number, fmt = ""): string {
   const params = new URLSearchParams({ limit: "60", page: String(page) });
@@ -278,16 +279,24 @@ export async function fetchAniListDiscovery(
   intent: DiscoveryIntent,
   page: number,
   fmt = "",
+  timeoutMs?: number,
 ): Promise<{ media: Anime[]; hasNextPage: boolean; total: number; count: number; page: number; facets?: DiscoveryFacets }> {
+  const isBrowse = !intent.search && !intent.genre && !intent.tag;
+  const effectiveTimeout = timeoutMs ?? (isBrowse ? 25000 : 3500);
   try {
     const qs = searchParamsForIntent(intent, page, fmt);
     // Server-side hits the backend directly; client-side goes through the proxy
     // route to stay same-origin.
     const base = typeof window === "undefined" ? `${SEARCH_DISCOVERY_BASE}/api/search` : "/api/search-proxy/api/search";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
     const json = await fetch(`${base}?${qs}`, {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
+      signal: controller.signal,
       ...(typeof window === "undefined" ? { next: { revalidate: 30 } } : {}),
-    }).then((r) => (r.ok ? (r.json() as Promise<Parameters<typeof mapCatalogList>[0] & { total?: number; count?: number; page?: number; facets?: DiscoveryFacets }>) : undefined));
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<Parameters<typeof mapCatalogList>[0] & { total?: number; count?: number; page?: number; facets?: DiscoveryFacets }>) : undefined))
+      .finally(() => clearTimeout(timeout));
     return {
       media: mapCatalogList(json),
       hasNextPage: Boolean(json?.has_more),

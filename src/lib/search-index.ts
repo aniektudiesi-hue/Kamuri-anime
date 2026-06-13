@@ -3,8 +3,8 @@ import type { Anime } from "@/lib/types";
 import { rankAnimeForSearch } from "@/lib/utils";
 
 // v4: dropped stale child-season ("Season 2/3") entries cached before root-only dedup.
-const SEARCH_CATALOG_KEY = "anime-tv-search-catalog-v4";
-const SEARCH_CATALOG_LIMIT = 1200;
+const SEARCH_CATALOG_KEY = "anime-tv-search-catalog-v5";
+const SEARCH_CATALOG_LIMIT = 10000;
 
 export function localSearchAnime(query: string, limit = 12): Anime[] {
   const normalized = query.trim();
@@ -75,6 +75,15 @@ function normalize(value: string) {
 
 function mergeAnimeResult(base: Anime, incoming: Anime): Anime {
   const next: Anime = { ...base, ...incoming };
+  const format = String(next.format || incoming.format || base.format || "").toUpperCase();
+  const useSeriesCrArt = format === "TV" || format === "ONA" || !format;
+  if (useSeriesCrArt && incoming.cr_poster) next.cr_poster = incoming.cr_poster;
+  else if (useSeriesCrArt && base.cr_poster) next.cr_poster = base.cr_poster;
+  else delete next.cr_poster;
+  if (useSeriesCrArt && incoming.cr_hero) next.cr_hero = incoming.cr_hero;
+  else if (useSeriesCrArt && base.cr_hero) next.cr_hero = base.cr_hero;
+  else delete next.cr_hero;
+
   const basePoster = firstPoster(base);
   const incomingPoster = firstPoster(incoming);
 
@@ -98,7 +107,10 @@ function mergeAnimeResult(base: Anime, incoming: Anime): Anime {
 }
 
 function firstPoster(anime: Anime) {
+  const format = String(anime.format || "").toUpperCase();
+  const useSeriesCrArt = format === "TV" || format === "ONA" || !format;
   return (
+    (useSeriesCrArt ? anime.cr_poster : "") ||
     anime.poster ||
     anime.image ||
     anime.thumbnail ||

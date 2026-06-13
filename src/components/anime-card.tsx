@@ -1,22 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Play, Star } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
 import { ProgressiveImage } from "@/components/progressive-image";
-import {
-  DEFAULT_STREAM_PROVIDER_ID,
-  STREAM_PROVIDERS,
-  fetchStreamProvider,
-  streamProviderQueryKey,
-  warmStreamProvider,
-} from "@/lib/stream-providers";
+import { startRouteBuffer } from "@/lib/route-buffer";
 import type { Anime } from "@/lib/types";
 import { useResumeHistory } from "@/lib/use-resume-history";
-import { animeId, animePath, episodeCount, episodeLabel, posterOf, rememberAnime, titleOf, watchPath } from "@/lib/utils";
+import { animeId, animePath, episodeLabel, posterOf, rememberAnime, titleOf } from "@/lib/utils";
 
 const loadedPosterUrls = new Set<string>();
 
@@ -43,13 +34,8 @@ export function AnimeCard({
   fastImage?: boolean;
   posterOverride?: string;
 }) {
-  const queryClient = useQueryClient();
-  const router = useRouter();
   const id = animeId(anime);
-  const episodes = episodeCount(anime);
-  const poster = posterOverride || posterOf(anime, priority ? "poster-lg" : "poster-md");
-  // Tiny blurred placeholder that paints instantly before the sharp poster decodes.
-  const posterLow = posterOverride ? "" : posterOf(anime, "poster-xs");
+  const poster = posterOverride || posterOf(anime, priority ? "poster-md" : "poster-sm");
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(() => Boolean(poster && loadedPosterUrls.has(poster)));
   const title = titleOf(anime);
@@ -58,66 +44,40 @@ export function AnimeCard({
   const seasonCount = Number(anime.season_count || 0);
   const synopsis = (anime.overview || "").trim();
   const resume = useResumeHistory(id);
-  const href = resume.hasResume
-    ? `${watchPath(anime, id, resume.episode)}${resume.progress > 1 ? `?t=${Math.floor(resume.progress)}` : ""}`
-    : animePath(anime, id);
+  const href = animePath(anime, id);
 
   useEffect(() => {
     setImageFailed(false);
     setImageLoaded(Boolean(poster && loadedPosterUrls.has(poster)));
   }, [poster]);
 
-  useEffect(() => {
-    if (!poster || loadedPosterUrls.has(poster)) return;
-    const image = new window.Image();
-    image.decoding = "async";
-    image.onload = () => {
-      loadedPosterUrls.add(poster);
-      setImageLoaded(true);
-    };
-    image.onerror = () => setImageFailed(true);
-    image.src = poster;
-  }, [poster]);
-
-  function prefetch() {
-    if (!id) return;
-    const episode = resume.hasResume ? String(resume.episode) : "1";
-    const provider = STREAM_PROVIDERS.find((item) => item.id === DEFAULT_STREAM_PROVIDER_ID) ?? STREAM_PROVIDERS[0];
-    const targetHref = resume.hasResume ? href : watchPath(anime, id, 1);
-    router.prefetch(targetHref);
-    queryClient.prefetchQuery({
-      queryKey: ["episodes", id, episodes],
-      queryFn: () => api.episodes(id, episodes),
-      staleTime: 1000 * 60 * 20,
-    });
-    queryClient.fetchQuery({
-      queryKey: streamProviderQueryKey(provider, id, episode, "sub"),
-      queryFn: () => fetchStreamProvider(provider, { malId: id, episode, type: "sub" }),
-      staleTime: 1000 * 60 * 25,
-    }).then((stream) => warmStreamProvider(provider, stream)).catch(() => undefined);
+  function pressAnime() {
+    startRouteBuffer();
   }
 
   return (
     <article
-      onMouseEnter={prefetch}
-      onFocus={prefetch}
-      onPointerDown={prefetch}
-      onTouchStart={prefetch}
+      onPointerDown={pressAnime}
+      onTouchStart={pressAnime}
       className={`card-lift scroll-card group ${className ?? "w-[160px] shrink-0 sm:w-[180px]"}`}
     >
-      <Link href={href} onClick={() => rememberAnime(anime)} className="block">
+      <Link href={href} onClick={() => { startRouteBuffer(); rememberAnime(anime); }} className="block">
 
         {/* Poster container */}
         <div className="netflix-image-shell relative aspect-[2/3] overflow-hidden rounded-lg bg-[#141828]" data-loaded={imageLoaded || imageFailed}>
           {poster && !imageFailed ? (
             <ProgressiveImage
-              lowSrc={posterLow}
               highSrc={poster}
               alt={title}
               sizes="(max-width:640px) 33vw, (max-width:1024px) 25vw, 180px"
               priority={priority}
+              loading={priority ? "eager" : "lazy"}
               imgClassName="transition-transform duration-200 group-hover:scale-[1.025]"
               onFail={() => setImageFailed(true)}
+              onLoad={() => {
+                loadedPosterUrls.add(poster);
+                setImageLoaded(true);
+              }}
             />
           ) : (
             <PosterFallback title={title} />

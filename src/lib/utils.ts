@@ -29,7 +29,10 @@ export function posterOf(anime: Anime | undefined, variant: "poster-xs" | "poste
 export function rawPosterOf(anime: Anime | undefined) {
   const jpg = anime?.images?.jpg;
   const webp = anime?.images?.webp;
+  const format = String(anime?.format || "").toUpperCase();
+  const useSeriesCrArt = format === "TV" || format === "ONA" || !format;
   return (
+    (useSeriesCrArt ? anime?.cr_poster : "") ||
     anime?.poster ||
     anime?.image ||
     anime?.thumbnail ||
@@ -45,7 +48,9 @@ export function rawPosterOf(anime: Anime | undefined) {
 }
 
 export function bannerOf(anime: Anime | undefined, variant: "banner-sm" | "banner-lg" = "banner-lg") {
-  return imageCdnUrl(anime?.banner || anime?.img_url || anime?.image || posterOf(anime, "poster-lg"), variant);
+  const format = String(anime?.format || "").toUpperCase();
+  const useSeriesCrArt = format === "TV" || format === "ONA" || !format;
+  return imageCdnUrl((useSeriesCrArt ? anime?.cr_hero : "") || anime?.banner || anime?.detail_banner || anime?.img_url || anime?.image || posterOf(anime, "poster-lg"), variant);
 }
 
 export function episodeCount(anime: Anime | undefined) {

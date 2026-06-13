@@ -1,7 +1,7 @@
 import type { AiringScheduleItem, Anime, HomeInitialData } from "./types";
 import { catalogScheduleFromAnime, catalogServerGet, fetchCatalogSection } from "./catalog-api";
 
-const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
+const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 const ANILIST_URL = "https://graphql.anilist.co";
 const HOME_REVALIDATE_SECONDS = 30 * 60;
 const SCHEDULE_REVALIDATE_SECONDS = 6 * 60 * 60;
@@ -39,7 +39,7 @@ type HomeInitialDataOptions = {
 };
 
 export async function getHomeInitialData(options: HomeInitialDataOptions = {}): Promise<HomeInitialData> {
-  const [banners, thumbnails, recent, topRated, popularRaw, romanceRaw, isekaiRaw, healingRaw] = await Promise.all([
+  const [banners, thumbnails, recent, topRated, popularRaw, romanceRaw, isekaiRaw, sportsRaw, healingRaw] = await Promise.all([
     fetchCatalogSection("/api/anime/season/2026/spring", 10, 1, HOME_REVALIDATE_SECONDS),
     fetchCatalogSection("/api/anime/season/2026/spring", 40, 1, HOME_REVALIDATE_SECONDS),
     fetchCatalogSection("/api/anime/new-releases", 40, 1, 15 * 60),
@@ -47,20 +47,34 @@ export async function getHomeInitialData(options: HomeInitialDataOptions = {}): 
     fetchCatalogSection("/api/anime/popular", 40, 1, HOME_REVALIDATE_SECONDS),
     fetchCatalogSection("/api/anime/genre/romance", 30, 1, HOME_REVALIDATE_SECONDS),
     fetchCatalogSection("/api/anime/genre/isekai", 30, 1, HOME_REVALIDATE_SECONDS),
+    fetchCatalogSection("/api/anime/genre/sports", 30, 1, HOME_REVALIDATE_SECONDS),
     fetchCatalogSection("/api/anime/genre/slice-of-life", 30, 1, HOME_REVALIDATE_SECONDS),
   ]);
+
+  const famousNewRaw = prioritizeByTitle(
+    mergeUniqueAnime([...recent, ...popularRaw, ...topRated, ...isekaiRaw]),
+    ["classroom", "tensura", "reincarnated as a slime", "my hero academia", "solo leveling", "jujutsu kaisen", "demon slayer"],
+  );
+  const selfImprovementRaw = prioritizeByTitle(
+    mergeUniqueAnime([...sportsRaw, ...healingRaw, ...topRated, ...popularRaw]),
+    ["blue lock", "haikyuu", "run with the wind", "barakamon", "relife", "march comes in like a lion", "baby steps", "ping pong"],
+  );
 
   // Bake Crunchyroll posters into the FIRST render and float CR-mapped titles to
   // the front. Doing this server-side kills the client-side poster swap that was
   // causing every grid image to reload (the flicker), and guarantees CR art shows
   // wherever it exists.
-  const [crThumbs, crRecent, crTop, crPopular, crRomance, crIsekai, crHealing] = await Promise.all([
+  const [crBanners, crThumbs, crRecent, crTop, crPopular, crFamousNew, crRomance, crIsekai, crSports, crSelfImprovement, crHealing] = await Promise.all([
+    enrichWithCr(banners),
     enrichWithCr(thumbnails),
     enrichWithCr(recent),
     enrichWithCr(topRated),
     enrichWithCr(popularRaw),
+    enrichWithCr(mergeUniqueAnime([...famousNewRaw, ...recent.slice(0, 10), ...popularRaw.slice(0, 10)])),
     enrichWithCr(romanceRaw),
     enrichWithCr(isekaiRaw),
+    enrichWithCr(sportsRaw),
+    enrichWithCr(selfImprovementRaw),
     enrichWithCr(healingRaw),
   ]);
 
@@ -69,17 +83,43 @@ export async function getHomeInitialData(options: HomeInitialDataOptions = {}): 
     : [];
 
   return {
-    banners: banners.slice(0, 10),
+    banners: crBanners.slice(0, 10),
     thumbnails: crThumbs.slice(0, 24),
     recent: crRecent.slice(0, 24),
     topRated: crTop.slice(0, 24),
     popular: crPopular.slice(0, 24),
+    famousNew: crFamousNew.slice(0, 24),
     romance: crRomance.slice(0, 24),
     isekai: crIsekai.slice(0, 24),
+    sports: crSports.slice(0, 24),
+    selfImprovement: crSelfImprovement.slice(0, 24),
     healing: crHealing.slice(0, 24),
     schedule: scheduleItems,
     generatedAt: new Date().toISOString(),
   };
+}
+
+function mergeUniqueAnime(items: Anime[]) {
+  const seen = new Set<string>();
+  const merged: Anime[] = [];
+  for (const item of items) {
+    const id = String(item.mal_id || item.anime_id || item.id || "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(item);
+  }
+  return merged;
+}
+
+function prioritizeByTitle(items: Anime[], needles: string[]) {
+  const normalizedNeedles = needles.map((needle) => needle.toLowerCase());
+  return [...items].sort((a, b) => titlePriority(b, normalizedNeedles) - titlePriority(a, normalizedNeedles));
+}
+
+function titlePriority(item: Anime, needles: string[]) {
+  const title = `${item.title || ""} ${item.title_en || ""} ${item.name || ""}`.toLowerCase();
+  const match = needles.findIndex((needle) => title.includes(needle));
+  return match === -1 ? 0 : 1000 - match;
 }
 
 type CrPosterMap = Record<string, { poster?: string; hero?: string; has_cr?: number }>;
@@ -101,7 +141,18 @@ async function enrichWithCr(items: Anime[]): Promise<Anime[]> {
     const enriched = items.map((a) => {
       const id = String(a.mal_id || a.anime_id || a.id || "");
       const cr = map[id];
-      if (cr?.poster) return { ...a, image_url: cr.poster, poster: cr.poster, cr_mapped: true };
+      if (cr?.poster || cr?.hero) {
+        return {
+          ...a,
+          image_url: cr.poster || a.image_url,
+          poster: cr.poster || a.poster,
+          cr_poster: cr.poster || a.cr_poster,
+          cr_hero: cr.hero || a.cr_hero,
+          detail_banner: cr.hero || a.detail_banner,
+          banner: cr.hero || a.banner,
+          cr_mapped: true,
+        };
+      }
       if (cr?.has_cr) return { ...a, cr_mapped: true };
       return a;
     });

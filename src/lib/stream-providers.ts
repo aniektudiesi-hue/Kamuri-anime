@@ -3,7 +3,7 @@ import { warmMoonPipeline, warmStreamManifest } from "./stream-cache";
 import type { StreamResponse, Subtitle } from "./types";
 
 export type StreamAudioType = "sub" | "dub";
-export type StreamProviderId = "hd1" | "hd2" | "moon" | (string & {});
+export type StreamProviderId = "hd1" | "hd2" | "megaplay" | "moon" | (string & {});
 
 export type StreamProvider = {
   id: StreamProviderId;
@@ -18,7 +18,7 @@ export type StreamProvider = {
 // HD1 and HD2 are the SAME stream proxied through two different Cloudflare
 // workers. If one worker is under heavy load (or fails), the player falls back
 // to the other — so we always have a healthy edge.
-const KAMURI_WORKER = "anime-tv-stream-proxy.kamuri-anime.workers.dev";
+const KAMURI_WORKER = "anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 const ANIMETVPLUS_WORKER = "anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 
 // Rewrite every proxied URL in a stream response from the Kamuri worker host to
@@ -65,6 +65,15 @@ export const STREAM_PROVIDERS = [
     warm: (stream) => warmStreamManifest(stream, { segments: 2, timeoutMs: 8_000 }),
   },
   {
+    id: "megaplay",
+    label: "Megaplay",
+    desc: "Megaplay CDN",
+    queryType: (type) => type,
+    fetch: (malId, episode, type) => api.megaplay(malId, episode, type),
+    retry: 1,
+    warm: (stream) => warmStreamManifest(stream, { segments: 4, timeoutMs: 10_000 }),
+  },
+  {
     id: "moon",
     label: "Moon",
     desc: "Backup - Fast CDN",
@@ -79,8 +88,12 @@ export function streamUrlOf(data: StreamResponse | undefined) {
   return data?.m3u8_url || data?.url || data?.stream_url || "";
 }
 
+export function iframeUrlOf(data: StreamResponse | undefined) {
+  return data?.iframe_url || data?.embed_url || "";
+}
+
 export function hasPlayableStream(data: StreamResponse | undefined) {
-  return Boolean(streamUrlOf(data));
+  return Boolean(streamUrlOf(data) || iframeUrlOf(data));
 }
 
 export function subtitlesOfStream(data: StreamResponse | undefined): Subtitle[] {

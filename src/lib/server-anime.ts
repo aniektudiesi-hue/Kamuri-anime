@@ -4,7 +4,7 @@ import { animeId } from "@/lib/utils";
 import { fetchAnimeMetadataByMalId } from "./anime-metadata";
 import { catalogServerGet, fetchCatalogSection, mapCatalogAnime } from "./catalog-api";
 
-const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.kamuri-anime.workers.dev";
+const API_BASE = process.env.NEXT_PUBLIC_PUBLIC_API_BASE_URL || "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 const HOME_PATHS = ["/api/v1/banners", "/home/thumbnails", "/home/recently-added", "/home/top-rated"];
 
 async function serverRequest<T>(path: string, revalidate = 3600): Promise<T | null> {

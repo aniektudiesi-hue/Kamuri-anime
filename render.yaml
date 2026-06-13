@@ -14,5 +14,13 @@ services:
         value: 22.16.0
       - key: NEXT_PUBLIC_API_BASE_URL
         value: https://anime-search-api-burw.onrender.com
+      - key: CATALOG_API_BASE
+        value: https://anime-tv-stream-proxy.animetvplus-stream.workers.dev
+      - key: NEXT_PUBLIC_CATALOG_API_BASE
+        value: https://anime-tv-stream-proxy.animetvplus-stream.workers.dev
+      - key: SEARCH_API_BASE
+        value: https://anime-tv-stream-proxy.animetvplus-stream.workers.dev
+      - key: NEXT_PUBLIC_SEARCH_API_BASE
+        value: https://anime-tv-stream-proxy.animetvplus-stream.workers.dev
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"

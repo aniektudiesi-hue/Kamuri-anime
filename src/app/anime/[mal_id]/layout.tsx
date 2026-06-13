@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getEpisodeMetadata, getKnownAnimeById } from "@/lib/server-anime";
+import { getKnownAnimeById } from "@/lib/server-anime";
 import {
   animeDescription,
   animeJsonLd,
@@ -44,8 +44,8 @@ export default async function AnimeLayout({ children, params }: AnimeLayoutProps
   const malId = idFromSlug(rawMalId);
   const anime = await getKnownAnimeById(malId);
   const hint = episodeCount(anime);
-  const episodes = await getEpisodeMetadata(malId, hint);
   const title = titleOf(anime) === "Untitled" ? `Anime ${malId}` : titleOf(anime);
+  const episodeNumbers = hint > 0 ? Array.from({ length: Math.min(hint, 100) }, (_, index) => index + 1) : [];
 
   const jsonLd = [
     animeJsonLd(anime, malId),
@@ -53,17 +53,17 @@ export default async function AnimeLayout({ children, params }: AnimeLayoutProps
       { name: "Home", path: "/" },
       { name: title, path: animePath(anime, malId) },
     ]),
-    episodes?.episodes?.length
+    episodeNumbers.length
       ? {
           "@context": "https://schema.org",
           "@type": "ItemList",
           name: `${title} episode list`,
-          numberOfItems: episodes.episodes.length,
-          itemListElement: episodes.episodes.slice(0, 100).map((episode, index) => ({
+          numberOfItems: hint,
+          itemListElement: episodeNumbers.map((episode, index) => ({
             "@type": "ListItem",
             position: index + 1,
-            url: absoluteUrl(watchPath(anime, malId, episode.episode_number)),
-            name: episode.title || `${title} Episode ${episode.episode_number}`,
+            url: absoluteUrl(watchPath(anime, malId, episode)),
+            name: `${title} Episode ${episode}`,
           })),
         }
       : undefined,
