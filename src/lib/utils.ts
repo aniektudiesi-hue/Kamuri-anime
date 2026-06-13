@@ -19,7 +19,7 @@ export function listFromPayload<T>(payload: unknown): T[] {
 }
 
 export function animeId(anime: Anime | undefined) {
-  return String(anime?.anime_id ?? anime?.mal_id ?? anime?.id ?? "");
+  return String(anime?.mal_id ?? anime?.anime_id ?? anime?.id ?? "");
 }
 
 export function posterOf(anime: Anime | undefined, variant: "poster-xs" | "poster-sm" | "poster-md" | "poster-lg" = "poster-md") {
@@ -167,10 +167,59 @@ function releaseYearOf(anime: Anime) {
   return 0;
 }
 
+const ANIME_CACHE_PREFIX = "kairostream-anime-";
+const ANIME_CACHE_MAX = 60;
+
+// Fields the detail page needs to paint instantly before its live fetch lands.
+// Persisting the WHOLE anime object per viewed title (unbounded) overflowed the
+// localStorage quota → QuotaExceededError on the detail page. Keep it lean + capped.
+const ANIME_CACHE_KEEP_KEYS: string[] = [
+  "mal_id", "anime_id", "id", "title", "title_en", "title_jp", "name",
+  "poster", "image", "image_url", "img_url", "cover", "thumbnail", "cr_poster",
+  "banner", "cr_hero", "detail_banner", "title_logo",
+  "format", "status", "score", "year", "start_date",
+  "num_episodes", "episode_count", "episodes", "season_count", "genres", "studios", "overview",
+];
+
+function slimAnimeForCache(anime: Anime): Anime {
+  const out: Record<string, unknown> = {};
+  for (const key of ANIME_CACHE_KEEP_KEYS) {
+    const value = (anime as Record<string, unknown>)[key];
+    if (value !== undefined && value !== null && value !== "") out[key] = value;
+  }
+  return out as Anime;
+}
+
+function animeCacheKeys(): string[] {
+  const keys: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (key && key.startsWith(ANIME_CACHE_PREFIX)) keys.push(key);
+  }
+  return keys;
+}
+
 export function rememberAnime(anime: Anime | undefined) {
   const id = animeId(anime);
-  if (!id || typeof window === "undefined") return;
-  window.localStorage.setItem(`kairostream-anime-${id}`, JSON.stringify(anime));
+  if (!id || !anime || typeof window === "undefined") return;
+  const key = `${ANIME_CACHE_PREFIX}${id}`;
+  // Keep the paint-cache bounded so it can't grow without limit.
+  const others = animeCacheKeys().filter((existing) => existing !== key);
+  if (others.length >= ANIME_CACHE_MAX) {
+    others.slice(0, others.length - ANIME_CACHE_MAX + 1).forEach((stale) => window.localStorage.removeItem(stale));
+  }
+  const value = JSON.stringify(slimAnimeForCache(anime));
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Over quota — drop the rest of the paint-cache and retry; it's only a cache.
+    animeCacheKeys().filter((existing) => existing !== key).forEach((stale) => window.localStorage.removeItem(stale));
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // give up silently — a missing paint-cache entry only slows the first paint
+    }
+  }
 }
 
 export function rememberedAnime(id: string) {
