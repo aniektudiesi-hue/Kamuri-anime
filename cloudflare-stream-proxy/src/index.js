@@ -34,7 +34,7 @@ const REGIONAL_CATALOG_ORIGINS = {
 };
 const CATALOG_FAILOVER_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 const CATALOG_CR_ENRICH_PREFIXES = ["/api/search", "/api/anime/", "/api/catalog"];
-const CATALOG_CACHE_VERSION = "catalog-v4";
+const CATALOG_CACHE_VERSION = "catalog-v5";
 const MOON_CACHE_TTL = 3600;
 const MANIFEST_CACHE_TTL = 600;
 const MANIFEST_STALE_TTL = 1800;
@@ -331,6 +331,15 @@ async function enrichCatalogPayload(payload, incoming, origin, env) {
       const id = String(item?.mal_id || item?.anime_id || item?.id || "");
       const cr = posters[id];
       if (!cr) return item;
+      // CR keyart belongs to the TV series / ONA only. OVAs, movies and specials
+      // are their OWN distinct titles and must keep their own cover art — never the
+      // parent series' Crunchyroll poster (the KonoSuba OVA/movie "all show the S3
+      // poster" bug). Matches the backend + frontend gating.
+      const fmt = String(item?.format || "").toUpperCase();
+      const useSeriesCrArt = fmt === "TV" || fmt === "ONA" || fmt === "";
+      if (!useSeriesCrArt) {
+        return { ...item, cr_mapped: Boolean(cr.has_cr || item.cr_mapped) };
+      }
       return {
         ...item,
         cr_poster: cr.poster || item.cr_poster,
@@ -1682,10 +1691,10 @@ function originApiTtl(pathname) {
 
 function originApiCacheControl(pathname) {
   if (pathname === "/api/status") return "public, s-maxage=10, stale-while-revalidate=60";
-  if (pathname.startsWith("/api/search")) return "public, s-maxage=300, stale-while-revalidate=1800";
-  if (pathname.startsWith("/api/cr/")) return "public, s-maxage=1800, stale-while-revalidate=86400";
+  if (pathname.startsWith("/api/search")) return "public, s-maxage=120, stale-while-revalidate=600";
+  if (pathname.startsWith("/api/cr/")) return "public, s-maxage=300, stale-while-revalidate=3600";
   if (pathname.startsWith("/api/episodes/") || pathname.startsWith("/api/streams/") || pathname.startsWith("/api/stream/")) return "public, s-maxage=300, stale-while-revalidate=1800";
-  if (pathname.startsWith("/api/anime/") || pathname.startsWith("/api/catalog")) return "public, s-maxage=900, stale-while-revalidate=3600";
+  if (pathname.startsWith("/api/anime/") || pathname.startsWith("/api/catalog")) return "public, s-maxage=300, stale-while-revalidate=1800";
   if (pathname.startsWith("/api/image-transform") || pathname.startsWith("/api/image-db/") || pathname.startsWith("/api/images/")) return `public, s-maxage=${IMAGE_CACHE_TTL}, stale-while-revalidate=${IMAGE_CACHE_TTL}`;
   if (pathname.startsWith("/anime/episode/")) return "public, s-maxage=3600, stale-while-revalidate=86400";
   if (pathname.startsWith("/home/") || pathname === "/api/v1/banners") return "public, s-maxage=600, stale-while-revalidate=3600";
