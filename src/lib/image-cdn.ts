@@ -15,13 +15,20 @@ function isCrImageHost(hostname: string) {
   return CR_IMAGE_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
 }
 
+// Crunchyroll's imgsrv only serves a FIXED WHITELIST of render boxes — asking for
+// any other WxH returns 403 (e.g. 320x480/220x330 fail, 240x360/480x720 work).
+// So we snap the requested width to the nearest allowed CR size (>= target, to
+// avoid upscale blur) for the matching aspect family.
+const CR_PORTRAIT_SIZES: [number, number][] = [[240, 360], [480, 720], [1560, 2340]];
+const CR_LANDSCAPE_SIZES: [number, number][] = [[320, 180], [640, 360], [1200, 675], [1920, 1080]];
+
 /**
  * Crunchyroll's imgsrv encodes the render box in the URL path, e.g.
  *   /imgsrv/display/thumbnail/1560x2340/catalog/...
- * Asking its CDN for a smaller box returns an edge-cached, properly resized image
- * (cf=HIT, ~40KB vs ~740KB at full size) with no proxy hop. We rewrite the WxH
- * segment to the requested variant width, preserving the source aspect ratio so
- * posters (2:3) and episode thumbs (16:9) both stay correct.
+ * Asking its CDN for a smaller WHITELISTED box returns an edge-cached, resized
+ * image (cf=HIT, ~40KB vs ~740KB full size) with no proxy hop. We map the
+ * requested variant width to the nearest allowed CR size for the source's aspect
+ * (2:3 posters / 16:9 thumbs); unknown aspects fall back to the native URL.
  */
 function crResizedUrl(parsed: URL, width: number): string {
   const match = parsed.pathname.match(/\/(\d+)x(\d+)\//);
@@ -29,9 +36,14 @@ function crResizedUrl(parsed: URL, width: number): string {
   const srcW = Number(match[1]);
   const srcH = Number(match[2]);
   if (!srcW || !srcH) return parsed.toString();
-  const targetW = Math.min(width, srcW);
-  const targetH = Math.max(1, Math.round((targetW * srcH) / srcW));
-  parsed.pathname = parsed.pathname.replace(/\/\d+x\d+\//, `/${targetW}x${targetH}/`);
+  const ratio = srcW / srcH;
+  let sizes: [number, number][] | null = null;
+  if (Math.abs(ratio - 2 / 3) < 0.06) sizes = CR_PORTRAIT_SIZES;
+  else if (Math.abs(ratio - 16 / 9) < 0.12) sizes = CR_LANDSCAPE_SIZES;
+  if (!sizes) return parsed.toString(); // unknown aspect — native size already serves 200
+  const pick = sizes.find(([w]) => w >= width) ?? sizes[sizes.length - 1];
+  if (pick[0] >= srcW) return parsed.toString(); // never upscale past the source
+  parsed.pathname = parsed.pathname.replace(/\/\d+x\d+\//, `/${pick[0]}x${pick[1]}/`);
   return parsed.toString();
 }
 
