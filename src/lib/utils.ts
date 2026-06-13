@@ -220,11 +220,31 @@ function watchedAtMillis(value: unknown) {
   return 0;
 }
 
+// Only the fields the history UI actually renders. Persisting the WHOLE anime
+// object (synopsis, genres, banners, studios…) per episode quickly blew past the
+// ~5MB localStorage quota — QuotaExceededError on setItem. Keep this list lean.
+const HISTORY_KEEP_KEYS: string[] = [
+  "mal_id", "anime_id", "id", "title", "title_en", "name",
+  "poster", "image", "image_url", "img_url", "cover", "thumbnail", "cr_poster",
+  "format", "status", "score",
+  "episode", "episode_num", "num_episodes", "episode_count", "episodes",
+  "playback_pos", "progress", "timestamp", "watched_at",
+];
+
+function slimHistoryItem(item: LibraryItem): LibraryItem {
+  const out: Record<string, unknown> = {};
+  for (const key of HISTORY_KEEP_KEYS) {
+    const value = (item as Record<string, unknown>)[key];
+    if (value !== undefined && value !== null && value !== "") out[key] = value;
+  }
+  return out as LibraryItem;
+}
+
 function normalizeHistoryItem(item: LibraryItem, id: string, episode: string | number): LibraryItem {
   const playbackPos = progressOf(item);
   const numericEpisode = Number(episode);
   return {
-    ...item,
+    ...slimHistoryItem(item),
     mal_id: id,
     anime_id: id,
     episode: Number.isFinite(numericEpisode) ? numericEpisode : 1,
@@ -234,6 +254,42 @@ function normalizeHistoryItem(item: LibraryItem, id: string, episode: string | n
     timestamp: playbackPos,
     watched_at: item.watched_at || new Date().toISOString(),
   };
+}
+
+// Remove stored episode entries whose key is no longer in the (capped) index, so
+// old per-episode blobs can't accumulate forever.
+function pruneOrphanHistoryKeys(keepKeys: Set<string>) {
+  if (typeof window === "undefined") return;
+  const toRemove: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (isHistoryStorageKey(key) && !keepKeys.has(key)) toRemove.push(key);
+  }
+  toRemove.forEach((key) => window.localStorage.removeItem(key));
+}
+
+// setItem that survives a full quota: drop progressively more old history and
+// retry, so a watch never crashes the player with QuotaExceededError.
+function setItemWithQuotaGuard(key: string, value: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    for (const keep of [120, 40, 10, 0]) {
+      const index = readHistoryIndex();
+      const keepKeys = new Set(index.slice(0, keep).map((entry) => entry.key));
+      keepKeys.add(key);
+      pruneOrphanHistoryKeys(keepKeys);
+      try {
+        window.localStorage.setItem(key, value);
+        return true;
+      } catch {
+        // still over quota — prune harder on the next pass
+      }
+    }
+    return false;
+  }
 }
 
 function notifyHistoryUpdated(item?: LibraryItem) {
@@ -251,14 +307,16 @@ export function rememberProgress(item: LibraryItem) {
   if (!id || typeof window === "undefined") return;
   const key = historyKey(id, episode);
   const saved = normalizeHistoryItem(item, id, episode);
-  window.localStorage.setItem(key, JSON.stringify(saved));
+  if (!setItemWithQuotaGuard(key, JSON.stringify(saved))) return;
 
   const pointer: HistoryPointer = { key, mal_id: id, episode, watched_at: saved.watched_at };
   const nextIndex = [
     pointer,
     ...readHistoryIndex().filter((entry) => String(entry.mal_id) !== id),
-  ].slice(0, 250);
-  window.localStorage.setItem(HISTORY_INDEX_KEY, JSON.stringify(nextIndex));
+  ].slice(0, 150);
+  // Drop episode blobs that fell out of the capped index so storage stays bounded.
+  pruneOrphanHistoryKeys(new Set(nextIndex.map((entry) => entry.key)));
+  setItemWithQuotaGuard(HISTORY_INDEX_KEY, JSON.stringify(nextIndex));
   notifyHistoryUpdated(saved);
 }
 
