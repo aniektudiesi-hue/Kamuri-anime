@@ -32,9 +32,14 @@ const REGIONAL_CATALOG_ORIGINS = {
   usEast: "https://animetvplus-catalog-api-usa-east.onrender.com",
   europe: "https://animetvplus-catalog-api-europe.onrender.com",
 };
+// TEMPORARY: the India origin's Turso DB is over its free-tier quota and 500s on
+// every query. Block it entirely — Asia/Oceania traffic routes to Europe (the
+// nearest healthy region) and India is dropped from the failover pool so no
+// request wastes a hop on it. Flip back to false once India's Turso is restored.
+const INDIA_ORIGIN_DISABLED = true;
 const CATALOG_FAILOVER_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 const CATALOG_CR_ENRICH_PREFIXES = ["/api/search", "/api/anime/", "/api/catalog"];
-const CATALOG_CACHE_VERSION = "catalog-v8";
+const CATALOG_CACHE_VERSION = "catalog-v9";
 const MOON_CACHE_TTL = 3600;
 const MANIFEST_CACHE_TTL = 600;
 const MANIFEST_STALE_TTL = 1800;
@@ -246,9 +251,12 @@ function catalogOriginPool(request, env) {
     env.CATALOG_ORIGIN_US_EAST || REGIONAL_CATALOG_ORIGINS.usEast,
     env.CATALOG_ORIGIN_US_WEST || REGIONAL_CATALOG_ORIGINS.usWest,
     env.CATALOG_ORIGIN_EUROPE || REGIONAL_CATALOG_ORIGINS.europe,
-    env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india,
+    // India dropped from the pool while its Turso quota is exhausted.
+    INDIA_ORIGIN_DISABLED ? null : (env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india),
   ];
-  return [...new Set(ordered.filter(Boolean).map((value) => value.replace(/\/$/, "")))];
+  const indiaOrigin = (env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india).replace(/\/$/, "");
+  return [...new Set(ordered.filter(Boolean).map((value) => value.replace(/\/$/, "")))]
+    .filter((value) => !INDIA_ORIGIN_DISABLED || value !== indiaOrigin);
 }
 
 function selectCatalogOrigin(request, env) {
@@ -261,7 +269,12 @@ function selectCatalogOrigin(request, env) {
   const longitude = Number(cf.longitude || 0);
 
   if (continent === "EU" || continent === "AF") return env.CATALOG_ORIGIN_EUROPE || REGIONAL_CATALOG_ORIGINS.europe;
-  if (continent === "AS" || continent === "OC") return env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india;
+  if (continent === "AS" || continent === "OC") {
+    // India's Turso is over quota — send Asia/Oceania to Europe (nearest healthy
+    // region) until it's restored.
+    if (INDIA_ORIGIN_DISABLED) return env.CATALOG_ORIGIN_EUROPE || REGIONAL_CATALOG_ORIGINS.europe;
+    return env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india;
+  }
   if (country === "US" || country === "CA" || country === "MX") {
     return longitude && longitude < -100
       ? env.CATALOG_ORIGIN_US_WEST || REGIONAL_CATALOG_ORIGINS.usWest
@@ -312,7 +325,12 @@ function regionForRequest(request) {
 }
 
 function originForRegion(region, env) {
-  if (region === "india") return env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india;
+  // India over quota — its sticky cookie maps to Europe until restored.
+  if (region === "india") {
+    return INDIA_ORIGIN_DISABLED
+      ? env.CATALOG_ORIGIN_EUROPE || REGIONAL_CATALOG_ORIGINS.europe
+      : env.CATALOG_ORIGIN_INDIA || REGIONAL_CATALOG_ORIGINS.india;
+  }
   if (region === "usWest") return env.CATALOG_ORIGIN_US_WEST || REGIONAL_CATALOG_ORIGINS.usWest;
   if (region === "europe") return env.CATALOG_ORIGIN_EUROPE || REGIONAL_CATALOG_ORIGINS.europe;
   return env.CATALOG_ORIGIN_US_EAST || REGIONAL_CATALOG_ORIGINS.usEast;
