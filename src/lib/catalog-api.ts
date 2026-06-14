@@ -298,8 +298,8 @@ export async function fetchCatalogEpisodes(malId: string, hint = 0): Promise<Epi
   };
 }
 
-// Fallback when an episode exists but has no m3u8 in our own DB.
-const ANIME_SEARCH_STREAM_BASE = "https://anime-search-api-burw.onrender.com";
+// Stream resolver — the CF worker proxies m3u8 segments (handles CORS/Referer).
+const ANIME_SEARCH_STREAM_BASE = "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 
 function hasPlayable(row: { m3u8_url?: string } | undefined) {
   return Boolean(row && row.m3u8_url);
