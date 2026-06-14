@@ -23,7 +23,6 @@ import {
   STREAM_PROVIDERS,
   fetchStreamProvider,
   hasPlayableStream,
-  iframeUrlOf,
   streamProviderCacheKey,
   streamProviderIndex,
   streamProviderQueryKey,
@@ -120,7 +119,7 @@ export default function WatchPage({
       enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
         provider.id === DEFAULT_STREAM_PROVIDER_ID || secondaryDataEnabled
       ) && (
-        type !== "dub" || provider.id === "megaplay" || provider.id === "hd1"
+        type !== "dub" || provider.id === "hd1"
       ),
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,
@@ -135,7 +134,7 @@ export default function WatchPage({
   const megaHasPlayableStream = hasPlayableStream(megaQuery?.data);
   const showAudioControls = megaHasPlayableStream;
   const playableServers = STREAM_PROVIDERS.filter((provider, i) => {
-    if (type === "dub") return (provider.id === "megaplay" || provider.id === "hd1") && hasPlayableStream(streamQueries[i]?.data);
+    if (type === "dub") return provider.id === "hd1" && hasPlayableStream(streamQueries[i]?.data);
     return hasPlayableStream(streamQueries[i]?.data);
   });
   const availableServers = playableServers;
@@ -502,18 +501,6 @@ export default function WatchPage({
                   }}
                 />
               </div>
-            ) : iframeUrlOf(selectedStreamForPlayer) && !streamUrlOf(selectedStreamForPlayer) ? (
-              <div className="relative aspect-video w-full overflow-hidden bg-black">
-                <iframe
-                  key={playerEpisodeKey}
-                  src={iframeUrlOf(selectedStreamForPlayer)}
-                  className="absolute inset-0 h-full w-full border-0"
-                  allowFullScreen
-                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                  referrerPolicy="no-referrer"
-                  scrolling="no"
-                />
-              </div>
             ) : (
               <VideoPlayer
                 key={playerEpisodeKey}
@@ -658,7 +645,7 @@ export default function WatchPage({
                         key={a}
                         onClick={() => {
                           setType(a);
-                          if (a === "dub" && server !== "megaplay" && server !== "hd1") setServer("megaplay");
+                          if (a === "dub" && server !== "hd1") setServer("hd1");
                         }}
                         className={`rounded-xl px-4 py-2 text-sm font-bold uppercase transition ${
                           type === a

@@ -3,7 +3,7 @@ import { warmMoonPipeline, warmStreamManifest } from "./stream-cache";
 import type { StreamResponse, Subtitle } from "./types";
 
 export type StreamAudioType = "sub" | "dub";
-export type StreamProviderId = "hd1" | "hd2" | "megaplay" | "moon" | (string & {});
+export type StreamProviderId = "hd1" | "hd2" | "moon" | (string & {});
 
 export type StreamProvider = {
   id: StreamProviderId;
@@ -56,14 +56,6 @@ export const STREAM_PROVIDERS = [
     warm: (stream) => warmStreamManifest(stream, { segments: 2, timeoutMs: 8_000 }),
   },
   {
-    id: "megaplay",
-    label: "Megaplay",
-    desc: "Megaplay CDN",
-    queryType: (type) => type,
-    fetch: (malId, episode, type) => api.megaplay(malId, episode, type),
-    retry: false,
-  },
-  {
     id: "hd2",
     label: "HD2",
     desc: "AnimeTVPlus edge",
@@ -87,12 +79,8 @@ export function streamUrlOf(data: StreamResponse | undefined) {
   return data?.m3u8_url || data?.url || data?.stream_url || "";
 }
 
-export function iframeUrlOf(data: StreamResponse | undefined) {
-  return data?.iframe_url || data?.embed_url || "";
-}
-
 export function hasPlayableStream(data: StreamResponse | undefined) {
-  return Boolean(streamUrlOf(data) || iframeUrlOf(data));
+  return Boolean(streamUrlOf(data));
 }
 
 export function subtitlesOfStream(data: StreamResponse | undefined): Subtitle[] {

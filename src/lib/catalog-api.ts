@@ -70,7 +70,6 @@ type CatalogStreamRow = {
   m3u8_url?: string;
   subtitles?: string | Subtitle[];
   server_id?: number | string;
-  iframe_url?: string;
   internal_id?: string;
   real_id?: string;
   media_id?: string;
@@ -299,28 +298,17 @@ export async function fetchCatalogEpisodes(malId: string, hint = 0): Promise<Epi
   };
 }
 
-// DUB is always served via the megaplay.buzz embed iframe.
-const MEGAPLAY_EMBED_BASE = "https://megaplay.buzz/stream/mal";
-// SUB fallback when an episode exists but has no m3u8 in our own DB.
+// Fallback when an episode exists but has no m3u8 in our own DB.
 const ANIME_SEARCH_STREAM_BASE = "https://anime-search-api-burw.onrender.com";
 
-function hasPlayable(row: { m3u8_url?: string; iframe_url?: string } | undefined) {
-  return Boolean(row && (row.m3u8_url || row.iframe_url));
+function hasPlayable(row: { m3u8_url?: string } | undefined) {
+  return Boolean(row && row.m3u8_url);
 }
 
 export async function fetchCatalogStream(malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> {
   const epNum = String(episode);
 
-  // DUB → always the megaplay.buzz iframe embed (no DB lookup).
-  if (type === "dub") {
-    return {
-      iframe_url: `${MEGAPLAY_EMBED_BASE}/${encodeURIComponent(malId)}/${encodeURIComponent(epNum)}/dub`,
-      mal_id: malId,
-      episode_num: epNum,
-    };
-  }
-
-  // SUB → try our own backend DB FIRST (single-stream endpoint, then the streams list).
+  // Try our own backend DB FIRST (single-stream endpoint, then the streams list).
   const params = new URLSearchParams({ stream_type: type });
   const single = await catalogClientGet<{ stream?: CatalogStreamRow; anime?: CatalogAnime }>(
     `/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(epNum)}?${params.toString()}`,
@@ -329,7 +317,6 @@ export async function fetchCatalogStream(malId: string, episode: string | number
   if (hasPlayable(single?.stream)) {
     return {
       m3u8_url: single!.stream!.m3u8_url,
-      iframe_url: single!.stream!.iframe_url,
       subtitles: normalizeSubtitles(single!.stream!.subtitles),
       server_id: Number(single!.stream!.server_id || 0) || undefined,
       mal_id: malId,
@@ -345,7 +332,6 @@ export async function fetchCatalogStream(malId: string, episode: string | number
   if (hasPlayable(row)) {
     return {
       m3u8_url: row!.m3u8_url,
-      iframe_url: row!.iframe_url,
       subtitles: normalizeSubtitles(row!.subtitles),
       server_id: Number(row!.server_id || 0) || undefined,
       mal_id: malId,
@@ -353,14 +339,10 @@ export async function fetchCatalogStream(malId: string, episode: string | number
     };
   }
 
-  // SUB fallback → episode exists but our DB has no m3u8: pull it directly from
-  // the anime-search API (https://anime-search-api-burw.onrender.com/api/stream/<mal>/<ep>).
-  const fallback = await fetchAnimeSearchStream(malId, epNum);
+  // Fallback → pull directly from the anime-search API.
+  const fallback = await fetchAnimeSearchStream(malId, epNum, type);
   if (fallback) {
-    // Write it back to our DB so the next view is served from the DB (player asks
-    // DB first, only hits the resolver on a miss). Fire-and-forget — caching must
-    // never delay or block playback.
-    void cacheResolvedStream(malId, epNum, "sub", fallback);
+    void cacheResolvedStream(malId, epNum, type, fallback);
     return fallback;
   }
 
@@ -376,7 +358,7 @@ async function cacheResolvedStream(
   stream: StreamResponse,
 ): Promise<void> {
   if (typeof window === "undefined") return;
-  if (!stream.m3u8_url && !stream.iframe_url) return;
+  if (!stream.m3u8_url) return;
   try {
     await fetch(`/api/catalog-proxy/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}`, {
       method: "POST",
@@ -384,7 +366,6 @@ async function cacheResolvedStream(
       body: JSON.stringify({
         stream_type: type,
         m3u8_url: stream.m3u8_url || "",
-        iframe_url: stream.iframe_url || "",
         subtitles: stream.subtitles || [],
         server_id: stream.server_id || "",
       }),
@@ -397,7 +378,6 @@ async function cacheResolvedStream(
 
 type AnimeSearchStreamPayload = {
   m3u8_url?: string; url?: string; stream_url?: string;
-  iframe_url?: string; embed_url?: string;
   sources?: Array<{ url?: string; file?: string; type?: string; quality?: string }>;
   subtitles?: string | Subtitle[] | Array<{ lang?: string; language?: string; label?: string; url?: string; file?: string }>;
   subtitle_url?: string; server_id?: number | string;
@@ -438,11 +418,9 @@ async function fetchAnimeSearchStream(malId: string, episode: string, type: "sub
     if (!res.ok) return undefined;
     const data = (await res.json()) as AnimeSearchStreamPayload;
     const m3u8 = pickSource(data);
-    const iframe = data.iframe_url || data.embed_url;
-    if (!m3u8 && !iframe) return undefined;
+    if (!m3u8) return undefined;
     return {
       m3u8_url: m3u8,
-      iframe_url: iframe,
       subtitles: mapResolverSubtitles(data.subtitles),
       subtitle_url: data.subtitle_url,
       server_id: Number(data.server_id || 0) || undefined,
