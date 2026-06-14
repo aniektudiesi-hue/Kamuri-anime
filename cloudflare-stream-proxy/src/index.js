@@ -34,7 +34,7 @@ const REGIONAL_CATALOG_ORIGINS = {
 };
 const CATALOG_FAILOVER_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 const CATALOG_CR_ENRICH_PREFIXES = ["/api/search", "/api/anime/", "/api/catalog"];
-const CATALOG_CACHE_VERSION = "catalog-v7";
+const CATALOG_CACHE_VERSION = "catalog-v8";
 const MOON_CACHE_TTL = 3600;
 const MANIFEST_CACHE_TTL = 600;
 const MANIFEST_STALE_TTL = 1800;
@@ -131,7 +131,7 @@ async function proxyOrigin(request, env, ctx) {
   const cache = caches.default;
   const primaryOrigin = catalogApi ? selectCatalogOrigin(request, env) : env.ORIGIN_BASE;
   const primaryTarget = new URL(incoming.pathname + incoming.search, primaryOrigin);
-  const cacheKeyUrl = catalogCacheKeyUrl(incoming);
+  const cacheKeyUrl = catalogCacheKeyUrl(incoming, catalogApi ? primaryOrigin : null);
   const cacheKey = new Request(catalogApi ? cacheKeyUrl : primaryTarget.toString(), { headers: cacheVaryHeaders(request) });
   if (canCache) {
     const hot = streamApi ? streamApiMemoryGet(primaryTarget.toString()) : null;
@@ -169,8 +169,17 @@ async function proxyOrigin(request, env, ctx) {
   return withCatalogDebugHeaders(withCors(response, streamApi), upstream.origin, upstream.attempts);
 }
 
-function catalogCacheKeyUrl(incoming) {
-  const key = new URL(`${incoming.origin}/${CATALOG_CACHE_VERSION}${incoming.pathname}`);
+function catalogCacheKeyUrl(incoming, originValue) {
+  // Partition the cache by the SELECTED backend region. Without this, one region's
+  // cached response is served to every region (and a cold/failed-over origin could
+  // poison the cache globally) — so an India user could get a US-cached payload.
+  // Tagging the key with the origin host keeps "India frontend -> India backend"
+  // true at the cache layer, every time.
+  let regionTag = "shared";
+  if (originValue) {
+    try { regionTag = new URL(originValue).host.split(".")[0]; } catch { regionTag = "shared"; }
+  }
+  const key = new URL(`${incoming.origin}/${CATALOG_CACHE_VERSION}/${regionTag}${incoming.pathname}`);
   for (const [name, value] of incoming.searchParams.entries()) {
     if (name === "__cf_cache_only" || name === "__cf_warm") continue;
     key.searchParams.append(name, value);
@@ -191,6 +200,12 @@ async function fetchOriginWithFailover(request, incoming, env, catalogApi, canCa
   for (const originValue of origins) {
     const origin = new URL(originValue);
     const target = new URL(incoming.pathname + incoming.search, origin);
+    // Tag the origin subrequest with the cache version. Cloudflare edge-caches this
+    // fetch (cf.cacheTtl, up to 1800s for /api/cr/), and that layer is NOT purged by
+    // bumping the internal cache key — so without this, a stale origin response stays
+    // pinned for the full TTL even after the origin redeploys. Bumping the version
+    // changes this URL, forcing a fresh origin fetch. The origin ignores the param.
+    if (catalogApi) target.searchParams.set("__cv", CATALOG_CACHE_VERSION);
     const headers = copyRequestHeaders(request.headers);
     headers.set("host", origin.host);
     headers.set("x-forwarded-host", incoming.host);
