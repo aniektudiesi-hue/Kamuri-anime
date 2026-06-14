@@ -259,7 +259,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const heroSrc = imageCdnUrl(heroImage, "banner-lg");
   const previewSrc = imageCdnUrl(heroImage || posterImage, "banner-sm");
   const initialSeasonReady = !useSeasons || Boolean(crCard.data?.selected_season);
-  const detailDataPending = crPending || (needsMetadataFallback && metadataFallback.isLoading) || !initialSeasonReady;
+  const detailDataPending = (needsMetadataFallback && metadataFallback.isLoading);
   // The buffer clears as soon as the DATA (CR card + season-1) is ready — it must
   // NOT wait for the heavy hero banner image to finish downloading (that fades in
   // on its own). A hard escape (below) guarantees the page never hangs forever on
@@ -285,7 +285,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   // even if the backend or hero image is still resolving.
   useEffect(() => {
     setBufferEscape(false);
-    const timer = window.setTimeout(() => setBufferEscape(true), 3500);
+    const timer = window.setTimeout(() => setBufferEscape(true), 1500);
     return () => window.clearTimeout(timer);
   }, [malId]);
 

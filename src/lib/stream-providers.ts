@@ -37,7 +37,7 @@ function viaWorker(stream: StreamResponse | undefined, host: string): StreamResp
   } as StreamResponse;
 }
 
-export const DEFAULT_STREAM_PROVIDER_ID = "megaplay" satisfies StreamProviderId;
+export const DEFAULT_STREAM_PROVIDER_ID = "hd1" satisfies StreamProviderId;
 
 function warmMoonStream(stream: StreamResponse | undefined) {
   if (!warmMoonPipeline(stream, 12)) {
@@ -47,14 +47,6 @@ function warmMoonStream(stream: StreamResponse | undefined) {
 
 export const STREAM_PROVIDERS = [
   {
-    id: DEFAULT_STREAM_PROVIDER_ID,
-    label: "Megaplay",
-    desc: "Megaplay CDN",
-    queryType: (type) => type,
-    fetch: (malId, episode, type) => api.megaplay(malId, episode, type),
-    retry: false,
-  },
-  {
     id: "hd1",
     label: "HD1",
     desc: "Kamuri edge",
@@ -62,6 +54,14 @@ export const STREAM_PROVIDERS = [
     fetch: (malId, episode, type) => api.stream(malId, episode, type),
     retry: 1,
     warm: (stream) => warmStreamManifest(stream, { segments: 2, timeoutMs: 8_000 }),
+  },
+  {
+    id: "megaplay",
+    label: "Megaplay",
+    desc: "Megaplay CDN",
+    queryType: (type) => type,
+    fetch: (malId, episode, type) => api.megaplay(malId, episode, type),
+    retry: false,
   },
   {
     id: "hd2",

@@ -120,7 +120,7 @@ export default function WatchPage({
       enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
         provider.id === DEFAULT_STREAM_PROVIDER_ID || secondaryDataEnabled
       ) && (
-        type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID || provider.id === "hd1"
+        type !== "dub" || provider.id === "megaplay" || provider.id === "hd1"
       ),
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,
@@ -135,7 +135,7 @@ export default function WatchPage({
   const megaHasPlayableStream = hasPlayableStream(megaQuery?.data);
   const showAudioControls = megaHasPlayableStream;
   const playableServers = STREAM_PROVIDERS.filter((provider, i) => {
-    if (type === "dub") return (provider.id === DEFAULT_STREAM_PROVIDER_ID || provider.id === "hd1") && hasPlayableStream(streamQueries[i]?.data);
+    if (type === "dub") return (provider.id === "megaplay" || provider.id === "hd1") && hasPlayableStream(streamQueries[i]?.data);
     return hasPlayableStream(streamQueries[i]?.data);
   });
   const availableServers = playableServers;
@@ -658,7 +658,7 @@ export default function WatchPage({
                         key={a}
                         onClick={() => {
                           setType(a);
-                          if (a === "dub" && server !== DEFAULT_STREAM_PROVIDER_ID) setServer(DEFAULT_STREAM_PROVIDER_ID);
+                          if (a === "dub" && server !== "megaplay" && server !== "hd1") setServer("megaplay");
                         }}
                         className={`rounded-xl px-4 py-2 text-sm font-bold uppercase transition ${
                           type === a
