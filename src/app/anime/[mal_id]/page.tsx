@@ -12,7 +12,7 @@ import { SidebarLayout } from "@/components/sidebar";
 import { ProgressiveImage } from "@/components/progressive-image";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
-import { fetchCrCard, type CrSeason } from "@/lib/catalog-api";
+import { crCardQueryKey, fetchCrCard, type CrSeason } from "@/lib/catalog-api";
 import { directImageUrl, imageCdnUrl } from "@/lib/image-cdn";
 import { useAuth } from "@/lib/auth";
 import {
@@ -165,7 +165,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   // a revisit paints the CR hero instantly instead of re-fetching (which forced
   // the AniList backdrop to flash before the CR keyart swapped in).
   const crCard = useQuery({
-    queryKey: ["cr-card", "canonical-v8", malId, 1],
+    queryKey: crCardQueryKey(malId, 1),
     queryFn: () => fetchCrCard(malId, 1),
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
@@ -190,13 +190,43 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const activeSeasonIndex = useSeasons ? Math.min(activeRange, crSeasons.length - 1) : activeRange;
   const activeSeasonNumber = useSeasons ? (crSeasons[activeSeasonIndex]?.season_number ?? activeSeasonIndex + 1) : 1;
   const activeCrCard = useQuery({
-    queryKey: ["cr-card", "canonical-v8", malId, activeSeasonNumber],
+    queryKey: crCardQueryKey(malId, activeSeasonNumber),
     queryFn: () => fetchCrCard(malId, activeSeasonNumber),
     enabled: useSeasons,
     initialData: activeSeasonNumber === 1 ? crCard.data : undefined,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
   });
+
+  // HACK for instant season switching: the moment the card loads, warm EVERY
+  // season's payload in the background (staggered so we don't stampede the cold
+  // backend). Switching then reads straight from the React Query cache — no
+  // network round-trip, no spinner.
+  useEffect(() => {
+    if (!useSeasons || crSeasons.length < 2) return;
+    let cancelled = false;
+    const pending = crSeasons
+      .map((s) => s.season_number ?? 0)
+      .filter((sn) => sn > 0 && sn !== activeSeasonNumber);
+    let i = 0;
+    const pump = () => {
+      if (cancelled || i >= pending.length) return;
+      const sn = pending[i++];
+      queryClient
+        .prefetchQuery({
+          queryKey: crCardQueryKey(malId, sn),
+          queryFn: () => fetchCrCard(malId, sn),
+          staleTime: 1000 * 60 * 30,
+        })
+        .finally(() => {
+          if (!cancelled) window.setTimeout(pump, 120);
+        });
+    };
+    pump();
+    return () => {
+      cancelled = true;
+    };
+  }, [useSeasons, crSeasons, malId, activeSeasonNumber, queryClient]);
   const selectedCrSeason = useMemo(() => {
     const activeSummary = crSeasons[activeSeasonIndex];
     const activeSummaryKey = crSeasonKey(activeSummary);

@@ -239,13 +239,21 @@ export type CrCard = {
   selected_season?: CrSeason;
 };
 
+// Single source of truth for the cr-card React Query key. Card prefetch, the
+// detail page, and per-season fetches MUST use this so a version bump can't leave
+// them mismatched (a stale key = prefetch warms a cache nobody reads = slow open).
+export const CR_CARD_QUERY_VERSION = "canonical-v10";
+export function crCardQueryKey(malId: string | number, season = 1) {
+  return ["cr-card", CR_CARD_QUERY_VERSION, String(malId), season] as const;
+}
+
 export async function fetchCrCard(malId: string, season?: number): Promise<CrCard | null> {
   try {
     // Use our enriched backend (single source of truth — correct season grouping
     // + synopsis, matches the season-review app). Server-side hits it directly,
     // client-side via the proxy route to stay same-origin.
     const base = typeof window === "undefined" ? SEARCH_API_BASE : "/api/search-proxy";
-    const params = new URLSearchParams({ v: "canonical-v8" });
+    const params = new URLSearchParams({ v: "canonical-v10" });
     if (season && season > 0) params.set("season", String(season));
     const card = await fetch(`${base}/api/cr/card/${encodeURIComponent(malId)}?${params.toString()}`, {
       headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
