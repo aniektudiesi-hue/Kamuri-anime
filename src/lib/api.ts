@@ -211,9 +211,34 @@ export const api = {
   stream: (malId: string, episode: string | number, type: "sub" | "dub") =>
     fetchCatalogStream(malId, episode, type),
   megaplay: async (malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> => {
-    const key = `megaplay-iframe-v1:${malId}:${episode}:${type}`;
+    const key = `megaplay-v2:${malId}:${episode}:${type}`;
     const cached = readCachedStream(key);
     if (cached) return cached;
+
+    if (type === "dub") {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(String(episode))}?type=dub`,
+          { headers: { Accept: "application/json" } },
+        );
+        if (res.ok) {
+          const json = await res.json() as { sources?: { url?: string; quality?: string; type?: string }[]; subtitles?: { lang?: string; url?: string }[]; headers?: Record<string, string> };
+          const hlsSource = json.sources?.find((s) => s.type === "hls") ?? json.sources?.[0];
+          if (hlsSource?.url) {
+            const data: StreamResponse = {
+              m3u8_url: hlsSource.url,
+              server: "megaplay",
+              mal_id: malId,
+              episode_num: String(episode),
+              subtitles: json.subtitles?.map((s) => ({ file: s.url || "", label: s.lang || "English", kind: "subtitles" })).filter((s) => s.file),
+            };
+            writeCachedStream(key, data);
+            return data;
+          }
+        }
+      } catch { /* fall through to iframe */ }
+    }
+
     const data: StreamResponse = {
       iframe_url: `https://megaplay.buzz/stream/mal/${encodeURIComponent(malId)}/${encodeURIComponent(String(episode))}/${type}`,
       server: "megaplay",
