@@ -16,6 +16,10 @@ const CLOUDFLARE_CATALOG_BASE =
 // single crashed/cold origin (e.g. India render 500ing) from taking the site down.
 const RETRYABLE_STATUS = new Set([500, 502, 503, 504, 521, 522, 523, 524, 525, 526]);
 
+// Banned origins — skipped entirely. India's Turso is over quota and 500s on
+// every query, so don't even attempt it.
+const DISABLED_ORIGIN_HOSTS = new Set(["animetvplus-stream-backup-india.onrender.com"]);
+
 export async function GET(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   return proxyCatalog(request, context);
 }
@@ -94,6 +98,11 @@ function dedupeBases(bases: string[]) {
   for (const raw of bases) {
     const base = normalizeBase(raw);
     if (!base || seen.has(base)) continue;
+    try {
+      if (DISABLED_ORIGIN_HOSTS.has(new URL(base).host)) continue;
+    } catch {
+      continue;
+    }
     seen.add(base);
     out.push(base);
   }

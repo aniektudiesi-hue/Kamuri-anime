@@ -24,6 +24,10 @@ const CLOUDFLARE_CATALOG_BASE =
 // never take the site down when a healthy origin/worker is available.)
 const RETRYABLE_STATUS = new Set([500, 502, 503, 504, 521, 522, 523, 524, 525, 526]);
 
+// Origins to skip entirely (banned). India's Turso is over quota and 500s on
+// every query — don't even waste a hop on it; the worker handles the rest.
+const DISABLED_ORIGIN_HOSTS = new Set(["animetvplus-stream-backup-india.onrender.com"]);
+
 // Forwards /api/search-proxy/<path...> → upstream/<path...> (query preserved).
 // Used for our enriched search/discovery and the cr-card detail payload.
 export async function GET(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
@@ -85,6 +89,11 @@ function dedupeBases(bases: string[]) {
   for (const raw of bases) {
     const base = normalizeBase(raw);
     if (!base || seen.has(base)) continue;
+    try {
+      if (DISABLED_ORIGIN_HOSTS.has(new URL(base).host)) continue;
+    } catch {
+      continue;
+    }
     seen.add(base);
     out.push(base);
   }
