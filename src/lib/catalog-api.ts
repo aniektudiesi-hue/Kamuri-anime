@@ -308,7 +308,7 @@ function hasPlayable(row: { m3u8_url?: string } | undefined) {
 export async function fetchCatalogStream(malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> {
   const epNum = String(episode);
 
-  // Try our own backend DB FIRST (single-stream endpoint, then the streams list).
+  // Primary: our CF worker DB (fast, cached m3u8 URLs).
   const params = new URLSearchParams({ stream_type: type });
   const single = await catalogClientGet<{ stream?: CatalogStreamRow; anime?: CatalogAnime }>(
     `/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(epNum)}?${params.toString()}`,
@@ -323,6 +323,17 @@ export async function fetchCatalogStream(malId: string, episode: string | number
       episode_num: String(single!.stream!.episode || episode),
     };
   }
+
+  // If single-stream endpoint returned something but no m3u8, resolve live.
+  if (single?.stream) {
+    const fallback = await fetchAnimeSearchStream(malId, epNum, type);
+    if (fallback) {
+      void cacheResolvedStream(malId, epNum, type, fallback);
+      return fallback;
+    }
+  }
+
+  // Try the streams list from CF worker.
   const payload = await fetchCatalogStreams(malId, type);
   const target = Number(episode);
   const rows = payload.streams ?? [];
@@ -339,7 +350,7 @@ export async function fetchCatalogStream(malId: string, episode: string | number
     };
   }
 
-  // Fallback → pull directly from the anime-search API.
+  // Last resort: resolve live from Render backend.
   const fallback = await fetchAnimeSearchStream(malId, epNum, type);
   if (fallback) {
     void cacheResolvedStream(malId, epNum, type, fallback);
