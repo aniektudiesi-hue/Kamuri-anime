@@ -34,7 +34,7 @@ const REGIONAL_CATALOG_ORIGINS = {
 };
 const CATALOG_FAILOVER_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 const CATALOG_CR_ENRICH_PREFIXES = ["/api/search", "/api/anime/", "/api/catalog"];
-const CATALOG_CACHE_VERSION = "catalog-v6";
+const CATALOG_CACHE_VERSION = "catalog-v7";
 const MOON_CACHE_TTL = 3600;
 const MANIFEST_CACHE_TTL = 600;
 const MANIFEST_STALE_TTL = 1800;
