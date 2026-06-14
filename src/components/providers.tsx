@@ -7,6 +7,7 @@ import { useState } from "react";
 import { AuthProvider } from "@/lib/auth";
 import { AuthRequiredGate } from "@/components/auth-required-gate";
 import { AnalyticsTracker } from "@/components/analytics-tracker";
+import { ChunkReloadGuard } from "@/components/chunk-reload-guard";
 import { makeQueryClient } from "@/lib/query";
 import { SettingsProvider } from "@/lib/settings";
 import { HistoryPersistenceSync } from "@/components/history-persistence-sync";
@@ -33,7 +34,7 @@ const queryPersister = typeof window === "undefined"
   ? noopPersister
   : createSyncStoragePersister({
     storage: window.localStorage,
-    key: "animeTVplus-query-cache-v2",
+    key: "animeTVplus-query-cache-v3",
     throttleTime: 1200,
   });
 
@@ -56,6 +57,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }}
     >
+      <ChunkReloadGuard />
       <SettingsProvider>
         <AuthProvider>
           <AnalyticsTracker />

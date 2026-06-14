@@ -52,7 +52,7 @@ export function ProgressiveImage({
     <div className={`absolute inset-0 overflow-hidden bg-[#111217] ${className}`}>
       <div
         aria-hidden="true"
-        className={`absolute inset-0 bg-[linear-gradient(110deg,#111217_0%,#191b23_42%,#111217_78%)] bg-[length:220%_100%] transition-opacity duration-200 ${loaded ? "opacity-0" : "animate-[shimmer_1.15s_ease-in-out_infinite] opacity-100"}`}
+        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,#111217_0%,#191b23_42%,#111217_78%)] bg-[length:220%_100%] transition-opacity duration-150 ${loaded ? "opacity-0" : "animate-[shimmer_1.15s_ease-in-out_infinite] opacity-25"}`}
       />
       <Image
         src={currentSrc}
@@ -77,7 +77,7 @@ export function ProgressiveImage({
           setLoaded(true);
           onLoad?.();
         }}
-        className={`object-cover transition-opacity duration-200 ${loaded ? "opacity-100" : "opacity-0"} ${imgClassName}`}
+        className={`object-cover ${imgClassName}`}
       />
     </div>
   );

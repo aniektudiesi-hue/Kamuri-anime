@@ -1,4 +1,4 @@
-import { getEpisodeMetadata, getHomeAnimeCatalog } from "@/lib/server-anime";
+import { getHomeAnimeCatalog } from "@/lib/server-anime";
 import { videoUploadDate } from "@/lib/seo";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 import { animeId, episodeCount, posterOf, titleOf, watchPath } from "@/lib/utils";
@@ -20,16 +20,10 @@ export async function GET() {
     const title = titleOf(anime) === "Untitled" ? `Anime ${id}` : titleOf(anime);
     const poster = posterOf(anime) || absoluteUrl("/opengraph-image");
     const knownCount = episodeCount(anime);
-    const episodeMetadata = await getEpisodeMetadata(id, knownCount);
-    const episodes = episodeMetadata?.episodes?.length
-      ? episodeMetadata.episodes.map((episode) => ({
-          number: episode.episode_number,
-          title: episode.title || `${title} Episode ${episode.episode_number}`,
-        }))
-      : Array.from({ length: Math.min(knownCount, MAX_VIDEOS_PER_ANIME) }, (_, index) => ({
-          number: index + 1,
-          title: `${title} Episode ${index + 1}`,
-        }));
+    const episodes = Array.from({ length: Math.min(knownCount, MAX_VIDEOS_PER_ANIME) }, (_, index) => ({
+      number: index + 1,
+      title: `${title} Episode ${index + 1}`,
+    }));
 
     for (const episode of prioritizedVideoEpisodes(episodes, MAX_VIDEOS_PER_ANIME)) {
       if (urls.length >= MAX_TOTAL_VIDEOS) break;

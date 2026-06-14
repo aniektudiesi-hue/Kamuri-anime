@@ -48,6 +48,7 @@ const MOON_SEGMENT_CACHE_TTL = SEGMENT_CACHE_TTL;
 const STREAM_API_MEMORY_TTL = 30 * 60 * 1000;
 const IMAGE_CACHE_TTL = 60 * 60 * 24 * 30;
 const STREAM_CACHE_VERSION = "v5";
+const STREAM_API_CACHE_VERSION = "stream-api-v4";
 const GENERIC_WARM_DEFAULT_SEGMENTS = 18;
 const GENERIC_WARM_MAX_SEGMENTS = 36;
 const GENERIC_WARM_STARTUP_SEGMENTS = 6;
@@ -128,7 +129,7 @@ export default worker;
 async function proxyOrigin(request, env, ctx) {
   const incoming = new URL(request.url);
   const catalogApi = isCatalogApiPath(incoming.pathname);
-  const streamApi = STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)) && !catalogApi;
+  const streamApi = STREAM_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix));
   const canCache =
     request.method === "GET" &&
     (PUBLIC_API_PREFIXES.some((prefix) => incoming.pathname.startsWith(prefix)) || PUBLIC_API_PATHS.includes(incoming.pathname));
@@ -137,7 +138,8 @@ async function proxyOrigin(request, env, ctx) {
   const primaryOrigin = catalogApi ? selectCatalogOrigin(request, env) : env.ORIGIN_BASE;
   const primaryTarget = new URL(incoming.pathname + incoming.search, primaryOrigin);
   const cacheKeyUrl = catalogCacheKeyUrl(incoming, catalogApi ? primaryOrigin : null);
-  const cacheKey = new Request(catalogApi ? cacheKeyUrl : primaryTarget.toString(), { headers: cacheVaryHeaders(request) });
+  const streamApiCacheKeyUrl = streamApi ? versionedStreamApiCacheKey(primaryTarget) : primaryTarget.toString();
+  const cacheKey = new Request(streamApi ? streamApiCacheKeyUrl : catalogApi ? cacheKeyUrl : primaryTarget.toString(), { headers: cacheVaryHeaders(request) });
   if (canCache) {
     const hot = streamApi ? streamApiMemoryGet(primaryTarget.toString()) : null;
     if (hot) {
@@ -189,6 +191,12 @@ function catalogCacheKeyUrl(incoming, originValue) {
     if (name === "__cf_cache_only" || name === "__cf_warm") continue;
     key.searchParams.append(name, value);
   }
+  return key.toString();
+}
+
+function versionedStreamApiCacheKey(target) {
+  const key = new URL(target.toString());
+  key.searchParams.set("__stream_api_cache", STREAM_API_CACHE_VERSION);
   return key.toString();
 }
 
@@ -490,11 +498,7 @@ async function proxyM3u8(request, env, ctx) {
   const cached = await cache.match(cacheKey);
   if (cached) return withCors(cached, false);
 
-  const upstream = await fetch(src, {
-    headers: upstreamHeaders(src, env),
-    redirect: "follow",
-    cf: { cacheTtl: MANIFEST_CACHE_TTL, cacheEverything: true },
-  });
+  const upstream = await fetchGenericManifest(src, env);
 
   if (!upstream.ok) return upstreamError(upstream);
 
@@ -669,11 +673,11 @@ async function proxyChunk(request, env, ctx) {
   }
 
   const upstream = range
-    ? await fetchGenericSegment(src, headers, range)
+    ? await fetchGenericSegment(src, headers, range, env)
     : await genericInflightDedupe(`chunk:${src}`, async () => {
         const cached = await cache.match(cacheKey);
         if (cached) return cached;
-        const fetched = await fetchGenericSegment(src, headers, "");
+        const fetched = await fetchGenericSegment(src, headers, "", env);
         if (fetched.status === 200) {
           const cacheable = streamUpstream(fetched, detectMime(src), `public, max-age=${SEGMENT_CACHE_TTL}, immutable`);
           await cache.put(cacheKey, cacheable.clone());
@@ -705,15 +709,34 @@ async function proxyVtt(request, env, ctx) {
   return response;
 }
 
-async function fetchGenericSegment(src, headers, range = "") {
+async function fetchGenericSegment(src, headers, range = "", env = {}) {
   const requestHeaders = new Headers(headers);
   if (range) requestHeaders.set("range", range);
-  return fetch(src, {
+  return fetchGenericWithRetries(src, requestHeaders, {
     method: "GET",
-    headers: requestHeaders,
     redirect: "follow",
     cf: { cacheTtl: range ? 0 : SEGMENT_CACHE_TTL, cacheEverything: !range },
-  });
+  }, env);
+}
+
+async function fetchGenericManifest(src, env) {
+  return fetchGenericWithRetries(src, upstreamHeaders(src, env), {
+    redirect: "follow",
+    cf: { cacheTtl: MANIFEST_CACHE_TTL, cacheEverything: true },
+  }, env);
+}
+
+async function fetchGenericWithRetries(src, headers, init = {}, env = {}) {
+  const variants = upstreamHeaderVariants(src, env, headers);
+  let last = null;
+  for (const variant of variants) {
+    const response = await fetch(src, { ...init, headers: variant });
+    last = response;
+    if (response.ok || response.status === 206) return response;
+    if (![401, 403, 404].includes(response.status)) return response;
+    try { await response.body?.cancel(); } catch {}
+  }
+  return last || fetch(src, { ...init, headers });
 }
 
 async function warmGenericPipeline(playlistUrl, playlistText, env, segmentCount = GENERIC_WARM_DEFAULT_SEGMENTS) {
@@ -749,7 +772,7 @@ async function warmGenericResource(url, env) {
     const cache = caches.default;
     const key = streamCacheRequest("chunk", url);
     if (await cache.match(key)) return;
-    const upstream = await fetchGenericSegment(url, upstreamHeaders(url, env));
+    const upstream = await fetchGenericSegment(url, upstreamHeaders(url, env), "", env);
     if (upstream.status !== 200) return;
     await cache.put(key, streamUpstream(upstream, detectMime(url), `public, max-age=${SEGMENT_CACHE_TTL}, immutable`));
   });
@@ -760,11 +783,7 @@ async function fetchGenericTextCached(url, env) {
   const key = streamCacheRequest("m3u8-raw", url);
   const cached = await cache.match(key);
   if (cached) return cached.text();
-  const upstream = await fetch(url, {
-    headers: upstreamHeaders(url, env),
-    redirect: "follow",
-    cf: { cacheTtl: MANIFEST_CACHE_TTL, cacheEverything: true },
-  });
+  const upstream = await fetchGenericManifest(url, env);
   if (!upstream.ok) throw new Error(`CDN ${upstream.status}`);
   const text = await upstream.text();
   await cache.put(key, new Response(text, {
@@ -901,6 +920,10 @@ function rewriteStreamPayload(value, workerOrigin) {
   const copy = { ...value };
   for (const key of ["m3u8_url", "url", "stream_url"]) {
     if (typeof copy[key] === "string" && copy[key]) {
+      if (isMewstreamUrl(copy[key])) {
+        copy[key] = "";
+        continue;
+      }
       copy[key] = streamProxyUrl(workerOrigin, copy[key]);
     }
   }
@@ -911,7 +934,23 @@ function rewriteStreamPayload(value, workerOrigin) {
       return { ...track, file: isAlreadyWorkerProxy(file, workerOrigin) ? file : proxyUrl(workerOrigin, "/proxy/vtt", file) };
     });
   }
+  for (const [key, nested] of Object.entries(copy)) {
+    if (key === "subtitles") continue;
+    if (nested && typeof nested === "object") copy[key] = rewriteStreamPayload(nested, workerOrigin);
+  }
   return copy;
+}
+
+function isMewstreamUrl(value) {
+  try {
+    const parsed = new URL(normalizeMaybeOriginUrl(value, "https://anime-tv-stream-proxy.local"));
+    if (parsed.hostname.toLowerCase().includes("mewstream.buzz")) return true;
+    const nestedSrc = parsed.searchParams.get("src");
+    if (!nestedSrc) return false;
+    return new URL(decodeURIComponent(nestedSrc)).hostname.toLowerCase().includes("mewstream.buzz");
+  } catch {
+    return false;
+  }
 }
 
 async function fetchMoonPlayback(videoId) {
@@ -1536,7 +1575,7 @@ function normalizeMaybeOriginUrl(value, workerOrigin) {
 function isAlreadyWorkerProxy(value, workerOrigin) {
   const parsed = new URL(value);
   const worker = new URL(workerOrigin);
-  return parsed.host === worker.host && parsed.pathname.startsWith("/proxy/");
+  return parsed.pathname.startsWith("/proxy/") && (parsed.host === worker.host || parsed.hostname.endsWith(".workers.dev"));
 }
 
 function proxyUrl(origin, route, src) {
@@ -1546,21 +1585,40 @@ function proxyUrl(origin, route, src) {
 function upstreamHeaders(src, env) {
   const host = new URL(src).hostname.toLowerCase();
   const policy = proxyPolicy(host, env);
+  return headersFromPolicy(policy);
+}
+
+function headersFromPolicy(policy) {
   const headers = new Headers();
   headers.set("user-agent", policy.ua);
   headers.set("accept", "*/*");
   headers.set("accept-language", "en-US,en;q=0.9");
   headers.set("origin", policy.origin);
   headers.set("referer", policy.referer);
+  if (policy.secFetchSite) headers.set("sec-fetch-site", policy.secFetchSite);
+  if (policy.secFetchMode) headers.set("sec-fetch-mode", policy.secFetchMode);
+  if (policy.secFetchDest) headers.set("sec-fetch-dest", policy.secFetchDest);
   return headers;
 }
 
 function proxyPolicy(host, env) {
+  const megaplay = env.MEGAPLAY_BASE || "https://megaplay.buzz";
+  const vidwish = env.VIDWISH_BASE || "https://vidwish.live";
+  if (host.includes("mewstream.buzz")) {
+    return {
+      referer: `${megaplay}/`,
+      origin: megaplay,
+      ua: ANDROID_UA,
+      secFetchSite: "cross-site",
+      secFetchMode: "cors",
+      secFetchDest: "empty",
+    };
+  }
   if (host.includes("watching.onl") || host.includes("cinewave")) {
-    return { referer: `${env.MEGAPLAY_BASE}/`, origin: env.MEGAPLAY_BASE, ua: ANDROID_UA };
+    return { referer: `${megaplay}/`, origin: megaplay, ua: ANDROID_UA };
   }
   if (host.includes("vidwish.live")) {
-    return { referer: `${env.VIDWISH_BASE}/`, origin: env.VIDWISH_BASE, ua: ANDROID_UA };
+    return { referer: `${vidwish}/`, origin: vidwish, ua: ANDROID_UA };
   }
   if (host.includes("r66nv9ed.com") || host.includes("sprintcdn") || host.includes("bysesayeveum.com") || host.includes("398fitus.com")) {
     return { referer: "https://bysesayeveum.com/", origin: "https://bysesayeveum.com", ua: DESKTOP_UA };
@@ -1568,7 +1626,33 @@ function proxyPolicy(host, env) {
   if (host.includes("workers.dev") || host.includes("owocdn.top") || host.includes("gogoanime.me.uk")) {
     return { referer: "https://9animetv.org.lv/", origin: "https://9animetv.org.lv", ua: DESKTOP_UA };
   }
-  return { referer: `${env.MEGAPLAY_BASE}/`, origin: env.MEGAPLAY_BASE, ua: ANDROID_UA };
+  return { referer: `${megaplay}/`, origin: megaplay, ua: ANDROID_UA };
+}
+
+function upstreamHeaderVariants(src, env, baseHeaders) {
+  const host = new URL(src).hostname.toLowerCase();
+  const base = new Headers(baseHeaders || upstreamHeaders(src, env));
+  if (!host.includes("mewstream.buzz")) return [base];
+
+  const megaplay = env.MEGAPLAY_BASE || "https://megaplay.buzz";
+  const vidwish = env.VIDWISH_BASE || "https://vidwish.live";
+  const policies = [
+    proxyPolicy(host, env),
+    { referer: `${megaplay}/`, origin: megaplay, ua: DESKTOP_UA, secFetchSite: "cross-site", secFetchMode: "cors", secFetchDest: "empty" },
+    { referer: `${megaplay}/`, origin: megaplay, ua: ANDROID_UA, secFetchSite: "same-site", secFetchMode: "cors", secFetchDest: "empty" },
+    { referer: `${vidwish}/`, origin: vidwish, ua: ANDROID_UA, secFetchSite: "cross-site", secFetchMode: "cors", secFetchDest: "empty" },
+    { referer: "https://cdn.mewstream.buzz/", origin: "https://cdn.mewstream.buzz", ua: DESKTOP_UA, secFetchSite: "same-origin", secFetchMode: "cors", secFetchDest: "empty" },
+  ];
+
+  const seen = new Set();
+  const headers = [];
+  for (const policy of policies) {
+    const key = `${policy.ua}|${policy.origin}|${policy.referer}|${policy.secFetchSite || ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    headers.push(headersFromPolicy(policy));
+  }
+  return headers;
 }
 
 function isAllowedImageHost(hostname) {

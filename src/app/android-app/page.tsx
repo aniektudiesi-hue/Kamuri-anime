@@ -22,8 +22,6 @@ export const metadata = buildPageMetadata({
   path: "/android-app",
 });
 
-const apkHref = "/downloads/animeTVplus.apk";
-
 const features = [
   {
     icon: Play,
@@ -109,14 +107,14 @@ export default function AndroidAppPage() {
               Download the animeTVplus APK for smooth HD anime playback, synced history, watchlist, monthly airing schedule, live chat, and offline episodes in a sharp red-black Android experience.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href={apkHref}
-                download
-                className="inline-flex items-center justify-center gap-3 rounded-xl bg-[#e11d48] px-6 py-4 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_20px_55px_rgba(225,29,72,0.35)] transition hover:-translate-y-0.5 hover:bg-[#ff315f]"
+              <button
+                type="button"
+                disabled
+                className="inline-flex cursor-not-allowed items-center justify-center gap-3 rounded-xl bg-[#e11d48]/70 px-6 py-4 text-sm font-black uppercase tracking-[0.12em] text-white/85 shadow-[0_20px_55px_rgba(225,29,72,0.22)]"
               >
                 <Download size={20} />
-                Download APK
-              </Link>
+                Available soon
+              </button>
               <Link
                 href="#features"
                 className="inline-flex items-center justify-center gap-3 rounded-xl border border-white/[0.11] bg-white/[0.045] px-6 py-4 text-sm font-black text-white/82 transition hover:border-white/20 hover:bg-white/[0.075]"
@@ -180,10 +178,10 @@ export default function AndroidAppPage() {
                 A premium anime app, not a web wrapper.
               </h2>
             </div>
-            <Link href={apkHref} download className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black text-[#07080d] transition hover:bg-[#ff4f70] hover:text-white">
+            <button type="button" disabled className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-white/75 px-4 py-3 text-sm font-black text-[#07080d]/70">
               <Download size={17} />
-              Get APK
-            </Link>
+              Available soon
+            </button>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
@@ -227,10 +225,10 @@ export default function AndroidAppPage() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row md:flex-col">
-              <Link href={apkHref} download className="inline-flex items-center justify-center gap-3 rounded-xl bg-[#e11d48] px-6 py-4 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_20px_55px_rgba(225,29,72,0.35)] transition hover:bg-[#ff315f]">
+              <button type="button" disabled className="inline-flex cursor-not-allowed items-center justify-center gap-3 rounded-xl bg-[#e11d48]/70 px-6 py-4 text-sm font-black uppercase tracking-[0.12em] text-white/85 shadow-[0_20px_55px_rgba(225,29,72,0.22)]">
                 <Download size={20} />
-                Download now
-              </Link>
+                Available soon
+              </button>
               <div className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-black/24 px-4 py-3 text-xs font-bold text-white/54">
                 <WifiOff size={16} />
                 Offline episodes supported

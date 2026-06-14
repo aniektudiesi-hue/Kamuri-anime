@@ -43,7 +43,6 @@ export async function loadEdgeSession(): Promise<EdgeSession | null> {
     if (cachedRegion) url.searchParams.set("region", cachedRegion);
     const response = await fetch(url.toString(), {
       headers: { Accept: "application/json" },
-      credentials: "include",
     });
     if (!response.ok) return null;
     const session = (await response.json()) as EdgeSession;

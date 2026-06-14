@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { BufferingScreen } from "@/components/buffering-screen";
 
 const MIN_VISIBLE_MS = 520;
@@ -13,10 +14,20 @@ const ROUTE_MIN_VISIBLE_MS = 280;
 const ROUTE_MAX_VISIBLE_MS = 3500;
 
 export function BootLoader() {
+  const pathname = usePathname();
+  const enabled = pathname.startsWith("/anime/");
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
+    if (!enabled) {
+      document.documentElement.classList.remove("atv-boot-lock");
+      document.body.classList.remove("atv-boot-lock");
+      setVisible(false);
+      setExiting(false);
+      return;
+    }
+
     let cleanupActive = () => undefined;
 
     const unlock = () => {
@@ -96,7 +107,7 @@ export function BootLoader() {
       cleanupActive();
       unlock();
     };
-  }, []);
+  }, [enabled]);
 
   if (!visible) return null;
 

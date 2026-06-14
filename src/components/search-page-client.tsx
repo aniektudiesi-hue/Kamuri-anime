@@ -86,8 +86,8 @@ function GridSkeleton({ count = 24 }: { count?: number }) {
 
 function warmAnimePosters(items: Anime[], priorityCount = 0) {
   if (typeof window === "undefined" || !items.length) return;
-  for (const [index, anime] of items.slice(0, 48).entries()) {
-    const poster = posterOf(anime, index < priorityCount ? "poster-md" : "poster-sm");
+  for (const [index, anime] of items.slice(0, 18).entries()) {
+    const poster = posterOf(anime, "poster-sm");
     if (!poster || warmedSearchPosters.has(poster)) continue;
     warmedSearchPosters.add(poster);
     const image = new window.Image();
@@ -323,7 +323,7 @@ function SearchContentBody({
         queryFn: async () => ({ intentKey: intent.key, fmtKey: formatFilter, ...(await fetchAniListDiscovery(intent, nextPage, formatFilter)) }),
         staleTime: 1000 * 60 * 30,
         gcTime: 1000 * 60 * 90,
-      }).then((data) => warmAnimePosters(data.media, 4)).catch(() => undefined);
+      }).catch(() => undefined);
     }
   }, [anilistQ.data?.hasNextPage, anilistQ.isFetching, discoveryPage, intent, q, formatFilter, queryClient]);
 
@@ -360,7 +360,7 @@ function SearchContentBody({
 
   useEffect(() => {
     if (!visibleMerged.length) return;
-    warmAnimePosters(visibleMerged, 8);
+    warmAnimePosters(visibleMerged, 6);
   }, [visibleMerged]);
 
   return (

@@ -120,7 +120,7 @@ export default function WatchPage({
       enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
         provider.id === DEFAULT_STREAM_PROVIDER_ID || secondaryDataEnabled
       ) && (
-        type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID || provider.id === "megaplay"
+        type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID
       ),
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,
@@ -135,7 +135,7 @@ export default function WatchPage({
   const megaHasPlayableStream = hasPlayableStream(megaQuery?.data);
   const showAudioControls = megaHasPlayableStream;
   const playableServers = STREAM_PROVIDERS.filter((provider, i) => {
-    if (type === "dub") return (provider.id === DEFAULT_STREAM_PROVIDER_ID || provider.id === "megaplay") && hasPlayableStream(streamQueries[i]?.data);
+    if (type === "dub") return provider.id === DEFAULT_STREAM_PROVIDER_ID && hasPlayableStream(streamQueries[i]?.data);
     return hasPlayableStream(streamQueries[i]?.data);
   });
   const availableServers = playableServers;
@@ -509,9 +509,9 @@ export default function WatchPage({
                   src={iframeUrlOf(selectedStreamForPlayer)}
                   className="absolute inset-0 h-full w-full border-0"
                   allowFullScreen
-                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                   referrerPolicy="no-referrer"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  scrolling="no"
                 />
               </div>
             ) : (
@@ -658,7 +658,7 @@ export default function WatchPage({
                         key={a}
                         onClick={() => {
                           setType(a);
-                          if (a === "dub" && server !== DEFAULT_STREAM_PROVIDER_ID && server !== "megaplay") setServer(DEFAULT_STREAM_PROVIDER_ID);
+                          if (a === "dub" && server !== DEFAULT_STREAM_PROVIDER_ID) setServer(DEFAULT_STREAM_PROVIDER_ID);
                         }}
                         className={`rounded-xl px-4 py-2 text-sm font-bold uppercase transition ${
                           type === a

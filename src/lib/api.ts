@@ -211,23 +211,17 @@ export const api = {
   stream: (malId: string, episode: string | number, type: "sub" | "dub") =>
     fetchCatalogStream(malId, episode, type),
   megaplay: async (malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> => {
-    const key = `megaplay:${malId}:${episode}:${type}`;
+    const key = `megaplay-iframe-v1:${malId}:${episode}:${type}`;
     const cached = readCachedStream(key);
     if (cached) return cached;
-    try {
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 12_000);
-      const res = await fetch(
-        `https://anime-search-api-burw.onrender.com/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(String(episode))}?type=${type}`,
-        { headers: { Accept: "application/json" }, signal: controller.signal },
-      ).finally(() => window.clearTimeout(timeout));
-      if (!res.ok) return { mal_id: malId, episode_num: String(episode) };
-      const data = await res.json() as StreamResponse;
-      writeCachedStream(key, data);
-      return data;
-    } catch {
-      return { mal_id: malId, episode_num: String(episode) };
-    }
+    const data: StreamResponse = {
+      iframe_url: `https://megaplay.buzz/stream/mal/${encodeURIComponent(malId)}/${encodeURIComponent(String(episode))}/${type}`,
+      server: "megaplay",
+      mal_id: malId,
+      episode_num: String(episode),
+    };
+    writeCachedStream(key, data);
+    return data;
   },
   moon: (malId: string, episode: string | number) =>
     cachedStreamRequest(`moon-fast:${malId}:${episode}`, `/api/moon/${malId}/${episode}`),

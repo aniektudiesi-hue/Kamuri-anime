@@ -204,6 +204,18 @@ const siteNavigationJsonLd = {
   ],
 };
 
+const storageRepairScript = `
+try {
+  var marker = "animeTVplus-storage-repair-v1";
+  if (window.localStorage && window.localStorage.getItem(marker) !== "1") {
+    Object.keys(window.localStorage)
+      .filter(function (key) { return key.indexOf("kairostream-anime-") === 0; })
+      .forEach(function (key) { window.localStorage.removeItem(key); });
+    window.localStorage.setItem(marker, "1");
+  }
+} catch (e) {}
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -225,6 +237,7 @@ export default function RootLayout({
         <meta name="admaven-placement" content="Bqjg8rdw8" />
       </head>
       <body className="min-h-full bg-background text-foreground">
+        <script dangerouslySetInnerHTML={{ __html: storageRepairScript }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
