@@ -102,12 +102,16 @@ export function HeroCarousel({ items = [], loading, crData = {} }: { items?: Ani
         ) : null}
       </div>
 
-      {/* Crunchyroll's EXACT hero gradient: bottom fade to black + left scrim for text. */}
+      {/* Hero scrim. Stronger + wider on the left so the text column is always on a
+          dark base — some Crunchyroll keyarts have the SERIES TITLE baked into the
+          art, and a weak scrim let that bleed through behind our own title/synopsis
+          (the faint duplicate-title glitch). Two left stops + an earlier bottom fade
+          keep the content readable regardless of the underlying keyart. */}
       <div
         className="absolute inset-0 z-[1]"
         style={{
           background:
-            "linear-gradient(180deg, rgba(0,0,0,0) 50%, #000 100%), linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0) 55%)",
+            "linear-gradient(180deg, rgba(0,0,0,0) 38%, rgba(0,0,0,0.55) 72%, #000 100%), linear-gradient(90deg, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.8) 26%, rgba(0,0,0,0.35) 48%, rgba(0,0,0,0) 64%)",
         }}
       />
 
