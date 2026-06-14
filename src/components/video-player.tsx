@@ -62,8 +62,8 @@ const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
   opacity: 1,
   boxOpacity: 0.22,
 };
-const FAST_START_BUFFER_SECONDS = 1.25;
-const MOON_FAST_START_BUFFER_SECONDS = 2;
+const FAST_START_BUFFER_SECONDS = 4;
+const MOON_FAST_START_BUFFER_SECONDS = 4;
 const DEEP_BUFFER_SECONDS = 180;
 const MAX_BUFFER_WINDOW_SECONDS = 600;
 const NORMAL_BUFFER_SECONDS = 90;
@@ -528,7 +528,7 @@ export function VideoPlayer({
       config.maxBufferLength = target;
       config.maxMaxBufferLength = startupReady && shouldDeepBuffer ? MAX_BUFFER_WINDOW_SECONDS : Math.max(target, 24);
       config.maxBufferSize = startupReady && shouldDeepBuffer ? DEEP_BUFFER_BYTES : 120 * 1024 * 1024;
-      config.backBufferLength = isMoonStream ? 12 : 20;
+      config.backBufferLength = 60;
     };
     const releaseStartupQuality = () => {
       if (!hls || startupQualityReleased) return;
@@ -541,7 +541,7 @@ export function VideoPlayer({
       prefetchStartTimer = window.setTimeout(() => {
         prefetchStartTimer = undefined;
         segmentCache.startPrefetch();
-      }, isMegaPlayServer ? 6500 : 3500);
+      }, 3000);
     };
     const chaseForwardBuffer = () => {
       if (!hls || !shouldDeepBuffer) return;
@@ -692,14 +692,14 @@ export function VideoPlayer({
           abrEwmaFastVoD: 3,
           abrEwmaSlowVoD: 9,
           maxBufferLength: initialForwardBuffer,
-          maxMaxBufferLength: isMegaPlayServer ? 24 : Math.max(initialForwardBuffer, 60),
-          maxBufferSize: isMegaPlayServer ? 48 * 1024 * 1024 : 120 * 1024 * 1024,
+          maxMaxBufferLength: 120,
+          maxBufferSize: 256 * 1024 * 1024,
           maxBufferHole: 0.5,
-          backBufferLength: isMegaPlayServer ? 12 : 30,
-          fragLoadingTimeOut: 8000,
-          fragLoadingMaxRetry: 4,
-          fragLoadingRetryDelay: 500,
-          fragLoadingMaxRetryTimeout: 4000,
+          backBufferLength: 60,
+          fragLoadingTimeOut: 10000,
+          fragLoadingMaxRetry: 6,
+          fragLoadingRetryDelay: 300,
+          fragLoadingMaxRetryTimeout: 6000,
           manifestLoadingTimeOut: 5000,
           manifestLoadingMaxRetry: 3,
           levelLoadingTimeOut: 5000,

@@ -240,6 +240,9 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     if (selected?.episodes?.length) return selected;
     const initialSelected = crCard.data?.selected_season;
     if (activeSeasonNumber === 1 && matchesActiveSeason(initialSelected)) return initialSelected;
+    if (initialSelected?.episodes?.length && activeSeasonNumber === 1) return initialSelected;
+    // Last resort: use the summary from crSeasons if it has episodes
+    if (activeSummary?.episodes?.length) return activeSummary;
     return undefined;
   }, [activeCrCard.data?.selected_season, activeSeasonIndex, activeSeasonNumber, crCard.data?.selected_season, crSeasons]);
   const crEpisodeTotal = useMemo(
