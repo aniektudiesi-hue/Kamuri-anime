@@ -308,54 +308,9 @@ function hasPlayable(row: { m3u8_url?: string } | undefined) {
 export async function fetchCatalogStream(malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> {
   const epNum = String(episode);
 
-  // Primary: our CF worker DB (fast, cached m3u8 URLs).
-  const params = new URLSearchParams({ stream_type: type });
-  const single = await catalogClientGet<{ stream?: CatalogStreamRow; anime?: CatalogAnime }>(
-    `/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(epNum)}?${params.toString()}`,
-    1000 * 60 * 5,
-  ).catch(() => undefined);
-  if (hasPlayable(single?.stream)) {
-    return {
-      m3u8_url: single!.stream!.m3u8_url,
-      subtitles: normalizeSubtitles(single!.stream!.subtitles),
-      server_id: Number(single!.stream!.server_id || 0) || undefined,
-      mal_id: malId,
-      episode_num: String(single!.stream!.episode || episode),
-    };
-  }
-
-  // If single-stream endpoint returned something but no m3u8, resolve live.
-  if (single?.stream) {
-    const fallback = await fetchAnimeSearchStream(malId, epNum, type);
-    if (fallback) {
-      void cacheResolvedStream(malId, epNum, type, fallback);
-      return fallback;
-    }
-  }
-
-  // Try the streams list from CF worker.
-  const payload = await fetchCatalogStreams(malId, type);
-  const target = Number(episode);
-  const rows = payload.streams ?? [];
-  const row = rows.find((item) => Number(item.episode) === target && item.stream_type === type)
-    || rows.find((item) => Number(item.episode) === target)
-    || rows[0];
-  if (hasPlayable(row)) {
-    return {
-      m3u8_url: row!.m3u8_url,
-      subtitles: normalizeSubtitles(row!.subtitles),
-      server_id: Number(row!.server_id || 0) || undefined,
-      mal_id: malId,
-      episode_num: String(row!.episode || episode),
-    };
-  }
-
-  // Last resort: resolve live from Render backend.
-  const fallback = await fetchAnimeSearchStream(malId, epNum, type);
-  if (fallback) {
-    void cacheResolvedStream(malId, epNum, type, fallback);
-    return fallback;
-  }
+  // Fetch fresh HLS directly from our API (always resolves live, no stale URLs).
+  const resolved = await fetchAnimeSearchStream(malId, epNum, type);
+  if (resolved) return resolved;
 
   return { mal_id: malId, episode_num: epNum };
 }
