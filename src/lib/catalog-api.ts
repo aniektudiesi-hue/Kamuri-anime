@@ -361,23 +361,55 @@ export async function fetchCatalogStream(malId: string, episode: string | number
   return { mal_id: malId, episode_num: epNum };
 }
 
-async function fetchAnimeSearchStream(malId: string, episode: string): Promise<StreamResponse | undefined> {
+type AnimeSearchStreamPayload = {
+  m3u8_url?: string; url?: string; stream_url?: string;
+  iframe_url?: string; embed_url?: string;
+  sources?: Array<{ url?: string; file?: string; type?: string; quality?: string }>;
+  subtitles?: string | Subtitle[] | Array<{ lang?: string; language?: string; label?: string; url?: string; file?: string }>;
+  subtitle_url?: string; server_id?: number | string;
+};
+
+// Pick the HLS (.m3u8) source from the resolver's `sources[]` array, else the
+// first source. The /api/stream resolver returns sources[].url (not m3u8_url),
+// so without this the sub fallback silently fails and the episode can't play.
+function pickSource(payload: AnimeSearchStreamPayload): string | undefined {
+  const direct = payload.m3u8_url || payload.url || payload.stream_url;
+  if (direct) return direct;
+  const sources = Array.isArray(payload.sources) ? payload.sources : [];
+  const hls = sources.find((s) => (s.type || "").toLowerCase() === "hls" || /\.m3u8(\?|$)/i.test(s.url || s.file || ""));
+  return (hls?.url || hls?.file || sources[0]?.url || sources[0]?.file) || undefined;
+}
+
+function mapResolverSubtitles(value: AnimeSearchStreamPayload["subtitles"]): Subtitle[] {
+  if (!Array.isArray(value)) return normalizeSubtitles(value as string | Subtitle[]);
+  return value
+    .map((s) => {
+      const item = s as Subtitle & { lang?: string; language?: string; url?: string };
+      const file = item.file || item.url || "";
+      if (!file) return null;
+      // Preserve real Subtitle fields (kind/default) while normalizing the doc's
+      // {lang,url} shape into {file,label}.
+      return { ...item, file, label: item.label || item.language || item.lang || "Subtitle" } as Subtitle;
+    })
+    .filter((s): s is Subtitle => Boolean(s));
+}
+
+async function fetchAnimeSearchStream(malId: string, episode: string, type: "sub" | "dub" = "sub"): Promise<StreamResponse | undefined> {
   try {
+    const qs = new URLSearchParams({ type });
     const res = await fetch(
-      `${ANIME_SEARCH_STREAM_BASE}/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}`,
+      `${ANIME_SEARCH_STREAM_BASE}/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}?${qs.toString()}`,
       { headers: { Accept: "application/json" } },
     );
     if (!res.ok) return undefined;
-    const data = (await res.json()) as {
-      m3u8_url?: string; url?: string; stream_url?: string;
-      iframe_url?: string; subtitles?: string | Subtitle[]; subtitle_url?: string; server_id?: number | string;
-    };
-    const m3u8 = data.m3u8_url || data.url || data.stream_url;
-    if (!m3u8 && !data.iframe_url) return undefined;
+    const data = (await res.json()) as AnimeSearchStreamPayload;
+    const m3u8 = pickSource(data);
+    const iframe = data.iframe_url || data.embed_url;
+    if (!m3u8 && !iframe) return undefined;
     return {
       m3u8_url: m3u8,
-      iframe_url: data.iframe_url,
-      subtitles: normalizeSubtitles(data.subtitles),
+      iframe_url: iframe,
+      subtitles: mapResolverSubtitles(data.subtitles),
       subtitle_url: data.subtitle_url,
       server_id: Number(data.server_id || 0) || undefined,
       mal_id: malId,
