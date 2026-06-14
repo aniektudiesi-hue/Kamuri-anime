@@ -120,7 +120,7 @@ export default function WatchPage({
       enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
         provider.id === DEFAULT_STREAM_PROVIDER_ID || secondaryDataEnabled
       ) && (
-        type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID
+        type !== "dub" || provider.id === DEFAULT_STREAM_PROVIDER_ID || provider.id === "hd1" || provider.id === "megaplay"
       ),
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,
@@ -135,7 +135,7 @@ export default function WatchPage({
   const megaHasPlayableStream = hasPlayableStream(megaQuery?.data);
   const showAudioControls = megaHasPlayableStream;
   const playableServers = STREAM_PROVIDERS.filter((provider, i) => {
-    if (type === "dub") return provider.id === DEFAULT_STREAM_PROVIDER_ID && hasPlayableStream(streamQueries[i]?.data);
+    if (type === "dub") return (provider.id === DEFAULT_STREAM_PROVIDER_ID || provider.id === "hd1" || provider.id === "megaplay") && hasPlayableStream(streamQueries[i]?.data);
     return hasPlayableStream(streamQueries[i]?.data);
   });
   const availableServers = playableServers;
