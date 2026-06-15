@@ -15,7 +15,7 @@ const store = ((globalThis as Record<string, unknown>).__surveyVotes ??= {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const choice = body?.choice;
+    const choice = body?.choice as string | undefined;
     if (choice !== "close" && choice !== "ads") {
       return NextResponse.json({ error: "invalid choice" }, { status: 400 });
     }
@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const ua = request.headers.get("user-agent") || "";
 
-    store[choice]++;
+    if (choice === "ads") store.ads++;
+    else store.close++;
     store.voters.push({ choice, ip, ua: ua.slice(0, 80), at: new Date().toISOString() });
 
     // Also fire-and-forget to analytics as backup
