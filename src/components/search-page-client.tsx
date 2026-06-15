@@ -130,10 +130,24 @@ const SearchField = memo(function SearchField({
   onCommit: (value: string) => void;
 }) {
   const [value, setValue] = useState(initial);
-  // Re-sync when the query changes from outside (chip nav, header submit).
-  useEffect(() => setValue(initial), [initial]);
+  const lastCommitted = useRef(initial);
+  // Re-sync ONLY on genuinely external changes (chip nav, header submit). Without
+  // the guard, the parent echoes our own just-committed value back as `initial`
+  // mid-keystroke and resets the input — dropping characters and jumping the
+  // cursor (the "typing lags" bug). Comparing against what we last committed
+  // tells our own echo apart from a real external change.
   useEffect(() => {
-    const id = setTimeout(() => onCommit(value.trim()), 140);
+    if (initial !== lastCommitted.current) {
+      lastCommitted.current = initial;
+      setValue(initial);
+    }
+  }, [initial]);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const next = value.trim();
+      lastCommitted.current = next;
+      onCommit(next);
+    }, 140);
     return () => clearTimeout(id);
   }, [value, onCommit]);
   return (

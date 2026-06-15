@@ -223,6 +223,22 @@ export function AdminDashboard() {
     staleTime: 1000 * 15,
     retry: false,
   });
+  const survey = useQuery({
+    queryKey: ["admin", "survey", token],
+    queryFn: async () => {
+      const r = await fetch("/api/survey", { cache: "no-store" });
+      if (!r.ok) throw new Error("survey fetch failed");
+      return (await r.json()) as { ads?: number; close?: number; total?: number; voters?: Array<{ choice?: string; ip?: string; at?: string }> };
+    },
+    enabled: Boolean(token),
+    refetchInterval: 30000,
+    retry: false,
+  });
+  const surveyData = survey.data ?? {};
+  const surveyAds = Number(surveyData.ads || 0);
+  const surveyClose = Number(surveyData.close || 0);
+  const surveyTotal = surveyAds + surveyClose;
+  const surveyAdsPct = surveyTotal ? Math.round((surveyAds / surveyTotal) * 100) : 0;
 
   const userRows = useMemo(() => asItems(users.data), [users.data]);
   const filteredUserRows = useMemo(() => {
@@ -328,6 +344,37 @@ export function AdminDashboard() {
               <StatCard icon={<Lock size={18} />} label="Failed" value={overviewData.login_failed} loading={overview.isLoading} />
               <StatCard icon={<Ban size={18} />} label="Banned" value={overviewData.banned_users} loading={overview.isLoading} />
             </div>
+
+            <Panel title="Service survey — Run ads vs Close" icon={<Activity size={16} />} loading={survey.isLoading} className="mt-6">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StatCard icon={<Activity size={18} />} label="Run ads (keep it alive)" value={surveyAds} />
+                <StatCard icon={<Ban size={18} />} label="Close the service" value={surveyClose} />
+                <StatCard icon={<UserRound size={18} />} label="Total votes" value={surveyTotal} />
+              </div>
+              <div className="mt-4">
+                <div className="mb-1.5 flex justify-between text-[11px] font-semibold">
+                  <span className="text-emerald-300">Run ads · {surveyAdsPct}%</span>
+                  <span className="text-red-300">Close · {surveyTotal ? 100 - surveyAdsPct : 0}%</span>
+                </div>
+                <div className="flex h-2.5 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="bg-emerald-500" style={{ width: `${surveyAdsPct}%` }} />
+                  <div className="bg-red-500" style={{ width: `${surveyTotal ? 100 - surveyAdsPct : 0}%` }} />
+                </div>
+              </div>
+              {Array.isArray(surveyData.voters) && surveyData.voters.length ? (
+                <div className="mt-4">
+                  <Table
+                    rows={(surveyData.voters as Row[]).slice(0, 50)}
+                    initialRows={10}
+                    columns={[
+                      ["Choice", (row) => <Badge className={text(row, "choice") === "ads" ? "bg-emerald-500/12 text-emerald-200" : "bg-red-500/12 text-red-200"}>{text(row, "choice", "-")}</Badge>],
+                      ["IP", (row) => text(row, "ip", "-")],
+                      ["When", (row) => text(row, "at", "-")],
+                    ]}
+                  />
+                </div>
+              ) : null}
+            </Panel>
 
             <Panel title="Online now" icon={<Activity size={16} />} loading={users.isLoading || visits.isLoading} className="mt-6">
               <Table
