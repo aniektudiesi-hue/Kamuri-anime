@@ -249,10 +249,7 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
 }
 
 // Our enriched search backend — root-only (no S2/S3 dupes), CR metadata, synonyms.
-const SEARCH_DISCOVERY_BASE =
-  process.env.SEARCH_API_BASE ||
-  process.env.NEXT_PUBLIC_SEARCH_API_BASE ||
-  "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
+const SEARCH_DISCOVERY_BASE = "https://animetvplus-stream-backup-india.onrender.com";
 
 function searchParamsForIntent(intent: DiscoveryIntent, page: number, fmt = ""): string {
   const params = new URLSearchParams({ limit: "60", page: String(page) });

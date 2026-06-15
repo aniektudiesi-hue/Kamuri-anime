@@ -164,9 +164,12 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   // Crunchyroll season tree (real seasons + per-episode thumbnails). Cache it so
   // a revisit paints the CR hero instantly instead of re-fetching (which forced
   // the AniList backdrop to flash before the CR keyart swapped in).
+  // full=1 returns EVERY season WITH its episodes in one payload, so season
+  // switching is instant and we sidestep the lazy per-season bug (scrambled raw
+  // season numbers made S2/S3 come back empty — e.g. Konosuba S3, Re:Zero).
   const crCard = useQuery({
-    queryKey: crCardQueryKey(malId, 1),
-    queryFn: () => fetchCrCard(malId, 1),
+    queryKey: ["cr-card-full", CR_CARD_QUERY_VERSION, malId],
+    queryFn: () => fetchCrCard(malId, 1, true),
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
   });
@@ -189,62 +192,14 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const useSeasons = crSeasons.length > 0;
   const activeSeasonIndex = useSeasons ? Math.min(activeRange, crSeasons.length - 1) : activeRange;
   const activeSeasonNumber = useSeasons ? (crSeasons[activeSeasonIndex]?.season_number ?? activeSeasonIndex + 1) : 1;
-  const activeCrCard = useQuery({
-    queryKey: crCardQueryKey(malId, activeSeasonNumber),
-    queryFn: () => fetchCrCard(malId, activeSeasonNumber),
-    enabled: useSeasons,
-    initialData: activeSeasonNumber === 1 ? crCard.data : undefined,
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 60,
-  });
-
-  // HACK for instant season switching: the moment the card loads, warm EVERY
-  // season's payload in the background (staggered so we don't stampede the cold
-  // backend). Switching then reads straight from the React Query cache — no
-  // network round-trip, no spinner.
-  useEffect(() => {
-    if (!useSeasons || crSeasons.length < 2) return;
-    let cancelled = false;
-    const pending = crSeasons
-      .map((s) => s.season_number ?? 0)
-      .filter((sn) => sn > 0 && sn !== activeSeasonNumber);
-    let i = 0;
-    const pump = () => {
-      if (cancelled || i >= pending.length) return;
-      const sn = pending[i++];
-      queryClient
-        .prefetchQuery({
-          queryKey: crCardQueryKey(malId, sn),
-          queryFn: () => fetchCrCard(malId, sn),
-          staleTime: 1000 * 60 * 30,
-        })
-        .finally(() => {
-          if (!cancelled) window.setTimeout(pump, 120);
-        });
-    };
-    pump();
-    return () => {
-      cancelled = true;
-    };
-  }, [useSeasons, crSeasons, malId, activeSeasonNumber, queryClient]);
+  // Every season already carries its episodes (full=1), so the active season is
+  // just an index into crSeasons — switching is instant, no refetch.
   const selectedCrSeason = useMemo(() => {
-    const activeSummary = crSeasons[activeSeasonIndex];
-    const activeSummaryKey = crSeasonKey(activeSummary);
-    const matchesActiveSeason = (season?: CrSeason) => {
-      if (!season) return false;
-      if (Number(season.season_number || 0) === Number(activeSeasonNumber)) return true;
-      return Boolean(activeSummaryKey && crSeasonKey(season) === activeSummaryKey);
-    };
-    const selected = activeCrCard.data?.selected_season;
-    if (matchesActiveSeason(selected)) return selected;
-    if (selected?.episodes?.length) return selected;
-    const initialSelected = crCard.data?.selected_season;
-    if (activeSeasonNumber === 1 && matchesActiveSeason(initialSelected)) return initialSelected;
-    if (initialSelected?.episodes?.length && activeSeasonNumber === 1) return initialSelected;
-    // Last resort: use the summary from crSeasons if it has episodes
-    if (activeSummary?.episodes?.length) return activeSummary;
-    return undefined;
-  }, [activeCrCard.data?.selected_season, activeSeasonIndex, activeSeasonNumber, crCard.data?.selected_season, crSeasons]);
+    const active = crSeasons[activeSeasonIndex];
+    if (active?.episodes?.length) return active;
+    return crSeasons.find((s) => Number(s.season_number || 0) === Number(activeSeasonNumber) && s.episodes?.length)
+      ?? active;
+  }, [crSeasons, activeSeasonIndex, activeSeasonNumber]);
   const crEpisodeTotal = useMemo(
     () => crSeasons.reduce((sum, season) => sum + (season.episodes?.length ?? season.episode_count ?? 0), 0),
     [crSeasons],
@@ -343,15 +298,17 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const seasonEpisodes = useMemo<Episode[]>(() => {
     if (!useSeasons) return [];
     const season = selectedCrSeason || crSeasons[activeSeasonIndex];
-    return (season?.episodes ?? []).map((episode) => ({
-      // episode_number drives the watch link/stream fetch (owner MAL's real episode);
-      // display_number is what the user sees (restarts at 1 each season).
-      episode_number: Number(episode.stream_ep ?? episode.ep) || 0,
-      display_number: Number(episode.ep) || 0,
-      title: episode.title || `Episode ${episode.ep}`,
-      thumbnail: episode.thumbnail,
-      has_stream: episode.has_stream,
-    }));
+    return (season?.episodes ?? [])
+      .filter((episode) => episode.has_stream !== false)
+      .map((episode) => ({
+        // episode_number drives the watch link/stream fetch (owner MAL's real episode);
+        // display_number is what the user sees (restarts at 1 each season).
+        episode_number: Number(episode.stream_ep ?? episode.ep) || 0,
+        display_number: Number(episode.ep) || 0,
+        title: episode.title || `Episode ${episode.ep}`,
+        thumbnail: episode.thumbnail,
+        has_stream: episode.has_stream,
+      }));
   }, [useSeasons, selectedCrSeason, crSeasons, activeSeasonIndex]);
 
   // Each CR season streams via the MAL id that actually owns its episodes.
@@ -366,7 +323,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           (ep) => ep.episode_number >= ranges[activeRange].start && ep.episode_number <= ranges[activeRange].end,
         )
       : allEpisodes;
-  const seasonEpisodesPending = useSeasons && !selectedCrSeason && (activeCrCard.isLoading || activeCrCard.isFetching || crCard.isFetching);
+  const seasonEpisodesPending = useSeasons && !selectedCrSeason && (crCard.isLoading || crCard.isFetching);
   const episodeListPending = episodes.isLoading || crPending || seasonEpisodesPending;
   const visibleEpisodes = rangeEpisodes.slice(0, episodeLimit);
 

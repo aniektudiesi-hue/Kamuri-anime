@@ -16,13 +16,8 @@ export type EdgeSession = {
 };
 
 export function storedCatalogRegion() {
-  if (typeof window === "undefined") return "";
-  const region = window.localStorage.getItem(REGION_KEY) || "";
-  if (!isCatalogRegion(region)) {
-    window.localStorage.removeItem(REGION_KEY);
-    return "";
-  }
-  return region;
+  if (typeof window !== "undefined") window.localStorage.setItem(REGION_KEY, "india");
+  return "india";
 }
 
 export function storedCountry() {
@@ -31,25 +26,20 @@ export function storedCountry() {
 }
 
 export function storedCatalogOrigin() {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(ORIGIN_KEY) || "";
+  if (typeof window !== "undefined") window.localStorage.setItem(ORIGIN_KEY, "https://animetvplus-stream-backup-india.onrender.com");
+  return "https://animetvplus-stream-backup-india.onrender.com";
 }
 
 export async function loadEdgeSession(): Promise<EdgeSession | null> {
   if (typeof window === "undefined") return null;
   try {
-    const cachedRegion = storedCatalogRegion();
-    const url = new URL(EDGE_SESSION_URL);
-    if (cachedRegion) url.searchParams.set("region", cachedRegion);
-    const response = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) return null;
-    const session = (await response.json()) as EdgeSession;
-    if (session.region && isCatalogRegion(session.region)) window.localStorage.setItem(REGION_KEY, session.region);
-    else window.localStorage.removeItem(REGION_KEY);
-    if (session.country) window.localStorage.setItem(COUNTRY_KEY, session.country);
-    if (session.origin) window.localStorage.setItem(ORIGIN_KEY, session.origin);
+    const session: EdgeSession = {
+      region: "india",
+      country: window.localStorage.getItem(COUNTRY_KEY) || "",
+      origin: "https://animetvplus-stream-backup-india.onrender.com",
+    };
+    window.localStorage.setItem(REGION_KEY, "india");
+    window.localStorage.setItem(ORIGIN_KEY, session.origin || "");
     return session;
   } catch {
     return null;

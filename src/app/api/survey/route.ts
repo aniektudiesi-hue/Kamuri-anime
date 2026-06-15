@@ -41,6 +41,24 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  try {
+    const r = await fetch(`${API_BASE}/analytics/survey`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (r.ok) {
+      const data = await r.json();
+      // Merge in-memory votes (since last deploy) with persisted analytics
+      data.ads = (data.ads || 0) + store.ads;
+      data.close = (data.close || 0) + store.close;
+      data.total = data.ads + data.close;
+      data.voters = [...store.voters, ...(data.voters || [])];
+      return NextResponse.json(data, {
+        headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+  } catch {}
+  // Fallback to in-memory only
   const total = store.ads + store.close;
   return NextResponse.json(
     { ads: store.ads, close: store.close, total, voters: store.voters },

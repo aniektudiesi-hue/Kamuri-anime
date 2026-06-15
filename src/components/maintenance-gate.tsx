@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Kairo } from "@/components/mascot/kairo";
 
-const MAINTENANCE_ON = true;
+const MAINTENANCE_ON = false;
 const MAINTENANCE_END = new Date("2026-06-15T13:45:00+05:30").getTime();
 
 function useCountdown(target: number) {

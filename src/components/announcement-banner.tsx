@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 
-// Bump this id whenever the message changes so the banner re-shows for everyone
-// who dismissed the previous one.
-const ANNOUNCEMENT_ID = "atvplus-back-app-migration-2026-06";
+const ANNOUNCEMENT_ID = "atvplus-server-work-india-only-2026-06-15";
 const DISMISS_KEY = `atvplus-announcement-${ANNOUNCEMENT_ID}`;
 
 export function AnnouncementBanner() {
@@ -26,23 +24,21 @@ export function AnnouncementBanner() {
     try {
       window.localStorage.setItem(DISMISS_KEY, "1");
     } catch {
-      // ignore — banner just reappears next visit, harmless
+      // ignore; the banner can reappear next visit.
     }
   };
 
   return (
-    <div className="relative z-[60] border-b border-[#c4182a]/30 bg-gradient-to-r from-[#c4182a]/18 via-[#0c0c0e] to-[#c4182a]/10">
-      <div className="mx-auto flex max-w-screen-2xl items-center gap-3 px-4 py-2 lg:px-6">
-        <span className="hidden shrink-0 rounded-md bg-[#c4182a] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white sm:inline-block">
-          We&apos;re back
+    <div className="relative z-[60] border-b border-amber-400/25 bg-[#0b0b0d]">
+      <div className="mx-auto flex max-w-screen-2xl items-center gap-3 px-4 py-2.5 lg:px-6">
+        <span className="hidden shrink-0 items-center gap-1.5 rounded-md bg-amber-400/12 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-200 sm:inline-flex">
+          <AlertTriangle size={13} />
+          Server update
         </span>
-        <p className="flex-1 text-[12px] leading-snug text-white/85 sm:text-[12.5px]">
-          <span aria-hidden="true">👋 </span>
-          <span className="font-semibold text-white">Hello dear user — AnimeTV+ is back, enjoy!</span>{" "}
-          We&apos;re launching apps for <span className="font-medium text-white">Mac, Windows &amp; Android</span> soon — when
-          they&apos;re out, please install the app, as we&apos;ll be moving service from the website to the app. We&apos;re
-          actively fixing any errors and reopened the site so you don&apos;t have to wait. Thank you!{" "}
-          <span aria-hidden="true">💛</span>
+        <p className="flex-1 text-[12px] leading-snug text-white/82 sm:text-[12.5px]">
+          <span className="font-semibold text-white">We are working on our regional servers right now.</span>{" "}
+          The site is temporarily using the India backend only. You may experience slower loading or delays in some areas,
+          but we are fixing it and service will improve shortly.
         </p>
         <button
           type="button"

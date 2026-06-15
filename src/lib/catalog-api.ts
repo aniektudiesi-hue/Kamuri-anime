@@ -1,18 +1,14 @@
 import type { AiringScheduleItem, Anime, EpisodeResponse, StreamResponse, Subtitle } from "./types";
 import { catalogRegionHeaders } from "./edge-region";
 
+const INDIA_RENDER_BASE = "https://animetvplus-stream-backup-india.onrender.com";
+
 // Single backend = the 5001 season-mapping gateway (authoritative seasons +
 // internal stream/section proxy). The UI never calls 3058 directly.
-export const CATALOG_API_BASE =
-  process.env.CATALOG_API_BASE ||
-  process.env.NEXT_PUBLIC_CATALOG_API_BASE ||
-  "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
+export const CATALOG_API_BASE = INDIA_RENDER_BASE;
 
 // Our enriched search backend (has synonyms, correct grouping)
-const SEARCH_API_BASE =
-  process.env.SEARCH_API_BASE ||
-  process.env.NEXT_PUBLIC_SEARCH_API_BASE ||
-  "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
+const SEARCH_API_BASE = INDIA_RENDER_BASE;
 
 export const CATALOG_PROXY_BASE = "/api/catalog-proxy";
 const CLIENT_CACHE_TTL = 1000 * 60 * 5;
@@ -246,14 +242,20 @@ export function crCardQueryKey(malId: string | number, season = 1) {
   return ["cr-card", CR_CARD_QUERY_VERSION, String(malId), season] as const;
 }
 
-export async function fetchCrCard(malId: string, season?: number): Promise<CrCard | null> {
+export async function fetchCrCard(malId: string, season?: number, full = false): Promise<CrCard | null> {
   try {
     // Use our enriched backend (single source of truth — correct season grouping
     // + synopsis, matches the season-review app). Server-side hits it directly,
     // client-side via the proxy route to stay same-origin.
     const base = typeof window === "undefined" ? SEARCH_API_BASE : "/api/search-proxy";
     const params = new URLSearchParams({ v: "canonical-v10" });
-    if (season && season > 0) params.set("season", String(season));
+    // full=1 returns EVERY season WITH its episodes in one payload. The lazy
+    // per-season path (?season=N) mismatches when the backend's raw season
+    // numbers are scrambled (Re:Zero / Konosuba S3 came back empty), so the
+    // detail page uses full=1 — it's always correct and lets season switching be
+    // instant (no per-season refetch).
+    if (full) params.set("full", "1");
+    else if (season && season > 0) params.set("season", String(season));
     const card = await fetch(`${base}/api/cr/card/${encodeURIComponent(malId)}?${params.toString()}`, {
       headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
       ...(typeof window === "undefined" ? { next: { revalidate: 1800 } } : {}),
@@ -279,13 +281,17 @@ export async function fetchCatalogEpisodes(malId: string, hint = 0): Promise<Epi
   const payload = await catalogClientGet<CatalogStreamsPayload>(`/api/streams/${encodeURIComponent(malId)}`);
   const streamNumbers = new Set((payload.streams ?? []).map((stream) => Number(stream.episode || 0)).filter(Boolean));
   const maxStreamEpisode = streamNumbers.size ? Math.max(...streamNumbers) : 0;
-  const total = Math.max(
-    Number(hint || 0),
+  const status = normalizeCatalogStatus(payload.anime?.airing_status || payload.anime?.status);
+  const releasedTotal = Math.max(
     Number(payload.anime?.m3u8_episode_count || 0),
     Number(payload.anime?.current_episodes || 0),
     maxStreamEpisode,
-    Number(payload.anime?.episodes_total || 0),
   );
+  const plannedTotal = Number(payload.anime?.episodes_total || 0);
+  const shouldAvoidPlannedEpisodes = status === "currently_airing" || status === "not_yet_aired";
+  const total = shouldAvoidPlannedEpisodes
+    ? releasedTotal
+    : Math.max(Number(hint || 0), releasedTotal, plannedTotal);
   const episodeNumbers = total > 0
     ? Array.from({ length: total }, (_, index) => index + 1)
     : Array.from(streamNumbers).sort((a, b) => a - b);
