@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { detectServerRegion } from "@/lib/edge-region";
+import { catalogOriginPool } from "@/lib/edge-region";
 
 export const dynamic = "force-dynamic";
 
@@ -14,43 +14,50 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pa
 }
 
 async function proxyToNearest(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  const { region, origin } = detectServerRegion(request.headers);
+  const { region, origins } = catalogOriginPool(request.headers);
   const { path } = await context.params;
   const upstreamPath = `/${path.join("/")}`;
-  const target = safeUrl(upstreamPath + request.nextUrl.search, origin);
-  if (!target) {
-    return NextResponse.json({ error: "invalid backend url" }, { status: 500 });
-  }
-
+  const search = request.nextUrl.search;
   const isGet = request.method === "GET";
+  // Read the POST body once so it can be replayed across failover attempts.
+  const body = isGet ? undefined : await request.text();
   const headers = proxyHeaders(request, region);
   const contentType = request.headers.get("Content-Type");
   if (contentType) headers.set("Content-Type", contentType);
+  // POSTs only go to the geo-picked region (no duplicate writes across regions).
+  const pool = isGet ? origins : origins.slice(0, 1);
 
-  try {
-    const response = await fetch(target, {
-      method: request.method,
-      headers,
-      body: isGet ? undefined : await request.text(),
-      cache: "no-store",
-    });
-    const text = await response.text();
-    return new NextResponse(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": response.headers.get("Content-Type") || "application/json",
-        "Cache-Control": isGet && !RETRYABLE_STATUS.has(response.status) ? "public, max-age=30, stale-while-revalidate=300" : "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "x-atv-origin": new URL(origin).origin,
-        "x-atv-region": region,
-      },
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: `${region} backend failed`, upstream_body: error instanceof Error ? error.message : String(error) },
-      { status: 502, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } },
-    );
+  let lastStatus = 502;
+  let lastBody = "";
+  for (const origin of pool) {
+    const target = safeUrl(upstreamPath + search, origin);
+    if (!target) continue;
+    try {
+      const response = await fetch(target, { method: request.method, headers, body: body || undefined, cache: "no-store" });
+      if (RETRYABLE_STATUS.has(response.status)) {
+        lastStatus = response.status;
+        lastBody = await response.text().catch(() => "");
+        continue; // region down/cold — try the next
+      }
+      const text = await response.text();
+      return new NextResponse(text, {
+        status: response.status,
+        headers: {
+          "Content-Type": response.headers.get("Content-Type") || "application/json",
+          "Cache-Control": isGet && !RETRYABLE_STATUS.has(response.status) ? "public, max-age=30, stale-while-revalidate=300" : "no-store",
+          "Access-Control-Allow-Origin": "*",
+          "x-atv-origin": new URL(origin).origin,
+          "x-atv-region": region,
+        },
+      });
+    } catch {
+      lastStatus = 502;
+    }
   }
+  return NextResponse.json(
+    { error: `all catalog backends failed`, upstream_status: lastStatus, upstream_body: lastBody.slice(0, 200) },
+    { status: 502, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } },
+  );
 }
 
 function safeUrl(pathWithSearch: string, base: string): URL | null {

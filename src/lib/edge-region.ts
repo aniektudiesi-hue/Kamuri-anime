@@ -65,6 +65,15 @@ export function detectServerRegion(headers: Headers): { region: RegionId; origin
   return { region, origin: originForRegion(region) };
 }
 
+// Geo-picked origin first, then every other region as a fallback — so a single
+// region being down (or cold) never breaks the site; the proxy retries the next.
+export function catalogOriginPool(headers: Headers): { region: RegionId; origins: string[] } {
+  const { region, origin } = detectServerRegion(headers);
+  const all = [origin, REGION_ORIGINS.usEast, REGION_ORIGINS.usWest, REGION_ORIGINS.europe, REGION_ORIGINS.india];
+  const origins = [...new Set(all.filter(Boolean).map((o) => o.replace(/\/$/, "")))];
+  return { region, origins };
+}
+
 export type EdgeSession = {
   region?: string;
   country?: string;

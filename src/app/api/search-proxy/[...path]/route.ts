@@ -1,38 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { detectServerRegion } from "@/lib/edge-region";
+import { catalogOriginPool } from "@/lib/edge-region";
 
 export const dynamic = "force-dynamic";
 
 const RETRYABLE_STATUS = new Set([500, 502, 503, 504, 521, 522, 523, 524, 525, 526]);
 
 export async function GET(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
-  const { region, origin } = detectServerRegion(request.headers);
+  const { region, origins } = catalogOriginPool(request.headers);
   const { path } = await context.params;
   const upstreamPath = `/${path.join("/")}`;
-  const target = safeUrl(upstreamPath + request.nextUrl.search, origin);
-  if (!target) {
-    return NextResponse.json({ error: "invalid backend url", items: [], has_more: false }, { status: 500 });
-  }
+  const search = request.nextUrl.search;
+  const headers = proxyHeaders(request, region);
 
-  try {
-    const response = await fetch(target, { headers: proxyHeaders(request, region), cache: "no-store" });
-    const text = await response.text();
-    return new NextResponse(text, {
-      status: response.status,
-      headers: {
-        "Content-Type": response.headers.get("Content-Type") || "application/json",
-        "Cache-Control": !RETRYABLE_STATUS.has(response.status) ? "public, max-age=30, stale-while-revalidate=300" : "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "x-atv-origin": new URL(origin).origin,
-        "x-atv-region": region,
-      },
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: `${region} search backend failed`, upstream_body: error instanceof Error ? error.message : String(error), items: [], has_more: false },
-      { status: 502, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } },
-    );
+  let lastStatus = 502;
+  let lastBody = "";
+  for (const origin of origins) {
+    const target = safeUrl(upstreamPath + search, origin);
+    if (!target) continue;
+    try {
+      const response = await fetch(target, { headers, cache: "no-store" });
+      if (RETRYABLE_STATUS.has(response.status)) {
+        lastStatus = response.status;
+        lastBody = await response.text().catch(() => "");
+        continue;
+      }
+      const text = await response.text();
+      return new NextResponse(text, {
+        status: response.status,
+        headers: {
+          "Content-Type": response.headers.get("Content-Type") || "application/json",
+          "Cache-Control": !RETRYABLE_STATUS.has(response.status) ? "public, max-age=30, stale-while-revalidate=300" : "no-store",
+          "Access-Control-Allow-Origin": "*",
+          "x-atv-origin": new URL(origin).origin,
+          "x-atv-region": region,
+        },
+      });
+    } catch {
+      lastStatus = 502;
+    }
   }
+  return NextResponse.json(
+    { error: "all search backends failed", upstream_status: lastStatus, upstream_body: lastBody.slice(0, 200), items: [], has_more: false },
+    { status: 502, headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" } },
+  );
 }
 
 function safeUrl(pathWithSearch: string, base: string): URL | null {
