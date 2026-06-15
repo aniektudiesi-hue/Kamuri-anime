@@ -222,7 +222,11 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   // NOT wait for the heavy hero banner image to finish downloading (that fades in
   // on its own). A hard escape (below) guarantees the page never hangs forever on
   // a slow/failing backend or image.
-  const showDetailBuffer = detailDataPending && !bufferEscape;
+  // Keep the buffer up until the DATA is ready AND the hero banner image has
+  // actually painted — so a card click reveals a fully-formed layout (with art),
+  // not a flash of empty boxes. onLoad/onError both mark the hero ready, and the
+  // escape timer below guarantees it can never hang.
+  const showDetailBuffer = (detailDataPending || !heroImageReady) && !bufferEscape;
   const showHeroSplash = showDetailBuffer;
 
   const markHeroImageReady = useCallback(() => {
@@ -239,11 +243,12 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     setHeroImageReady(!heroSrc);
   }, [heroSrc]);
 
-  // Hard safety: never let the detail buffer hang. Reveal the page after 3.5s
-  // even if the backend or hero image is still resolving.
+  // Hard safety: never let the detail buffer hang. Reveal the page after 4s even
+  // if the backend or hero image is still resolving (the hero usually paints far
+  // sooner — especially when the card hover already warmed it).
   useEffect(() => {
     setBufferEscape(false);
-    const timer = window.setTimeout(() => setBufferEscape(true), 1500);
+    const timer = window.setTimeout(() => setBufferEscape(true), 4000);
     return () => window.clearTimeout(timer);
   }, [malId]);
 
