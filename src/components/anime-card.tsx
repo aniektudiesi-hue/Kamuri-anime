@@ -81,6 +81,7 @@ export function AnimeCard({
       return;
     }
     event.preventDefault();
+    window.dispatchEvent(new CustomEvent("atv:route-buffer-start"));
     window.location.assign(href);
   }
 
