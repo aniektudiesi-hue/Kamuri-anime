@@ -201,6 +201,7 @@ export function VideoPlayer({
   const [mobileFullscreen, setMobileFullscreen] = useState(false);
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
+  const streamHeaders = stream?.headers;
   const isMegaPlayServer =
     serverId === "hd1" ||
     serverId === "hd2" ||
@@ -704,6 +705,19 @@ export function VideoPlayer({
           manifestLoadingMaxRetry: 3,
           levelLoadingTimeOut: 5000,
           levelLoadingMaxRetry: 3,
+          xhrSetup: (xhr) => {
+            if (!streamHeaders) return;
+            for (const [key, value] of Object.entries(streamHeaders)) {
+              if (!value) continue;
+              const normalized = key.toLowerCase();
+              if (["referer", "origin", "host", "cookie", "user-agent"].includes(normalized)) continue;
+              try {
+                xhr.setRequestHeader(key, value);
+              } catch {
+                // Some CDN/browser header combinations are forbidden; direct HLS still works without them.
+              }
+            }
+          },
         });
         hlsRef.current = hls;
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
@@ -834,7 +848,7 @@ export function VideoPlayer({
       video.removeEventListener("stalled", markWaiting);
       video.removeEventListener("progress", updateBufferedFromEvent);
     };
-  }, [hideControlsSoon, isHlsStream, isMegaPlayServer, isMoonStream, loading, serverId, src, stream?.server, syncCaptionAt]);
+  }, [hideControlsSoon, isHlsStream, isMegaPlayServer, isMoonStream, loading, serverId, src, stream?.server, streamHeaders, syncCaptionAt]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;

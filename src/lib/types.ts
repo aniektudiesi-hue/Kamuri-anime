@@ -70,6 +70,7 @@ export type StreamResponse = {
   stream_url?: string;
   iframe_url?: string;
   embed_url?: string;
+  headers?: Record<string, string>;
   server?: string;
   subtitles?: Subtitle[];
   subtitle_url?: string;

@@ -38,6 +38,7 @@ function viaWorker(stream: StreamResponse | undefined, host: string): StreamResp
 }
 
 export const DEFAULT_STREAM_PROVIDER_ID = "hd1" satisfies StreamProviderId;
+export const STREAM_QUERY_VERSION = "direct-anime-search-v3";
 
 function warmMoonStream(stream: StreamResponse | undefined) {
   if (!warmMoonPipeline(stream, 12)) {
@@ -128,7 +129,7 @@ export function streamProviderQueryKey(
   episode: string,
   type: StreamAudioType,
 ) {
-  return ["stream", malId, episode, provider.id, provider.queryType(type)] as const;
+  return ["stream", STREAM_QUERY_VERSION, malId, episode, provider.id, provider.queryType(type)] as const;
 }
 
 export function streamProviderCacheKey(

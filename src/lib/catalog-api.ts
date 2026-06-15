@@ -352,6 +352,7 @@ type AnimeSearchStreamPayload = {
   m3u8_url?: string; url?: string; stream_url?: string;
   sources?: Array<{ url?: string; file?: string; type?: string; quality?: string }>;
   subtitles?: string | Subtitle[] | Array<{ lang?: string; language?: string; label?: string; url?: string; file?: string }>;
+  headers?: Record<string, string>;
   subtitle_url?: string; server_id?: number | string;
 };
 
@@ -382,7 +383,7 @@ function mapResolverSubtitles(value: AnimeSearchStreamPayload["subtitles"]): Sub
 
 async function fetchAnimeSearchStream(malId: string, episode: string, type: "sub" | "dub" = "sub"): Promise<StreamResponse | undefined> {
   try {
-    const qs = new URLSearchParams({ type });
+    const qs = new URLSearchParams({ type, embed: "false" });
     const res = await fetch(
       `${ANIME_SEARCH_STREAM_BASE}/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}?${qs.toString()}`,
       { headers: { Accept: "application/json" } },
@@ -393,8 +394,12 @@ async function fetchAnimeSearchStream(malId: string, episode: string, type: "sub
     if (!m3u8) return undefined;
     return {
       m3u8_url: m3u8,
+      url: m3u8,
+      stream_url: m3u8,
       subtitles: mapResolverSubtitles(data.subtitles),
       subtitle_url: data.subtitle_url,
+      headers: data.headers,
+      server: "anime-search",
       server_id: Number(data.server_id || 0) || undefined,
       mal_id: malId,
       episode_num: episode,

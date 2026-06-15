@@ -1,6 +1,6 @@
 import type { StreamResponse } from "./types";
 
-const STREAM_CACHE_PREFIX = "anime-tv-stream-meta:v2:";
+const STREAM_CACHE_PREFIX = "anime-tv-stream-meta:v3:";
 const STREAM_CACHE_TTL = 1000 * 60 * 60;
 const warmedManifests = new Set<string>();
 const warmedMoon = new Map<string, number>();
@@ -32,6 +32,7 @@ export function readCachedStream(key: string) {
 
 export function writeCachedStream(key: string, value: StreamResponse) {
   try {
+    if (!value.m3u8_url && !value.stream_url && !value.url) return;
     const payload = JSON.stringify({ expiresAt: Date.now() + STREAM_CACHE_TTL, key, value } satisfies CachedStream);
     const storageKey = STREAM_CACHE_PREFIX + key;
     window.sessionStorage.setItem(storageKey, payload);
