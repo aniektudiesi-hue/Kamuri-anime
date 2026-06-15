@@ -227,8 +227,10 @@ export default function RootLayout({
       className={cn("h-full antialiased", "font-sans")}
     >
       <head>
-        <link rel="preconnect" href="https://anime-search-api-burw.onrender.com" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href="https://anime-search-api-burw.onrender.com" />
+        <link rel="preconnect" href="https://animetvplus-stream-backup-india.onrender.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://animetvplus-stream-backup-india.onrender.com" />
+        <link rel="dns-prefetch" href="https://animetvplus-catalog-api-us-west.onrender.com" />
+        <link rel="dns-prefetch" href="https://animetvplus-catalog-api-europe.onrender.com" />
         <link rel="preconnect" href="https://anime-tv-stream-proxy.animetvplus-stream.workers.dev" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://cdn.animetvplus.xyz" />
         <link rel="preconnect" href="https://s4.anilist.co" crossOrigin="anonymous" />

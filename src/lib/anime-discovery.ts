@@ -1,7 +1,7 @@
 import type { Anime } from "./types";
 import { animeId } from "./utils";
 import { catalogClientGet, mapCatalogList } from "./catalog-api";
-import { catalogRegionHeaders } from "./edge-region";
+import { catalogRegionHeaders, detectServerRegion, originForRegion } from "./edge-region";
 
 type AniListMedia = {
   idMal: number | null;
@@ -251,6 +251,17 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
 // Our enriched search backend — root-only (no S2/S3 dupes), CR metadata, synonyms.
 const SEARCH_DISCOVERY_BASE = "https://animetvplus-stream-backup-india.onrender.com";
 
+async function getDiscoveryServerOrigin(): Promise<string> {
+  if (typeof window !== "undefined") return "";
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    return detectServerRegion(h).origin;
+  } catch {
+    return SEARCH_DISCOVERY_BASE;
+  }
+}
+
 function searchParamsForIntent(intent: DiscoveryIntent, page: number, fmt = ""): string {
   const params = new URLSearchParams({ limit: "60", page: String(page) });
   const genre = intent.genre || intent.tag;
@@ -284,7 +295,7 @@ export async function fetchAniListDiscovery(
     const qs = searchParamsForIntent(intent, page, fmt);
     // Server-side hits the backend directly; client-side goes through the proxy
     // route to stay same-origin.
-    const base = typeof window === "undefined" ? `${SEARCH_DISCOVERY_BASE}/api/search` : "/api/search-proxy/api/search";
+    const base = typeof window === "undefined" ? `${(await getDiscoveryServerOrigin()) || SEARCH_DISCOVERY_BASE}/api/search` : "/api/search-proxy/api/search";
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
     const json = await fetch(`${base}?${qs}`, {

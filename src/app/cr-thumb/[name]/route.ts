@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { detectServerRegion } from "@/lib/edge-region";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const REMOTE_THUMB_BASE =
-  process.env.CATALOG_DIRECT_API_BASE ||
-  process.env.SEARCH_DIRECT_API_BASE ||
-  "https://animetvplus-stream-backup-india.onrender.com";
+function getThumbBase(headers: Headers): string {
+  return (
+    process.env.CATALOG_DIRECT_API_BASE ||
+    process.env.SEARCH_DIRECT_API_BASE ||
+    detectServerRegion(headers).origin
+  );
+}
 
 const IMAGE_HEADERS = {
   "Content-Type": "image/webp",
@@ -20,7 +24,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ name: stri
   }
 
   try {
-    const remoteUrl = new URL(`/cr-thumb/${encodeURIComponent(name)}`, REMOTE_THUMB_BASE);
+    const remoteUrl = new URL(`/cr-thumb/${encodeURIComponent(name)}`, getThumbBase(_req.headers));
     const remote = await fetch(remoteUrl, {
       cache: "force-cache",
       next: { revalidate: 60 * 60 * 24 * 30 },

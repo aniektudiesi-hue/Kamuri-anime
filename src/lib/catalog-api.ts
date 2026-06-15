@@ -1,14 +1,20 @@
 import type { AiringScheduleItem, Anime, EpisodeResponse, StreamResponse, Subtitle } from "./types";
-import { catalogRegionHeaders } from "./edge-region";
+import { catalogRegionHeaders, detectServerRegion, originForRegion } from "./edge-region";
 
-const INDIA_RENDER_BASE = "https://animetvplus-stream-backup-india.onrender.com";
+async function getServerOrigin(): Promise<string> {
+  if (typeof window !== "undefined") return "";
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    return detectServerRegion(h).origin;
+  } catch {
+    return originForRegion("india");
+  }
+}
 
-// Single backend = the 5001 season-mapping gateway (authoritative seasons +
-// internal stream/section proxy). The UI never calls 3058 directly.
-export const CATALOG_API_BASE = INDIA_RENDER_BASE;
+export const CATALOG_API_BASE = "https://animetvplus-stream-backup-india.onrender.com";
 
-// Our enriched search backend (has synonyms, correct grouping)
-const SEARCH_API_BASE = INDIA_RENDER_BASE;
+const SEARCH_API_BASE = CATALOG_API_BASE;
 
 export const CATALOG_PROXY_BASE = "/api/catalog-proxy";
 const CLIENT_CACHE_TTL = 1000 * 60 * 5;
@@ -85,7 +91,7 @@ export async function catalogServerGet<T>(path: string, revalidate = 60): Promis
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-      const response = await fetch(`${CATALOG_API_BASE}${path}`, {
+      const response = await fetch(`${(await getServerOrigin()) || CATALOG_API_BASE}${path}`, {
         headers: { Accept: "application/json" },
         signal: controller.signal,
         ...(revalidate <= 0 ? { cache: "no-store" as const } : { next: { revalidate } }),
@@ -190,7 +196,7 @@ export async function fetchCatalogSection(path: string, limit = 24, page = 1, re
 export async function fetchCatalogSearch(query: string, limit = 40, page = 1) {
   const params = new URLSearchParams({ q: query, limit: String(limit), page: String(page) });
   // Use our enriched search backend (synonyms + correct season grouping)
-  const base = typeof window === "undefined" ? SEARCH_API_BASE : "/api/search-proxy";
+  const base = typeof window === "undefined" ? ((await getServerOrigin()) || SEARCH_API_BASE) : "/api/search-proxy";
   const payload = await fetch(`${base}/api/search?${params.toString()}`, {
     headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
     ...(typeof window === "undefined" ? { next: { revalidate: 30 } } : {}),
@@ -247,7 +253,7 @@ export async function fetchCrCard(malId: string, season?: number, full = false):
     // Use our enriched backend (single source of truth — correct season grouping
     // + synopsis, matches the season-review app). Server-side hits it directly,
     // client-side via the proxy route to stay same-origin.
-    const base = typeof window === "undefined" ? SEARCH_API_BASE : "/api/search-proxy";
+    const base = typeof window === "undefined" ? ((await getServerOrigin()) || SEARCH_API_BASE) : "/api/search-proxy";
     const params = new URLSearchParams({ v: "canonical-v10" });
     // full=1 returns EVERY season WITH its episodes in one payload. The lazy
     // per-season path (?season=N) mismatches when the backend's raw season
