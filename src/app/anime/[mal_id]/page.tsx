@@ -12,7 +12,7 @@ import { SidebarLayout } from "@/components/sidebar";
 import { ProgressiveImage } from "@/components/progressive-image";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
-import { crCardQueryKey, fetchCrCard, type CrSeason } from "@/lib/catalog-api";
+import { CR_CARD_QUERY_VERSION, fetchCrCard, type CrSeason } from "@/lib/catalog-api";
 import { directImageUrl, imageCdnUrl } from "@/lib/image-cdn";
 import { useAuth } from "@/lib/auth";
 import {
