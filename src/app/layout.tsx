@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Providers } from "@/components/providers";
 import { MaintenanceGate } from "@/components/maintenance-gate";
 import { AdNoticeBanner } from "@/components/ad-notice-banner";
+import { RegisterPopup } from "@/components/register-popup";
 import { absoluteUrl, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -248,6 +249,7 @@ export default function RootLayout({
         />
         <Providers>{children}</Providers>
         <AdNoticeBanner />
+        <RegisterPopup />
         <MaintenanceGate />
         {/* Google AdSense */}
         <Script
