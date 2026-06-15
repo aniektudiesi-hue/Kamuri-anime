@@ -292,7 +292,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
 
   // Tabs: Crunchyroll seasons when the title splits into seasons, else 100-ep ranges.
   const episodeTabs = useSeasons
-    ? crSeasons.map((season, index) => season.title || `Season ${season.season_number ?? index + 1}`)
+    ? cleanSeasonLabels(crSeasons.map((season, index) => season.title || `Season ${season.season_number ?? index + 1}`))
     : ranges.map((range) => range.label);
 
   const seasonEpisodes = useMemo<Episode[]>(() => {
@@ -658,6 +658,26 @@ function formatClock(s: number) {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+// Season dropdown labels. CR season titles all repeat the franchise name
+// ("Re:ZERO -Starting Life…- Season 2", "… Season 3"), so the distinguishing
+// part gets truncated and every row looks identical. Strip the shared prefix and
+// show just the differing tail ("Season 2", "STONE WARS"), falling back to
+// "Season N". Kept conservative: only strips a long common prefix that still
+// leaves meaningful labels (so e.g. "Season 1 Part 1/2/3" is left untouched).
+function cleanSeasonLabels(titles: string[]): string[] {
+  if (titles.length < 2) return titles;
+  let prefix = titles[0] ?? "";
+  for (const t of titles) {
+    while (prefix && t.slice(0, prefix.length) !== prefix) prefix = prefix.slice(0, -1);
+    if (!prefix) break;
+  }
+  if (prefix.length < 8) return titles;
+  const stripped = titles.map((t) => t.slice(prefix.length).replace(/^[\s\-:·–—|]+/, "").trim());
+  const meaningful = stripped.filter((s) => s.length >= 3 && /[a-z]/i.test(s)).length;
+  if (meaningful < Math.max(1, titles.length - 2)) return titles;
+  return stripped.map((s, i) => s || `Season ${i + 1}`);
 }
 
 function crSeasonKey(season?: Pick<CrSeason, "title" | "owner_mal" | "episode_count">) {

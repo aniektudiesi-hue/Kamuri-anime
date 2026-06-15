@@ -80,9 +80,10 @@ export function AnimeCard({
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
       return;
     }
-    event.preventDefault();
+    // Client-side navigation (the <Link> handles it) — instant and keeps the
+    // React Query cache, so going back/forward never black-screens or refetches.
+    // Just trigger the buffer overlay; do NOT full-reload with location.assign.
     window.dispatchEvent(new CustomEvent("atv:route-buffer-start"));
-    window.location.assign(href);
   }
 
   return (
