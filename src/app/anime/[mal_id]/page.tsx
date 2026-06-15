@@ -304,7 +304,6 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     if (!useSeasons) return [];
     const season = selectedCrSeason || crSeasons[activeSeasonIndex];
     return (season?.episodes ?? [])
-      .filter((episode) => episode.has_stream !== false)
       .map((episode) => ({
         // episode_number drives the watch link/stream fetch (owner MAL's real episode);
         // display_number is what the user sees (restarts at 1 each season).
@@ -571,9 +570,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                 {visibleEpisodes.map((ep) => {
                   const isCurrent = ep.episode_number === lastEp && Boolean(last);
                   const displayNum = ep.display_number ?? ep.episode_number;
-                  // Every episode is clickable. If our DB has no m3u8 yet, the watch
-                  // page resolves it live from the /api/stream resolver.
-                  const canPlay = true;
+                  const canPlay = ep.has_stream !== false;
                   const watchAnime = { ...displayAnime, mal_id: activeSeasonMal, anime_id: activeSeasonMal, id: activeSeasonMal } as Anime;
                   const href = canPlay ? (!useSeasons && isCurrent ? resumeHref : watchPath(watchAnime, activeSeasonMal, ep.episode_number)) : "#";
                   return (
