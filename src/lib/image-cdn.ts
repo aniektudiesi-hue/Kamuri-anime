@@ -15,6 +15,28 @@ function isCrImageHost(hostname: string) {
   return CR_IMAGE_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
 }
 
+// US-side proxy for Crunchyroll art. CR's imgsrv geo-redirects/403s some boxes
+// outside the US, so non-US viewers load CR images through the worker (which
+// fetches from CR and edge-caches the bytes). US / SSR / unknown viewers load
+// straight from CR's global CDN — no proxy hop.
+const CR_PROXY_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev/cr-image";
+const COUNTRY_KEY = "anime-tv-edge-country";
+
+function viewerCountry(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return (window.localStorage.getItem(COUNTRY_KEY) || "").toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
+function maybeProxyCr(crUrl: string): string {
+  const country = viewerCountry();
+  if (!country || country === "US") return crUrl;
+  return `${CR_PROXY_BASE}?u=${encodeURIComponent(crUrl)}`;
+}
+
 // Crunchyroll's imgsrv only serves a FIXED WHITELIST of render boxes — asking for
 // any other WxH returns 403 (e.g. 320x480/220x330 fail, 240x360/480x720 work).
 // So we snap the requested width to the nearest allowed CR size (>= target, to
@@ -109,7 +131,7 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
     // Crunchyroll: resize on CR's own edge CDN via the URL path — fastest,
     // globally cached, no proxy hop. This is the primary art source.
     if (isCrImageHost(parsed.hostname)) {
-      return crResizedUrl(parsed, width);
+      return maybeProxyCr(crResizedUrl(parsed, width));
     }
     // Optional self-hosted WebP cache (opt-in).
     if (LOCAL_IMAGE_CACHE_ENABLED) {
