@@ -217,8 +217,8 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   );
   const visibleEpisodeTotal = useSeasons ? crEpisodeTotal : episodeTotal;
 
-  // Prefer the CR detail-page keyart (wide backdrop) > CR hero > AniList backdrop.
-  const instantHero = displayAnime.detail_banner || displayAnime.cr_hero || backdrop;
+  // Hero banner: ONLY Crunchyroll keyart. Never fall back to AniList backdrop.
+  const instantHero = displayAnime.detail_banner || displayAnime.cr_hero || null;
   const heroImage = crCard.data?.detail_banner || crCard.data?.hero_banner || instantHero;
   // Construct title_logo from any existing keyart URL pattern so we don't wait for crCard
   const CR_KEYART_BASE = "https://imgsrv.crunchyroll.com/cdn-cgi/image/format=auto,quality=90";
