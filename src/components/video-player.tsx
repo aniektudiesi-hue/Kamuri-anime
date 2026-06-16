@@ -64,9 +64,14 @@ const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
 };
 const FAST_START_BUFFER_SECONDS = 4;
 const MOON_FAST_START_BUFFER_SECONDS = 4;
-const DEEP_BUFFER_SECONDS = 180;
-const MAX_BUFFER_WINDOW_SECONDS = 600;
-const NORMAL_BUFFER_SECONDS = 90;
+// Aggressive fixed 2-minute buffer window. We keep ~120s ahead and ~120s
+// behind the playhead so that any seek inside that ±2-min range is instant
+// (no rebuffer). 120s is the hard cap — we deliberately do NOT buffer the whole
+// episode (that would waste bandwidth/memory and hammer the origin).
+const DEEP_BUFFER_SECONDS = 120;
+const MAX_BUFFER_WINDOW_SECONDS = 120;
+const NORMAL_BUFFER_SECONDS = 120;
+const BACK_BUFFER_SECONDS = 120;
 const DEEP_BUFFER_BYTES = 512 * 1024 * 1024;
 
 function currentFullscreenElement() {
@@ -489,7 +494,10 @@ export function VideoPlayer({
     restoredRef.current = false;
     const startupTime = Math.max(0, Number(initialTimeRef.current || 0));
     const shouldAutoPlay = autoPlayRef.current;
-    const shouldDeepBuffer = deepBufferRef.current;
+    // Always maintain the aggressive 2-min buffer, regardless of the deepBuffer
+    // prop or which server is in use (mewstream/megaplay included). The prop
+    // used to gate this off for those servers, which is why they rebuffered.
+    const shouldDeepBuffer = true;
     const useSegmentCache = shouldDeepBuffer && !isMegaPlayServer;
     const segmentCache = createHlsSegmentCacheSession({
       enabled: useSegmentCache,
@@ -527,9 +535,11 @@ export function VideoPlayer({
         backBufferLength: number;
       };
       config.maxBufferLength = target;
-      config.maxMaxBufferLength = startupReady && shouldDeepBuffer ? MAX_BUFFER_WINDOW_SECONDS : Math.max(target, 24);
-      config.maxBufferSize = startupReady && shouldDeepBuffer ? DEEP_BUFFER_BYTES : 120 * 1024 * 1024;
-      config.backBufferLength = 60;
+      // Hard cap the forward buffer at 2 min, and never let the byte budget cap
+      // it below that window. Keep 2 min behind too so backward seeks are instant.
+      config.maxMaxBufferLength = MAX_BUFFER_WINDOW_SECONDS;
+      config.maxBufferSize = DEEP_BUFFER_BYTES;
+      config.backBufferLength = BACK_BUFFER_SECONDS;
     };
     const releaseStartupQuality = () => {
       if (!hls || startupQualityReleased) return;
@@ -693,10 +703,10 @@ export function VideoPlayer({
           abrEwmaFastVoD: 3,
           abrEwmaSlowVoD: 9,
           maxBufferLength: initialForwardBuffer,
-          maxMaxBufferLength: 120,
-          maxBufferSize: 256 * 1024 * 1024,
+          maxMaxBufferLength: MAX_BUFFER_WINDOW_SECONDS,
+          maxBufferSize: DEEP_BUFFER_BYTES,
           maxBufferHole: 0.5,
-          backBufferLength: 60,
+          backBufferLength: BACK_BUFFER_SECONDS,
           fragLoadingTimeOut: 10000,
           fragLoadingMaxRetry: 6,
           fragLoadingRetryDelay: 300,
