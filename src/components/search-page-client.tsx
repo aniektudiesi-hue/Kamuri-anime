@@ -46,7 +46,7 @@ const GENRE_LINKS = new Set([
   "Demons",
 ]);
 
-const DISCOVERY_QUERY_VERSION = "v2";
+const DISCOVERY_QUERY_VERSION = "v3";
 const warmedSearchPosters = new Set<string>();
 
 export type SearchInitialData = {
@@ -247,7 +247,7 @@ function SearchContentBody({
     queryKey: ["anilist-discovery", DISCOVERY_QUERY_VERSION, intent.key, q, formatFilter, discoveryPage],
     queryFn: async () => ({ intentKey: intent.key, fmtKey: formatFilter, ...(await fetchAniListDiscovery(intent, discoveryPage, formatFilter)) }),
     enabled: true,
-    staleTime: 1000 * 60 * 30,
+    staleTime: intent.key.startsWith("search:") ? 1000 * 30 : 1000 * 60 * 30,
     gcTime: 1000 * 60 * 90,
     initialData: initialMatches && formatFilter === "ALL" && discoveryPage === 1 && initialData
       ? {
@@ -335,7 +335,7 @@ function SearchContentBody({
       queryClient.ensureQueryData({
         queryKey: ["anilist-discovery", DISCOVERY_QUERY_VERSION, intent.key, q, formatFilter, nextPage],
         queryFn: async () => ({ intentKey: intent.key, fmtKey: formatFilter, ...(await fetchAniListDiscovery(intent, nextPage, formatFilter)) }),
-        staleTime: 1000 * 60 * 30,
+        staleTime: intent.key.startsWith("search:") ? 1000 * 30 : 1000 * 60 * 30,
         gcTime: 1000 * 60 * 90,
       }).catch(() => undefined);
     }
