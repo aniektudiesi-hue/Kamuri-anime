@@ -602,21 +602,23 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                             sizes="(max-width: 640px) 50vw, 25vw"
                             imgClassName="object-center transition-opacity duration-300"
                           />
-                        ) : cloudinaryEpisodeThumb(activeSeasonMal, ep.episode_number) ? (
-                          <Image
-                            src={cloudinaryEpisodeThumb(activeSeasonMal, ep.episode_number)}
-                            alt={ep.title || `Episode ${ep.episode_number} thumbnail`}
-                            fill
-                            sizes="(max-width: 640px) 50vw, 25vw"
-                            className="object-cover"
-                            unoptimized
-                          />
                         ) : (
-                          <div className="absolute inset-0 grid place-items-center bg-[#121318]">
-                            <span className="rounded-sm border border-white/10 bg-black/25 px-2 py-1 text-[0.6875rem] font-black uppercase text-white/35">
-                              EP {displayNum}
-                            </span>
-                          </div>
+                          <>
+                            {/* EP N placeholder — always rendered, cloudinary img overlays it */}
+                            <div className="absolute inset-0 grid place-items-center bg-[#121318]">
+                              <span className="rounded-sm border border-white/10 bg-black/25 px-2 py-1 text-[0.6875rem] font-black uppercase text-white/35">
+                                EP {displayNum}
+                              </span>
+                            </div>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={cloudinaryEpisodeThumb(activeSeasonMal, ep.episode_number)}
+                              alt=""
+                              loading="lazy"
+                              className="absolute inset-0 h-full w-full object-cover"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                            />
+                          </>
                         )}
                         <div className="absolute inset-0 bg-white opacity-0 transition-opacity duration-200 group-hover:opacity-[0.08]" />
                         {canPlay ? (

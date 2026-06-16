@@ -900,12 +900,20 @@ function EpisodeSidebar({
                   }`}>
                     {ep.thumbnail ? (
                       <Image src={imageCdnUrl(ep.thumbnail, "thumb")} alt="" fill sizes="112px" className="object-cover" />
-                    ) : cloudinaryEpisodeThumb(malId, ep.episode_number) ? (
-                      <Image src={cloudinaryEpisodeThumb(malId, ep.episode_number)} alt="" fill sizes="112px" className="object-cover" unoptimized />
                     ) : (
-                      <div className="absolute inset-0 grid place-items-center bg-[#121318] text-[10px] font-black uppercase text-white/35">
-                        EP {ep.episode_number}
-                      </div>
+                      <>
+                        <div className="absolute inset-0 grid place-items-center bg-[#121318] text-[10px] font-black uppercase text-white/35">
+                          EP {ep.episode_number}
+                        </div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={cloudinaryEpisodeThumb(malId, ep.episode_number)}
+                          alt=""
+                          loading="lazy"
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                        />
+                      </>
                     )}
                     <div className="absolute inset-0 bg-black/30" />
                     {/* Play overlay on hover */}

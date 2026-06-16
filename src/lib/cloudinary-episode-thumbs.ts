@@ -142,6 +142,5 @@ export const CLOUDINARY_THUMB_MALS = new Set<string>([
 ]);
 
 export function cloudinaryEpisodeThumb(malId: string, episode: number): string {
-  if (!CLOUDINARY_THUMB_MALS.has(malId)) return "";
   return `https://res.cloudinary.com/dbwqpkbiy/image/upload/kamuri/episode-thumbs/mal_${malId}_ep_${episode}.webp`;
 }
