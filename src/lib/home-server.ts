@@ -39,7 +39,7 @@ type HomeInitialDataOptions = {
 };
 
 export async function getHomeInitialData(options: HomeInitialDataOptions = {}): Promise<HomeInitialData> {
-  const [banners, thumbnails, recent, topRated, popularRaw, romanceRaw, isekaiRaw, sportsRaw, healingRaw] = await Promise.all([
+  const [bannersRaw, thumbnailsRaw, recentRaw, topRatedRaw, popularRaw, romanceRaw, isekaiRaw, sportsRaw, healingRaw] = await Promise.all([
     fetchCatalogSection("/api/anime/season/2026/spring", 10, 1, HOME_REVALIDATE_SECONDS),
     fetchCatalogSection("/api/anime/season/2026/spring", 40, 1, HOME_REVALIDATE_SECONDS),
     fetchCatalogSection("/api/anime/new-releases", 40, 1, 15 * 60),
@@ -51,31 +51,38 @@ export async function getHomeInitialData(options: HomeInitialDataOptions = {}): 
     fetchCatalogSection("/api/anime/genre/slice-of-life", 30, 1, HOME_REVALIDATE_SECONDS),
   ]);
 
-  const famousNewRaw = prioritizeByTitle(
-    mergeUniqueAnime([...recent, ...popularRaw, ...topRated, ...isekaiRaw]),
+  // Strip sequels from all listing sections — only root (season 1) entries.
+  const banners = bannersRaw.filter(isRootAnime);
+  const thumbnails = thumbnailsRaw.filter(isRootAnime);
+  const recent = recentRaw.filter(isRootAnime);
+  const topRated = topRatedRaw.filter(isRootAnime);
+  const popular = popularRaw.filter(isRootAnime);
+  const romance = romanceRaw.filter(isRootAnime);
+  const isekai = isekaiRaw.filter(isRootAnime);
+  const sports = sportsRaw.filter(isRootAnime);
+  const healing = healingRaw.filter(isRootAnime);
+
+  const famousNew = prioritizeByTitle(
+    mergeUniqueAnime([...recent, ...popular, ...topRated, ...isekai]),
     ["classroom", "tensura", "reincarnated as a slime", "my hero academia", "solo leveling", "jujutsu kaisen", "demon slayer"],
   );
-  const selfImprovementRaw = prioritizeByTitle(
-    mergeUniqueAnime([...sportsRaw, ...healingRaw, ...topRated, ...popularRaw]),
+  const selfImprovement = prioritizeByTitle(
+    mergeUniqueAnime([...sports, ...healing, ...topRated, ...popular]),
     ["blue lock", "haikyuu", "run with the wind", "barakamon", "relife", "march comes in like a lion", "baby steps", "ping pong"],
   );
 
-  // Bake Crunchyroll posters into the FIRST render and float CR-mapped titles to
-  // the front. Doing this server-side kills the client-side poster swap that was
-  // causing every grid image to reload (the flicker), and guarantees CR art shows
-  // wherever it exists.
   const [crBanners, crThumbs, crRecent, crTop, crPopular, crFamousNew, crRomance, crIsekai, crSports, crSelfImprovement, crHealing] = await Promise.all([
     enrichWithCr(banners),
     enrichWithCr(thumbnails),
     enrichWithCr(recent),
     enrichWithCr(topRated),
-    enrichWithCr(popularRaw),
-    enrichWithCr(mergeUniqueAnime([...famousNewRaw, ...recent.slice(0, 10), ...popularRaw.slice(0, 10)])),
-    enrichWithCr(romanceRaw),
-    enrichWithCr(isekaiRaw),
-    enrichWithCr(sportsRaw),
-    enrichWithCr(selfImprovementRaw),
-    enrichWithCr(healingRaw),
+    enrichWithCr(popular),
+    enrichWithCr(mergeUniqueAnime([...famousNew, ...recent.slice(0, 10), ...popular.slice(0, 10)])),
+    enrichWithCr(romance),
+    enrichWithCr(isekai),
+    enrichWithCr(sports),
+    enrichWithCr(selfImprovement),
+    enrichWithCr(healing),
   ]);
 
   const scheduleItems = options.fullSchedule
@@ -97,6 +104,14 @@ export async function getHomeInitialData(options: HomeInitialDataOptions = {}): 
     schedule: scheduleItems,
     generatedAt: new Date().toISOString(),
   };
+}
+
+// Sequel patterns — e.g. "Season 2", "2nd Season", "Final Season", "Part 2"
+const SEQUEL_RE = /\b(season\s*[2-9]|[2-9](st|nd|rd|th)\s+season|final\s+season|part\s*[2-9ii]+|ii+$|ova$|specials?$)\b/i;
+
+function isRootAnime(anime: Anime): boolean {
+  const t = `${anime.title || ""} ${(anime as Record<string,unknown>).title_en || ""} ${(anime as Record<string,unknown>).canonical_title || ""}`.trim();
+  return !SEQUEL_RE.test(t);
 }
 
 function mergeUniqueAnime(items: Anime[]) {
