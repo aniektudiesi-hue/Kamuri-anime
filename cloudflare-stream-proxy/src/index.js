@@ -920,7 +920,14 @@ function rewriteStreamPayload(value, workerOrigin) {
   const copy = { ...value };
   for (const key of ["m3u8_url", "url", "stream_url"]) {
     if (typeof copy[key] === "string" && copy[key]) {
-      if (isMewstreamUrl(copy[key])) {
+      // Already proxied through our Python backend (/proxy/...) — e.g. mewstream
+      // streams, which ONLY the backend can fetch (curl_cffi TLS impersonation;
+      // the Worker itself gets a 403 from mewstream). Leave it untouched: it's
+      // already a playable URL. Blanking it here was why mewstream episodes (e.g.
+      // MAL 38000) returned an empty m3u8_url and never played.
+      if (isBackendProxyUrl(copy[key])) continue;
+      // Only blank a RAW mewstream CDN URL — the Worker genuinely can't fetch it.
+      if (isRawMewstreamUrl(copy[key])) {
         copy[key] = "";
         continue;
       }
@@ -948,6 +955,29 @@ function isMewstreamUrl(value) {
     const nestedSrc = parsed.searchParams.get("src");
     if (!nestedSrc) return false;
     return new URL(decodeURIComponent(nestedSrc)).hostname.toLowerCase().includes("mewstream.buzz");
+  } catch {
+    return false;
+  }
+}
+
+// A URL already proxied through our own backend/edge (/proxy/m3u8, /proxy/chunk,
+// /proxy/moon/...). These are playable as-is and must NOT be re-wrapped or blanked.
+function isBackendProxyUrl(value) {
+  try {
+    return new URL(normalizeMaybeOriginUrl(value, "https://anime-tv-stream-proxy.local"))
+      .pathname.startsWith("/proxy/");
+  } catch {
+    return false;
+  }
+}
+
+// A RAW mewstream CDN URL (the host itself is mewstream) — the Worker can't fetch
+// these (Cloudflare egress is TLS-blocked / 403'd), so they get blanked. Once a
+// URL is wrapped by the backend's /proxy/ it is handled by isBackendProxyUrl above.
+function isRawMewstreamUrl(value) {
+  try {
+    return new URL(normalizeMaybeOriginUrl(value, "https://anime-tv-stream-proxy.local"))
+      .hostname.toLowerCase().includes("mewstream.buzz");
   } catch {
     return false;
   }
