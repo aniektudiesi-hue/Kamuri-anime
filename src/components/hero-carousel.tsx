@@ -72,7 +72,7 @@ export function HeroCarousel({ items = [], loading, crData = {} }: { items?: Ani
   const id = animeId(current);
   const malId = String(current.mal_id || current.anime_id || current.id || "");
   const cr = crData[malId];
-  const heroSrc = imageCdnUrl(cr?.detail_banner || bannerOf(current, "banner-lg"), "banner-lg");
+  const heroSrc = imageCdnUrl(cr?.detail_banner || current.detail_banner || current.cr_hero || "", "banner-lg");
   const titleLogo = imageCdnUrl(cr?.title_logo || "", "thumb");
   const synopsis = cr?.synopsis || current.overview || "";
   const genres = current.genres?.slice(0, 4) ?? [];
@@ -280,7 +280,7 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
   const cr = crData[malId];
   const poster = posterOf(current, "poster-md");
   const banner = bannerOf(current, "banner-sm");
-  const bgSrc = cr?.detail_banner || banner || poster;
+  const bgSrc = cr?.detail_banner || current.detail_banner || current.cr_hero || poster;
   const titleLogo = cr?.title_logo || "";
   const count = episodeCount(current);
   const genres = current.genres?.slice(0, 3) ?? [];

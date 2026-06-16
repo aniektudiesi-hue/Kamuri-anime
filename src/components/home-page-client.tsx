@@ -223,7 +223,7 @@ function ResponsiveHero({ homeData }: { homeData: HomeInitialData }) {
     for (const anime of bannerItems.slice(0, 8)) {
       const id = String(anime.mal_id || anime.anime_id || anime.id || "");
       if (!id) continue;
-      let detailBanner = anime.detail_banner || anime.cr_hero || anime.banner;
+      let detailBanner = anime.detail_banner || anime.cr_hero;
       let titleLogo = anime.title_logo;
       const crIdMatch = (detailBanner || titleLogo || "").match(/keyart\/([A-Z0-9]+)-/i);
       if (crIdMatch) {
@@ -268,7 +268,8 @@ function ResponsiveHero({ homeData }: { homeData: HomeInitialData }) {
   const crBanners = useMemo(() => {
     return homeData.banners.filter((a) => {
       const id = String(a.mal_id || a.anime_id || a.id || "");
-      return (a as { cr_mapped?: boolean }).cr_mapped || crData[id]?.detail_banner;
+      const hasCrKeyart = a.detail_banner || a.cr_hero || crData[id]?.detail_banner;
+      return hasCrKeyart;
     });
   }, [homeData.banners, crData]);
   const heroItems = crBanners.length ? crBanners : homeData.banners;
