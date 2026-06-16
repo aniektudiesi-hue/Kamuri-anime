@@ -1429,11 +1429,9 @@ export function VideoPlayer({
       {/* Buffering spinner */}
       {isBuffering && !playbackError && !introActive ? (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center">
-          <div className="relative grid h-[74px] w-[74px] place-items-center rounded-full border border-white/[0.075] bg-black/28 shadow-[0_24px_90px_rgba(0,0,0,0.72)] backdrop-blur-xl">
-            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(225,29,72,0.13),transparent_58%)]" />
-            <div className="absolute inset-3 animate-spin rounded-full border-[2px] border-white/[0.08] border-t-[#cf2442]/90 border-r-white/45" />
-            <div className="absolute inset-5 animate-[spin_1.7s_linear_infinite_reverse] rounded-full border border-white/[0.055] border-b-white/55" />
-            <div className="h-2 w-2 rounded-full bg-white/84 shadow-[0_0_20px_rgba(207,36,66,0.48)]" />
+          <div className="relative grid h-11 w-11 place-items-center">
+            <div className="absolute inset-0 animate-spin rounded-full border-2 border-white/15 border-t-[#cf2442]" />
+            <div className="h-1.5 w-1.5 rounded-full bg-[#cf2442] shadow-[0_0_12px_rgba(207,36,66,0.6)]" />
           </div>
         </div>
       ) : null}
@@ -1552,10 +1550,10 @@ export function VideoPlayer({
               className="absolute inset-y-0 left-0 rounded-full bg-[#cf2442] pointer-events-none shadow-[0_0_20px_rgba(207,36,66,0.58)]"
               style={{ width: `${progress}%` }}
             />
-            {/* Knob */}
+            {/* Knob — Crunchyroll-style red thumb that scales in on hover */}
             <div
-              className="absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full bg-white shadow-md pointer-events-none opacity-0 group-hover/seek:opacity-100 transition-opacity"
-              style={{ left: `calc(${progress}% - 6px)` }}
+              className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 scale-0 rounded-full bg-[#cf2442] ring-2 ring-white shadow-[0_0_12px_rgba(207,36,66,0.85)] pointer-events-none transition-transform duration-150 group-hover/seek:scale-100"
+              style={{ left: `${progress}%` }}
             />
           </div>
 
@@ -1565,7 +1563,7 @@ export function VideoPlayer({
             <button
               aria-label={playing ? "Pause" : "Play"}
               onClick={togglePlay}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white transition-colors hover:bg-white/10 hover:text-white"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white transition-colors hover:bg-[#cf2442]/15 hover:text-[#ff5e78]"
             >
               {playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
             </button>
@@ -1573,7 +1571,7 @@ export function VideoPlayer({
             <button
               aria-label="Rewind 10 seconds"
               onClick={() => seekBy(-10)}
-              className="hidden h-8 w-8 shrink-0 place-items-center rounded-xl text-white/65 transition hover:bg-white/10 hover:text-white sm:grid"
+              className="hidden h-8 w-8 shrink-0 place-items-center rounded-xl text-white/65 transition hover:bg-[#cf2442]/15 hover:text-[#ff5e78] sm:grid"
             >
               <RotateCcw size={17} />
             </button>
@@ -1581,7 +1579,7 @@ export function VideoPlayer({
             <button
               aria-label="Forward 10 seconds"
               onClick={() => seekBy(10)}
-              className="hidden h-8 w-8 shrink-0 place-items-center rounded-xl text-white/65 transition hover:bg-white/10 hover:text-white sm:grid"
+              className="hidden h-8 w-8 shrink-0 place-items-center rounded-xl text-white/65 transition hover:bg-[#cf2442]/15 hover:text-[#ff5e78] sm:grid"
             >
               <RotateCw size={17} />
             </button>
@@ -1605,7 +1603,7 @@ export function VideoPlayer({
               <button
                 aria-label={muted ? "Unmute" : "Mute"}
                 onClick={toggleMute}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/70 transition-colors hover:bg-[#cf2442]/15 hover:text-[#ff5e78]"
               >
                 {muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
@@ -1627,7 +1625,7 @@ export function VideoPlayer({
               onClick={() => subtitleCount > 0 && setCaptionsOn((v) => !v)}
               title={subtitleCount > 0 ? (captionsOn ? "Hide captions" : "Show captions") : "No captions for this server"}
               className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-                captionsOn && subtitleCount > 0 ? "bg-white/10 text-white" : "text-white/45 hover:bg-white/10 hover:text-white"
+                captionsOn && subtitleCount > 0 ? "bg-white/10 text-white" : "text-white/45 hover:bg-[#cf2442]/15 hover:text-[#ff5e78]"
               }`}
             >
               <Captions size={18} />
@@ -1651,7 +1649,7 @@ export function VideoPlayer({
                   }}
                   title="Caption settings"
                   className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-colors ${
-                    captionSettingsOpen ? "bg-white/10 text-white" : "text-white/55 hover:bg-white/10 hover:text-white"
+                    captionSettingsOpen ? "bg-white/10 text-white" : "text-white/55 hover:bg-[#cf2442]/15 hover:text-[#ff5e78]"
                   }`}
                 >
                   <Settings2 size={17} />
@@ -1810,7 +1808,7 @@ export function VideoPlayer({
                 className={`hidden h-8 items-center gap-1 rounded-xl px-2 text-xs font-bold transition-colors min-[390px]:flex ${
                   showSpeedMenu || playbackRate !== 1
                     ? "bg-white/10 text-white"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                    : "text-white/60 hover:bg-[#cf2442]/15 hover:text-[#ff5e78]"
                 }`}
               >
                 <Gauge size={13} />
@@ -1847,7 +1845,7 @@ export function VideoPlayer({
                 className={`hidden h-8 rounded-xl px-2 text-xs font-bold transition-colors min-[390px]:block ${
                   showQualityMenu || selectedQuality !== -1 || !hasSwitchableQuality
                     ? "bg-white/10 text-white"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                    : "text-white/60 hover:bg-[#cf2442]/15 hover:text-[#ff5e78]"
                 }`}
               >
                 {qualityLabel}
@@ -1907,7 +1905,7 @@ export function VideoPlayer({
                 aria-label={pipActive ? "Exit picture in picture" : "Picture in picture"}
                 onClick={togglePictureInPicture}
                 className={`hidden h-8 w-8 place-items-center rounded-xl transition-colors sm:grid ${
-                  pipActive ? "bg-white/10 text-white" : "text-white/75 hover:bg-white/10 hover:text-white"
+                  pipActive ? "bg-white/10 text-white" : "text-white/75 hover:bg-[#cf2442]/15 hover:text-[#ff5e78]"
                 }`}
               >
                 <PictureInPicture2 size={18} />
@@ -1918,7 +1916,7 @@ export function VideoPlayer({
             <button
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               onClick={fullscreen}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-white/75 transition-colors hover:bg-[#cf2442]/15 hover:text-[#ff5e78]"
             >
               {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
             </button>
