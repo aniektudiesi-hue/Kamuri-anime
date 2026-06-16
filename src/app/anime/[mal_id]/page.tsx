@@ -69,7 +69,9 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   }, [malId]);
 
   const known = clickedAnime as Anime | undefined;
-  const needsMetadataFallback = !known || titleOf(known) === "Untitled" || !posterOf(known) || !known.banner || !known.overview;
+  // Skip AniList entirely if the anime already has CR art — CR is always preferred.
+  const hasCrData = Boolean(known?.cr_poster || known?.cr_hero);
+  const needsMetadataFallback = !hasCrData && (!known || titleOf(known) === "Untitled" || !posterOf(known) || !known.overview);
   const metadataFallback = useQuery({
     queryKey: ["anime-metadata", malId],
     // React Query rejects an undefined resolve; the metadata source can be
@@ -80,15 +82,23 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     gcTime: 1000 * 60 * 60 * 24,
     placeholderData: keepPreviousData,
   });
-  const displayAnime = useMemo(
-    () => ({
+  const displayAnime = useMemo(() => {
+    const meta = metadataFallback.data ?? {};
+    const k = known ?? {};
+    // CR fields always win — AniList is only a gap-filler for non-CR anime.
+    return {
       title: titleFromSlug(rawMalId),
-      ...(known ?? {}),
-      ...(metadataFallback.data ?? {}),
+      ...meta,
+      ...k,
+      // Restore CR image fields if known has them (never let AniList overwrite CR art)
+      cr_poster: k.cr_poster || meta.cr_poster || undefined,
+      cr_hero: k.cr_hero || meta.cr_hero || undefined,
+      detail_banner: k.detail_banner || meta.detail_banner || undefined,
+      banner: k.cr_hero || k.banner || meta.cr_hero || meta.banner || undefined,
+      image_url: k.cr_poster || k.image_url || meta.cr_poster || meta.image_url || undefined,
       mal_id: malId,
-    }) as Anime,
-    [known, malId, metadataFallback.data, rawMalId],
-  );
+    } as Anime;
+  }, [known, malId, metadataFallback.data, rawMalId]);
   const hint = episodeCount(displayAnime);
 
   useEffect(() => {

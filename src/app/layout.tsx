@@ -5,6 +5,7 @@ import { MaintenanceGate } from "@/components/maintenance-gate";
 import { AdNoticeBanner } from "@/components/ad-notice-banner";
 import { RegisterPopup } from "@/components/register-popup";
 import { absoluteUrl, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/site";
+import { SITE_MAINTENANCE } from "@/lib/maintenance";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
@@ -247,29 +248,39 @@ export default function RootLayout({
             __html: JSON.stringify([websiteJsonLd, organizationJsonLd, webApplicationJsonLd, faqJsonLd, siteNavigationJsonLd]).replace(/</g, "\\u003c"),
           }}
         />
-        <Providers>{children}</Providers>
-        <AdNoticeBanner />
-        <RegisterPopup />
-        <MaintenanceGate />
-        {/* Google AdSense */}
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5284738130230191"
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
-        {/* Google Analytics (GA4) */}
-        <Script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=G-G3YG35B59E"
-          strategy="afterInteractive"
-        />
-        <Script id="ga4-init" strategy="afterInteractive">
-          {`window.dataLayer = window.dataLayer || [];
+        {SITE_MAINTENANCE ? (
+          <MaintenanceGate />
+        ) : (
+          <>
+            <Providers>{children}</Providers>
+            <AdNoticeBanner />
+            <RegisterPopup />
+            <MaintenanceGate />
+          </>
+        )}
+        {SITE_MAINTENANCE ? null : (
+          <>
+            {/* Google AdSense */}
+            <Script
+              async
+              src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5284738130230191"
+              crossOrigin="anonymous"
+              strategy="afterInteractive"
+            />
+            {/* Google Analytics (GA4) */}
+            <Script
+              async
+              src="https://www.googletagmanager.com/gtag/js?id=G-G3YG35B59E"
+              strategy="afterInteractive"
+            />
+            <Script id="ga4-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', 'G-G3YG35B59E');`}
-        </Script>
+            </Script>
+          </>
+        )}
       </body>
     </html>
   );

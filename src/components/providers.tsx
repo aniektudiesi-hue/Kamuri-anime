@@ -34,7 +34,7 @@ const queryPersister = typeof window === "undefined"
   ? noopPersister
   : createSyncStoragePersister({
     storage: window.localStorage,
-    key: "animeTVplus-query-cache-v3",
+    key: "animeTVplus-query-cache-v4",
     throttleTime: 1200,
   });
 

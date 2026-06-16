@@ -60,12 +60,16 @@ export async function fetchAnimeMetadataByMalId(malId: string | number): Promise
 
   const anilist = await fetchAniListAnime(id);
   if (streamAnime || anilist) {
+    // CR fields always take priority — AniList only fills gaps for non-CR anime.
     return {
-      ...(streamAnime ?? {}),
-      ...(anilist ?? {}),
-      banner: anilist?.banner || streamAnime?.banner,
-      image_url: streamAnime?.image_url || anilist?.image_url,
-      poster: streamAnime?.poster || anilist?.poster,
+      ...(anilist ?? {}),      // AniList as base
+      ...(streamAnime ?? {}),  // DB data (cr_poster, cr_hero, etc.) overrides AniList
+      // Images: always prefer CR/DB, AniList only if nothing else
+      cr_poster: streamAnime?.cr_poster || undefined,
+      cr_hero: streamAnime?.cr_hero || undefined,
+      banner: streamAnime?.cr_hero || streamAnime?.banner || anilist?.banner,
+      image_url: streamAnime?.cr_poster || streamAnime?.image_url || anilist?.image_url,
+      poster: streamAnime?.cr_poster || streamAnime?.poster || anilist?.poster,
       episodes: streamAnime?.episodes || anilist?.episodes,
       episode_count: streamAnime?.episode_count || anilist?.episode_count,
       num_episodes: streamAnime?.num_episodes || anilist?.num_episodes,
