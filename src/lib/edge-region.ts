@@ -6,7 +6,7 @@ export type RegionId = "india" | "usWest" | "usEast" | "europe";
 
 // All regions now route through the Cloudflare Worker which geo-routes to the
 // nearest Turso replica internally. Single origin = maximally edge-cached.
-const CF_WORKER = "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
+const CF_WORKER = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
 
 const REGION_ORIGINS: Record<RegionId, string> = {
   india: CF_WORKER,

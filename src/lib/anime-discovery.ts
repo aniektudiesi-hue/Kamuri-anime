@@ -248,10 +248,8 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
   };
 }
 
-// CF Worker — proxies to regional Render origins (which hold CR enrichment) with
-// edge caching. The Turso-backed worker lost its cr_display data, so we route
-// catalog/search through the proxy worker that returns full CR posters.
-const SEARCH_DISCOVERY_BASE = "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
+// CF Worker — geo-routes to nearest Turso replica, edge-cached.
+const SEARCH_DISCOVERY_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
 
 async function getDiscoveryServerOrigin(): Promise<string> {
   if (typeof window !== "undefined") return "";

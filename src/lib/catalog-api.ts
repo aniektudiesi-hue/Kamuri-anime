@@ -1,17 +1,18 @@
 import type { AiringScheduleItem, Anime, EpisodeResponse, StreamResponse, Subtitle } from "./types";
-import { catalogRegionHeaders, originForRegion } from "./edge-region";
+import { catalogRegionHeaders, detectServerRegion, originForRegion } from "./edge-region";
 
 async function getServerOrigin(): Promise<string> {
   if (typeof window !== "undefined") return "";
-  // Every region maps to the same edge worker, so server-side geo-detection adds
-  // nothing. Critically, reading headers() here opted the whole page into DYNAMIC
-  // (no-store) rendering, which re-ran ~20 catalog subrequests on every single
-  // request and hammered the backend (slow loads + dropped CR enrichment). Return
-  // the fixed origin so the home page stays statically/ISR cached.
-  return originForRegion("india");
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    return detectServerRegion(h).origin;
+  } catch {
+    return originForRegion("india");
+  }
 }
 
-export const CATALOG_API_BASE = "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
+export const CATALOG_API_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
 
 const SEARCH_API_BASE = CATALOG_API_BASE;
 

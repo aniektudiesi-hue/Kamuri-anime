@@ -3,11 +3,9 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Kairo } from "@/components/mascot/kairo";
-import { SITE_MAINTENANCE } from "@/lib/maintenance";
 
-const SHOW_COUNTDOWN = false;
-const SHOW_SURVEY = false;
-const MAINTENANCE_END = new Date("2026-06-17T00:00:00+05:30").getTime();
+const MAINTENANCE_ON = false;
+const MAINTENANCE_END = new Date("2026-06-15T13:45:00+05:30").getTime();
 
 function useCountdown(target: number) {
   const [remaining, setRemaining] = useState(() => Math.max(0, target - Date.now()));
@@ -109,25 +107,24 @@ function SurveyPopup() {
 }
 
 export function MaintenanceGate() {
-  if (!SITE_MAINTENANCE) return null;
+  if (!MAINTENANCE_ON) return null;
 
   const { h, m, s, done } = useCountdown(MAINTENANCE_END);
 
-  if (SHOW_COUNTDOWN && done) return null;
+  if (done) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-y-auto bg-black px-6 py-10 text-center">
       <Image src="/logo-full.png" alt="animeTVplus" width={1495} height={402} priority className="h-10 w-auto object-contain" />
       <Kairo mood="sleepy" size={180} priority className="mt-8" />
       <h1 className="mt-6 text-3xl font-black tracking-tight text-white sm:text-4xl">
-        We&apos;re doing quick maintenance
+        We&apos;re finalizing things
       </h1>
       <p className="mt-3 max-w-md text-[15px] leading-relaxed text-white/55">
-        animeTV<span className="text-[#c4182a]">plus</span>{" "}
-        is temporarily offline while we update the site. We&apos;ll be back shortly.
+        animeTV<span className="text-[#c4182a]">plus</span> is getting a major upgrade. Kairo&apos;s putting the finishing touches — we&apos;ll be back shortly.
       </p>
 
-      <div className={SHOW_COUNTDOWN ? "mt-8 flex gap-4" : "hidden"}>
+      <div className="mt-8 flex gap-4">
         <div className="flex flex-col items-center">
           <span className="text-4xl font-black tabular-nums text-white">{String(h).padStart(2, "0")}</span>
           <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">Hours</span>
@@ -148,7 +145,7 @@ export function MaintenanceGate() {
         <div className="h-full w-1/2 animate-pulse rounded-full bg-[#c4182a]" />
       </div>
 
-      {SHOW_SURVEY ? <SurveyPopup /> : null}
+      <SurveyPopup />
     </div>
   );
 }

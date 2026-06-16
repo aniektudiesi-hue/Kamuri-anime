@@ -233,13 +233,19 @@ export function VideoPlayer({
     introUsedRef.current = true;
     setIntroFading(false);
     setIntroActive(true);
+    // Hold playback (not the HLS loader) so the intro owns the screen + audio.
+    try { video.pause(); } catch { /* best-effort */ }
     // Hard cap: end intro after 1.6 s regardless of clip length
     const killTimer = window.setTimeout(() => endIntroRef.current(), 1600);
     try {
       intro.currentTime = 0;
+      intro.muted = video.muted;
       const play = intro.play();
       if (play && typeof play.catch === "function") {
-        play.catch(() => endIntroRef.current());
+        play.catch(() => {
+          intro.muted = true;
+          intro.play().catch(() => endIntroRef.current());
+        });
       }
     } catch {
       endIntroRef.current();

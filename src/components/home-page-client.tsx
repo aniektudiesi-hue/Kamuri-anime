@@ -93,8 +93,7 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
   // Spring spotlight: a CR-mapped title from the season, rotated daily (stable
   // between server + client render to avoid a hydration mismatch).
   const springSpotlightId = useMemo(() => {
-    const pool = homeData.thumbnails.filter((a) => (a as { cr_mapped?: boolean }).cr_mapped);
-    const list = pool.length ? pool : homeData.thumbnails;
+    const list = homeData.thumbnails;
     if (!list.length) return "";
     const pick = list[new Date().getDate() % list.length];
     return String(pick.mal_id || pick.anime_id || pick.id || "");
@@ -265,13 +264,14 @@ function ResponsiveHero({ homeData }: { homeData: HomeInitialData }) {
   });
 
   const crData = useMemo(() => ({ ...initialCrData, ...(crCards.data || {}) }), [initialCrData, crCards.data]);
-  // The desktop hero is reserved for titles that have real Crunchyroll keyart
-  // (wide detail banner). Filter the banners down to those, and fall back to
-  // raw banners so the hero never waits on late CR detail calls.
+  // Hero only shows CR-mapped anime with real Crunchyroll keyart.
   const crBanners = useMemo(() => {
-    return homeData.banners.filter((a) => crData[String(a.mal_id || a.anime_id || a.id || "")]?.detail_banner);
+    return homeData.banners.filter((a) => {
+      const id = String(a.mal_id || a.anime_id || a.id || "");
+      return (a as { cr_mapped?: boolean }).cr_mapped || crData[id]?.detail_banner;
+    });
   }, [homeData.banners, crData]);
-  const heroItems = crBanners.length ? crBanners : (homeData.banners.length ? homeData.banners : bannerItems);
+  const heroItems = crBanners.length ? crBanners : homeData.banners;
   const heroLoading = !heroItems.length;
 
   return (
