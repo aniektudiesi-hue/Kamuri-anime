@@ -1623,26 +1623,38 @@ function headersFromPolicy(policy) {
   headers.set("user-agent", policy.ua);
   headers.set("accept", "*/*");
   headers.set("accept-language", "en-US,en;q=0.9");
-  headers.set("origin", policy.origin);
-  headers.set("referer", policy.referer);
+  if (policy.origin) headers.set("origin", policy.origin);
+  if (policy.referer) headers.set("referer", policy.referer);
+  if (policy.secChUa) headers.set("sec-ch-ua", policy.secChUa);
+  if (policy.secChUaMobile) headers.set("sec-ch-ua-mobile", policy.secChUaMobile);
+  if (policy.secChUaPlatform) headers.set("sec-ch-ua-platform", policy.secChUaPlatform);
   if (policy.secFetchSite) headers.set("sec-fetch-site", policy.secFetchSite);
   if (policy.secFetchMode) headers.set("sec-fetch-mode", policy.secFetchMode);
   if (policy.secFetchDest) headers.set("sec-fetch-dest", policy.secFetchDest);
   return headers;
 }
 
+function megaplayAndroidHlsPolicy(env) {
+  const megaplay = env.MEGAPLAY_BASE || "https://megaplay.buzz";
+  return {
+    name: "megaplay-android-chrome149",
+    referer: `${megaplay}/`,
+    origin: megaplay,
+    ua: "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36",
+    secChUa: '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
+    secChUaMobile: "?1",
+    secChUaPlatform: '"Android"',
+    secFetchSite: "cross-site",
+    secFetchMode: "cors",
+    secFetchDest: "empty",
+  };
+}
+
 function proxyPolicy(host, env) {
   const megaplay = env.MEGAPLAY_BASE || "https://megaplay.buzz";
   const vidwish = env.VIDWISH_BASE || "https://vidwish.live";
-  if (host.includes("mewstream.buzz")) {
-    return {
-      referer: `${megaplay}/`,
-      origin: megaplay,
-      ua: ANDROID_UA,
-      secFetchSite: "cross-site",
-      secFetchMode: "cors",
-      secFetchDest: "empty",
-    };
+  if (host.includes("mewstream.buzz") || host.includes("nekostream.site")) {
+    return megaplayAndroidHlsPolicy(env);
   }
   if (host.includes("watching.onl") || host.includes("cinewave")) {
     return { referer: `${megaplay}/`, origin: megaplay, ua: ANDROID_UA };
@@ -1660,18 +1672,21 @@ function proxyPolicy(host, env) {
 }
 
 function upstreamHeaderVariants(src, env, baseHeaders) {
-  const host = new URL(src).hostname.toLowerCase();
+  const source = new URL(src);
+  const host = source.hostname.toLowerCase();
   const base = new Headers(baseHeaders || upstreamHeaders(src, env));
-  if (!host.includes("mewstream.buzz")) return [base];
+  if (!host.includes("mewstream.buzz") && !host.includes("nekostream.site")) return [base];
 
   const megaplay = env.MEGAPLAY_BASE || "https://megaplay.buzz";
   const vidwish = env.VIDWISH_BASE || "https://vidwish.live";
+  const sourceOrigin = `${source.protocol}//${source.host}`;
   const policies = [
-    proxyPolicy(host, env),
-    { referer: `${megaplay}/`, origin: megaplay, ua: DESKTOP_UA, secFetchSite: "cross-site", secFetchMode: "cors", secFetchDest: "empty" },
-    { referer: `${megaplay}/`, origin: megaplay, ua: ANDROID_UA, secFetchSite: "same-site", secFetchMode: "cors", secFetchDest: "empty" },
-    { referer: `${vidwish}/`, origin: vidwish, ua: ANDROID_UA, secFetchSite: "cross-site", secFetchMode: "cors", secFetchDest: "empty" },
-    { referer: "https://cdn.mewstream.buzz/", origin: "https://cdn.mewstream.buzz", ua: DESKTOP_UA, secFetchSite: "same-origin", secFetchMode: "cors", secFetchDest: "empty" },
+    megaplayAndroidHlsPolicy(env),
+    { name: "megaplay-desktop-cross-site", referer: `${megaplay}/`, origin: megaplay, ua: DESKTOP_UA, secFetchSite: "cross-site", secFetchMode: "cors", secFetchDest: "empty" },
+    { name: "megaplay-android-same-site", referer: `${megaplay}/`, origin: megaplay, ua: ANDROID_UA, secFetchSite: "same-site", secFetchMode: "cors", secFetchDest: "empty" },
+    { name: "megaplay-referer-only", referer: `${megaplay}/`, origin: "", ua: ANDROID_UA, secFetchSite: "cross-site", secFetchMode: "cors", secFetchDest: "empty" },
+    { name: "vidwish-android-cross-site", referer: `${vidwish}/`, origin: vidwish, ua: ANDROID_UA, secFetchSite: "cross-site", secFetchMode: "cors", secFetchDest: "empty" },
+    { name: "cdn-same-origin", referer: `${sourceOrigin}/`, origin: sourceOrigin, ua: DESKTOP_UA, secFetchSite: "same-origin", secFetchMode: "cors", secFetchDest: "empty" },
   ];
 
   const seen = new Set();

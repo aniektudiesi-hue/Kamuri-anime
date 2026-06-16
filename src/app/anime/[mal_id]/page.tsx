@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
 import { CR_CARD_QUERY_VERSION, fetchCrCard, type CrSeason } from "@/lib/catalog-api";
 import { directImageUrl, imageCdnUrl } from "@/lib/image-cdn";
+import { cloudinaryEpisodeThumb } from "@/lib/cloudinary-episode-thumbs";
 import { useAuth } from "@/lib/auth";
 import {
   STREAM_PROVIDERS,
@@ -209,7 +210,11 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   // Prefer the CR detail-page keyart (wide backdrop) > CR hero > AniList backdrop.
   const instantHero = displayAnime.detail_banner || displayAnime.cr_hero || backdrop;
   const heroImage = crCard.data?.detail_banner || crCard.data?.hero_banner || instantHero;
-  const titleLogo = crCard.data?.title_logo || "";
+  // Construct title_logo from any existing keyart URL pattern so we don't wait for crCard
+  const CR_KEYART_BASE = "https://imgsrv.crunchyroll.com/cdn-cgi/image/format=auto,quality=90";
+  const crIdMatch = (instantHero || "").match(/keyart\/([A-Z0-9]+)-/i);
+  const instantTitleLogo = crIdMatch ? `${CR_KEYART_BASE},width=600/keyart/${crIdMatch[1]}-title_logo-en-us` : "";
+  const titleLogo = crCard.data?.title_logo || instantTitleLogo;
   const posterImage = crCard.data?.poster || poster;
   // CR keyart is already a sized CDN URL — use it directly; only route AniList art
   // through the WebP cache.
@@ -304,15 +309,16 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     if (!useSeasons) return [];
     const season = selectedCrSeason || crSeasons[activeSeasonIndex];
     return (season?.episodes ?? [])
-      .map((episode) => ({
-        // episode_number drives the watch link/stream fetch (owner MAL's real episode);
-        // display_number is what the user sees (restarts at 1 each season).
-        episode_number: Number(episode.stream_ep ?? episode.ep) || 0,
-        display_number: Number(episode.ep) || 0,
-        title: episode.title || `Episode ${episode.ep}`,
-        thumbnail: episode.thumbnail,
-        has_stream: episode.has_stream,
-      }));
+      .map((episode, i) => {
+        const epNum = Number(episode.stream_ep ?? episode.ep) || (i + 1);
+        return {
+          episode_number: epNum,
+          display_number: epNum,
+          title: episode.title || `Episode ${epNum}`,
+          thumbnail: episode.thumbnail,
+          has_stream: episode.has_stream,
+        };
+      });
   }, [useSeasons, selectedCrSeason, crSeasons, activeSeasonIndex]);
 
   // Each CR season streams via the MAL id that actually owns its episodes.
@@ -345,7 +351,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
       {/* Hero banner — always full-bleed to prevent layout flash when CR data loads */}
       <section className="relative overflow-hidden bg-[#050506]">
         <div className="absolute inset-0">
-          {!crPending && heroSrc ? (
+          {heroSrc ? (
             <Image
               key={heroSrc}
               src={heroSrc}
@@ -375,25 +381,22 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
 
         <div className={`relative z-10 mx-auto grid min-h-[255px] max-w-screen-2xl items-end gap-4 px-5 pb-4 pt-10 transition-opacity duration-200 sm:min-h-[310px] md:min-h-[380px] md:gap-8 md:px-12 md:pb-10 md:pt-16 lg:min-h-[430px] lg:px-20 ${showHeroSplash ? "opacity-0" : "opacity-100"}`}>
           <div className="max-w-[640px]">
-            {crPending ? (
-              <div className="mb-5 h-[78px] w-[220px] animate-pulse rounded-md bg-white/[0.06] md:h-[110px] md:w-[320px]" />
-            ) : (
-              <div className="animate-[fadeIn_0.4s_ease]">
-                {titleLogo ? (
-                  <img
-                    src={imageCdnUrl(titleLogo, "thumb")}
-                    alt={`${title} logo`}
-                    loading="eager"
-                    className="mb-2 block max-h-[62px] w-auto max-w-[min(178px,64vw)] object-contain object-left drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)] sm:mb-3 sm:max-h-[92px] sm:max-w-[220px] md:mb-5 md:max-h-[150px] md:max-w-[360px] xl:max-w-[420px]"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)?.style.removeProperty("display"); }}
-                  />
-                ) : null}
-                <h1
-                  className="mb-2 text-[1.25rem] font-bold leading-[1.1] text-[#f2f2f2] drop-shadow-xl sm:mb-3 sm:text-[2rem] md:mb-4 lg:text-[2.5rem]"
-                  style={titleLogo ? { display: "none" } : undefined}
-                >{title}</h1>
-              </div>
-            )}
+            <div className="animate-[fadeIn_0.4s_ease]">
+              {titleLogo ? (
+                <img
+                  key={titleLogo}
+                  src={imageCdnUrl(titleLogo, "thumb")}
+                  alt={`${title} logo`}
+                  loading="eager"
+                  className="mb-2 block max-h-[62px] w-auto max-w-[min(178px,64vw)] object-contain object-left drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)] sm:mb-3 sm:max-h-[92px] sm:max-w-[220px] md:mb-5 md:max-h-[150px] md:max-w-[360px] xl:max-w-[420px]"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement)?.style.removeProperty("display"); }}
+                />
+              ) : null}
+              <h1
+                className="mb-2 text-[1.25rem] font-bold leading-[1.1] text-[#f2f2f2] drop-shadow-xl sm:mb-3 sm:text-[2rem] md:mb-4 lg:text-[2.5rem]"
+                style={titleLogo ? { display: "none" } : undefined}
+              >{title}</h1>
+            </div>
 
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.75rem] leading-[1.125rem] font-medium text-[#f2f2f2]/72 sm:gap-x-2 sm:gap-y-1.5 sm:text-[0.9375rem] sm:leading-[1.25rem]">
               <span className="grid h-[22px] w-[22px] place-items-center rounded-sm bg-[#f2f2f2]/16 text-[0.625rem] font-bold uppercase text-[#f2f2f2]/88 sm:h-[26px] sm:w-[26px] sm:text-[0.6875rem]">A</span>
@@ -567,7 +570,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           ) : rangeEpisodes.length ? (
             <>
               <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-                {visibleEpisodes.map((ep) => {
+                {visibleEpisodes.map((ep, idx) => {
                   const isCurrent = ep.episode_number === lastEp && Boolean(last);
                   const displayNum = ep.display_number ?? ep.episode_number;
                   const canPlay = ep.has_stream !== false;
@@ -575,7 +578,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                   const href = canPlay ? (!useSeasons && isCurrent ? resumeHref : watchPath(watchAnime, activeSeasonMal, ep.episode_number)) : "#";
                   return (
                     <Link
-                      key={`${activeSeasonMal}-${activeSeasonNumber}-${ep.episode_number}`}
+                      key={`${activeSeasonMal}-${activeSeasonNumber}-${ep.episode_number}-${idx}`}
                       href={href}
                       aria-disabled={!canPlay}
                       tabIndex={canPlay ? undefined : -1}
@@ -587,6 +590,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                       onPointerDown={() => canPlay && prefetchWatch(ep.episode_number, activeSeasonMal)}
                       onTouchStart={() => canPlay && prefetchWatch(ep.episode_number, activeSeasonMal)}
                       title={ep.title || `Episode ${ep.episode_number}`}
+                      style={{ animation: `fadeSlideUp 0.35s ease both`, animationDelay: `${Math.min(idx * 40, 600)}ms` }}
                       className={`group block text-left ${canPlay ? "" : "cursor-default opacity-55"}`}
                     >
                       <div className={`relative aspect-video w-full overflow-hidden rounded-sm bg-[#151515] transition-shadow duration-200 ${isCurrent ? "shadow-[0_0_0_0.375rem_#c4182a]" : "group-hover:shadow-[0_0_0_0.375rem_#151515]"}`}>
@@ -597,6 +601,15 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                             alt={ep.title || `Episode ${ep.episode_number} thumbnail`}
                             sizes="(max-width: 640px) 50vw, 25vw"
                             imgClassName="object-center transition-opacity duration-300"
+                          />
+                        ) : cloudinaryEpisodeThumb(activeSeasonMal, ep.episode_number) ? (
+                          <Image
+                            src={cloudinaryEpisodeThumb(activeSeasonMal, ep.episode_number)}
+                            alt={ep.title || `Episode ${ep.episode_number} thumbnail`}
+                            fill
+                            sizes="(max-width: 640px) 50vw, 25vw"
+                            className="object-cover"
+                            unoptimized
                           />
                         ) : (
                           <div className="absolute inset-0 grid place-items-center bg-[#121318]">

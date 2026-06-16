@@ -12,7 +12,7 @@ async function getServerOrigin(): Promise<string> {
   }
 }
 
-export const CATALOG_API_BASE = "https://animetvplus-stream-backup-india.onrender.com";
+export const CATALOG_API_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
 
 const SEARCH_API_BASE = CATALOG_API_BASE;
 
@@ -248,25 +248,72 @@ export function crCardQueryKey(malId: string | number, season = 1) {
   return ["cr-card", CR_CARD_QUERY_VERSION, String(malId), season] as const;
 }
 
-export async function fetchCrCard(malId: string, season?: number, full = false): Promise<CrCard | null> {
+// CR Live Engine — direct Crunchyroll API fetch via local dashboard server.
+// Returns title_logo, detail_banner, seasons with episodes+thumbnails, all
+// without touching the remote database. Falls back to the DB-backed card if
+// the live engine is unreachable.
+const CR_LIVE_BASE = "http://127.0.0.1:8899";
+
+async function fetchCrLive(malId: string): Promise<CrCard | null> {
   try {
-    // Use our enriched backend (single source of truth — correct season grouping
-    // + synopsis, matches the season-review app). Server-side hits it directly,
-    // client-side via the proxy route to stay same-origin.
+    const info = await fetch(`${CR_LIVE_BASE}/api/cr/${encodeURIComponent(malId)}/info?full=1`, {
+      signal: AbortSignal.timeout(15000),
+    }).then((r) => (r.ok ? r.json() : null));
+    if (!info || info.error) return null;
+
+    const s = info.series || {};
+    const mapEps = (eps: any[]) => eps.map((ep: any) => ({
+      ep: ep.ep ?? ep.seq,
+      title: ep.title,
+      thumbnail: ep.thumb,
+      has_stream: true,
+    }));
+
+    const allEps: any[] = info.all_episodes || [];
+    const seasons: CrSeason[] = (info.seasons || []).map((se: any, i: number) => ({
+      season_number: se.num,
+      title: se.title,
+      episode_count: se.total,
+      owner_mal: malId,
+      episodes: allEps[i]?.eps?.length ? mapEps(allEps[i].eps) : [],
+    }));
+
+    return {
+      mal_id: malId,
+      has_cr: 1,
+      cr_series_id: info.cr_id,
+      detail_banner: s.detail_banner,
+      title_logo: s.title_logo,
+      hero_banner: s.wide,
+      poster: s.poster,
+      synopsis: s.description,
+      season_count: info.season_count,
+      total_episodes: seasons.reduce((sum, se) => sum + (se.episodes?.length || se.episode_count || 0), 0),
+      seasons,
+      selected_season: seasons[0],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCrCard(malId: string, season?: number, full = false): Promise<CrCard | null> {
+  // Try the CR Live Engine first (direct Crunchyroll API, no DB dependency)
+  if (typeof window !== "undefined" && full) {
+    const live = await fetchCrLive(malId);
+    if (live) return live;
+  }
+
+  try {
+    // Fallback: DB-backed enriched backend
     const base = typeof window === "undefined" ? ((await getServerOrigin()) || SEARCH_API_BASE) : "/api/search-proxy";
     const params = new URLSearchParams({ v: "canonical-v10" });
-    // full=1 returns EVERY season WITH its episodes in one payload. The lazy
-    // per-season path (?season=N) mismatches when the backend's raw season
-    // numbers are scrambled (Re:Zero / Konosuba S3 came back empty), so the
-    // detail page uses full=1 — it's always correct and lets season switching be
-    // instant (no per-season refetch).
     if (full) params.set("full", "1");
     else if (season && season > 0) params.set("season", String(season));
     const card = await fetch(`${base}/api/cr/card/${encodeURIComponent(malId)}?${params.toString()}`, {
       headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
       ...(typeof window === "undefined" ? { next: { revalidate: 1800 } } : {}),
     }).then((r) => (r.ok ? (r.json() as Promise<CrCard>) : null));
-    // React Query rejects undefined — always return a value (null when missing).
     return card ?? null;
   } catch {
     return null;

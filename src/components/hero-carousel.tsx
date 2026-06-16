@@ -137,20 +137,22 @@ export function HeroCarousel({ items = [], loading, crData = {} }: { items?: Ani
 
         {/* Metadata row — CR style: genres · score · episodes */}
         <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-white/60 lg:text-[14px]">
+          <span>Sub | Dub</span>
+          {score ? <span className="text-white/30">◆</span> : null}
           {score ? (
             <span className="flex items-center gap-1 text-[#d8b56a]">
               <Star size={12} className="fill-[#d8b56a]" />
               {score}
             </span>
           ) : null}
-          {score && genres.length > 0 ? <span className="text-white/30">·</span> : null}
+          {score && genres.length > 0 ? <span className="text-white/30">◆</span> : null}
           {genres.map((g, i) => (
             <span key={g}>
-              {i > 0 ? <span className="mr-2 text-white/30">·</span> : null}
+              {i > 0 ? <span className="mr-2 text-white/30">◆</span> : null}
               {g}
             </span>
           ))}
-          {count > 0 && (genres.length > 0 || score) ? <span className="text-white/30">·</span> : null}
+          {count > 0 && (genres.length > 0 || score) ? <span className="text-white/30">◆</span> : null}
           {count > 0 ? <span>{count} Episodes</span> : null}
         </div>
 
@@ -173,7 +175,7 @@ export function HeroCarousel({ items = [], loading, crData = {} }: { items?: Ani
           <Link
             href={animePath(current, id)}
             aria-label="Add to watchlist"
-            className="grid h-[52px] w-[52px] place-items-center rounded-[2px] border border-white/[0.22] bg-white/[0.04] text-white/70 transition-all duration-200 hover:border-white/40 hover:bg-white/[0.08] hover:text-white lg:h-[56px] lg:w-[56px]"
+            className="grid h-[52px] w-[52px] place-items-center rounded-[2px] border border-[#c4182a]/60 bg-[#c4182a]/[0.08] text-[#e2495a] transition-all duration-200 hover:border-[#c4182a] hover:bg-[#c4182a]/[0.16] hover:text-white lg:h-[56px] lg:w-[56px]"
           >
             <Bookmark size={20} />
           </Link>
@@ -284,9 +286,9 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
   const genres = current.genres?.slice(0, 3) ?? [];
 
   return (
-    <section ref={sectionRef} className="relative min-h-[520px] overflow-hidden bg-[#050506] sm:hidden">
-      {/* Full-bleed keyart — character framed to the right, like Crunchyroll mobile */}
-      <div className="absolute inset-0">
+    <section ref={sectionRef} className="relative overflow-hidden bg-[#050506] sm:hidden">
+      {/* Key art — centered, character-framed, top of card */}
+      <div className="relative h-[clamp(220px,46vw,320px)] w-full">
         {bgSrc ? (
           <Image
             key={`${id}-${index}`}
@@ -298,26 +300,25 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
             fetchPriority={index === 0 ? "high" : "auto"}
             loading={index === 0 ? undefined : "lazy"}
             sizes="100vw"
-            className="animate-[fadeIn_0.4s_ease] object-cover object-[62%_center]"
+            className="animate-[fadeIn_0.4s_ease] object-cover object-center"
           />
         ) : null}
-        {/* Bottom-heavy gradient so the title/CTA stays readable */}
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(5,5,6,0.12) 0%, rgba(5,5,6,0.05) 32%, rgba(5,5,6,0.78) 78%, #050506 100%)" }} />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(5,5,6,0.55) 0%, rgba(5,5,6,0.08) 55%, rgba(5,5,6,0) 100%)" }} />
+        {/* Soft fade into the content block below */}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(5,5,6,0) 60%, #050506 100%)" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(5,5,6,0.35) 0%, rgba(5,5,6,0) 35%)" }} />
       </div>
 
-      {/* Bottom-left content — lifted above the bottom nav for breathing room */}
-      <div className="absolute inset-x-5 bottom-24 z-10">
+      {/* Content block — below the art, full width */}
+      <div className="relative z-10 px-5 pb-6 pt-3">
         {titleLogo ? (
           <img
             src={titleLogo}
             alt={`${title} logo`}
             loading="eager"
-            className="mb-3 max-h-[78px] w-auto max-w-[52vw] object-contain object-left drop-shadow-[0_3px_18px_rgba(0,0,0,0.7)]"
-            style={{ width: "min(52vw, 200px)" }}
+            className="mb-3 max-h-[64px] w-auto max-w-[70vw] object-contain object-left drop-shadow-[0_3px_18px_rgba(0,0,0,0.7)]"
           />
         ) : (
-          <h1 className="mb-3 line-clamp-2 text-[26px] font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]">
+          <h1 className="mb-3 line-clamp-2 text-[24px] font-extrabold leading-[1.1] tracking-tight text-white">
             {title}
           </h1>
         )}
@@ -325,8 +326,8 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
         {/* Short metadata — one line */}
         <div className="mb-3.5 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] font-medium text-white/70">
           <span>Sub | Dub</span>
-          {count > 0 ? <><span className="text-white/35">·</span><span>{count} Ep</span></> : null}
-          {genres.length ? <><span className="text-white/35">·</span><span className="truncate text-white/55">{genres.join(", ")}</span></> : null}
+          {count > 0 ? <><span className="text-white/35">◆</span><span>{count} Ep</span></> : null}
+          {genres.length ? <><span className="text-white/35">◆</span><span className="truncate text-white/55">{genres.join(", ")}</span></> : null}
         </div>
 
         {/* Primary CTA + watchlist icon */}
@@ -341,7 +342,7 @@ export function MobileHeroBanner({ items = [], loading, crData = {} }: { items?:
           <Link
             href={animePath(current, id)}
             aria-label={`View details for ${title}`}
-            className="grid h-[44px] w-[44px] place-items-center rounded-[2px] border border-white/[0.22] bg-white/[0.04] text-white/75"
+            className="grid h-[44px] w-[44px] place-items-center rounded-[2px] border border-[#c4182a]/60 bg-[#c4182a]/[0.08] text-[#e2495a]"
           >
             <Bookmark size={18} />
           </Link>

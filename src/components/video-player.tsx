@@ -27,6 +27,7 @@ type CaptionSettings = {
   weight: number;
   opacity: number;
   boxOpacity: number;
+  letterSpacing: number;
 };
 
 type WebKitFullscreenVideo = HTMLVideoElement & {
@@ -53,21 +54,18 @@ type LockableScreenOrientation = ScreenOrientation & {
   unlock?: () => void;
 };
 
-const CAPTION_SETTINGS_KEY = "anime-tv-caption-settings-v1";
+const CAPTION_SETTINGS_KEY = "anime-tv-caption-settings-v2";
 const DEFAULT_CAPTION_SETTINGS: CaptionSettings = {
   x: 50,
   y: 78,
   size: 24,
-  weight: 800,
+  weight: 600,
   opacity: 1,
-  boxOpacity: 0.22,
+  boxOpacity: 0,
+  letterSpacing: 0,
 };
 const FAST_START_BUFFER_SECONDS = 4;
 const MOON_FAST_START_BUFFER_SECONDS = 4;
-// Aggressive fixed 2-minute buffer window. We keep ~120s ahead and ~120s
-// behind the playhead so that any seek inside that ±2-min range is instant
-// (no rebuffer). 120s is the hard cap — we deliberately do NOT buffer the whole
-// episode (that would waste bandwidth/memory and hammer the origin).
 const DEEP_BUFFER_SECONDS = 120;
 const MAX_BUFFER_WINDOW_SECONDS = 120;
 const NORMAL_BUFFER_SECONDS = 120;
@@ -174,6 +172,11 @@ export function VideoPlayer({
   const deepBufferRef = useRef(deepBuffer);
   const initialTimeRef = useRef(initialTime);
   const nextHrefRef = useRef(nextHref);
+  // Branded intro overlay — purely visual, never touches the HLS pipeline.
+  const introRef = useRef<HTMLVideoElement | null>(null);
+  const introUsedRef = useRef(false);
+  const startIntroRef = useRef<() => void>(() => {});
+  const endIntroRef = useRef<() => void>(() => {});
 
   const [activeCaption, setActiveCaption] = useState("");
   const [isBuffering, setIsBuffering] = useState(true);
@@ -204,6 +207,57 @@ export function VideoPlayer({
   const [bufferedPercent, setBufferedPercent] = useState(0);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
   const [mobileFullscreen, setMobileFullscreen] = useState(false);
+  const [introActive, setIntroActive] = useState(false);
+  const [introFading, setIntroFading] = useState(false);
+
+  // Fire the branded intro once per loaded source, when the first HLS chunk is
+  // ready. It plays as an overlay on top of the player while HLS keeps buffering
+  // underneath, then fades out and hands off to the real episode.
+  const endIntro = useCallback(() => {
+    setIntroFading(true);
+    window.setTimeout(() => {
+      setIntroActive(false);
+      setIntroFading(false);
+      const video = videoRef.current;
+      if (video && autoPlayRef.current && video.paused) {
+        video.play().catch(() => undefined);
+      }
+    }, 440);
+  }, []);
+
+  const startIntro = useCallback(() => {
+    if (introUsedRef.current) return;
+    const intro = introRef.current;
+    const video = videoRef.current;
+    if (!intro || !video) return;
+    introUsedRef.current = true;
+    setIntroFading(false);
+    setIntroActive(true);
+    // Hold playback (not the HLS loader) so the intro owns the screen + audio.
+    try { video.pause(); } catch { /* best-effort */ }
+    // Hard cap: end intro after 1.6 s regardless of clip length
+    const killTimer = window.setTimeout(() => endIntroRef.current(), 1600);
+    try {
+      intro.currentTime = 0;
+      intro.muted = video.muted;
+      const play = intro.play();
+      if (play && typeof play.catch === "function") {
+        play.catch(() => {
+          intro.muted = true;
+          intro.play().catch(() => endIntroRef.current());
+        });
+      }
+    } catch {
+      endIntroRef.current();
+    }
+    // Clear the kill timer once the clip ends naturally (onEnded fires first)
+    intro.addEventListener("ended", () => window.clearTimeout(killTimer), { once: true });
+  }, []);
+
+  useEffect(() => {
+    startIntroRef.current = startIntro;
+    endIntroRef.current = endIntro;
+  }, [startIntro, endIntro]);
 
   const src = stream?.m3u8_url || stream?.stream_url || stream?.url;
   const streamHeaders = stream?.headers;
@@ -296,7 +350,7 @@ export function VideoPlayer({
       if (saved) {
         setCaptionSettings({ ...DEFAULT_CAPTION_SETTINGS, ...JSON.parse(saved) });
       } else if (window.innerHeight <= 540) {
-        setCaptionSettings((current) => ({ ...current, y: 20, size: 16, boxOpacity: 0.16 }));
+        setCaptionSettings((current) => ({ ...current, y: 20, size: 16 }));
       }
     } catch {
       setCaptionSettings(DEFAULT_CAPTION_SETTINGS);
@@ -491,6 +545,9 @@ export function VideoPlayer({
     setQualityLevels([]);
     setSelectedQuality(-1);
     setShowQualityMenu(false);
+    introUsedRef.current = false;
+    setIntroActive(false);
+    setIntroFading(false);
     restoredRef.current = false;
     const startupTime = Math.max(0, Number(initialTimeRef.current || 0));
     const shouldAutoPlay = autoPlayRef.current;
@@ -503,7 +560,7 @@ export function VideoPlayer({
       enabled: useSegmentCache,
       namespace: `${serverId ?? stream?.server ?? "stream"}:${src}`,
       concurrency: isMoonStream ? 4 : 3,
-      immediateAheadSeconds: 300,
+      immediateAheadSeconds: 120,
     });
     const hlsCacheDebug = isHlsSegmentCacheDebugEnabled();
     const logHlsCache = (message: string, details?: Record<string, unknown>) => {
@@ -658,6 +715,7 @@ export function VideoPlayer({
       setHasVideoFrame(true);
       setIsBuffering(shouldAutoPlay && video.paused);
       scheduleSegmentPrefetch();
+      startIntroRef.current();
       playWhenReady();
     };
     const markPause = () => {
@@ -764,6 +822,7 @@ export function VideoPlayer({
           updateBuffered(true);
           scheduleSegmentPrefetch();
           armDeepBuffer();
+          startIntroRef.current();
           playWhenReady();
         });
         hls.on(Hls.Events.LEVEL_LOADED, (_, data) => {
@@ -1286,6 +1345,22 @@ export function VideoPlayer({
         crossOrigin="anonymous"
       />
 
+      {/* Branded cinematic intro — overlay only, never touches HLS. Fits the
+          16:9 player via object-cover; fades out when the clip ends. */}
+      <video
+        ref={introRef}
+        src="/intro/animetvplus-intro.mp4"
+        playsInline
+        preload="auto"
+        muted={muted}
+        onEnded={endIntro}
+        aria-hidden
+        style={{ visibility: introActive ? "visible" : "hidden" }}
+        className={`pointer-events-none absolute inset-0 z-[60] h-full w-full bg-black object-cover transition-opacity duration-[440ms] ease-out ${
+          introActive && !introFading ? "opacity-100" : "opacity-0"
+        }`}
+      />
+
       {poster && !hasVideoFrame && !playbackError ? (
         <div className="pointer-events-none absolute inset-0 z-10 bg-black">
           <Image src={poster} alt="" fill sizes="100vw" className="object-cover opacity-80" />
@@ -1339,6 +1414,8 @@ export function VideoPlayer({
               fontSize: `${captionSettings.size}px`,
               fontWeight: captionSettings.weight,
               opacity: captionSettings.opacity,
+              letterSpacing: `${captionSettings.letterSpacing}px`,
+              wordSpacing: `${captionSettings.letterSpacing * 2}px`,
               textShadow:
                 "2px 2px 4px #000, -1px -1px 3px #000, 1px -1px 3px #000, -1px 1px 3px #000, 0 0 12px rgba(0,0,0,0.8)",
             }}
@@ -1350,7 +1427,7 @@ export function VideoPlayer({
       ) : null}
 
       {/* Buffering spinner */}
-      {isBuffering && !playbackError ? (
+      {isBuffering && !playbackError && !introActive ? (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center">
           <div className="relative grid h-[74px] w-[74px] place-items-center rounded-full border border-white/[0.075] bg-black/28 shadow-[0_24px_90px_rgba(0,0,0,0.72)] backdrop-blur-xl">
             <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(225,29,72,0.13),transparent_58%)]" />
@@ -1421,7 +1498,7 @@ export function VideoPlayer({
       ) : null}
 
       {/* Center play/pause overlay — only shown when paused */}
-      {!playing && !isBuffering ? (
+      {!playing && !isBuffering && !introActive ? (
         <button
           aria-label="Play"
           onClick={togglePlay}
@@ -1588,7 +1665,7 @@ export function VideoPlayer({
                         setCaptionEditUnlocked(false);
                       }}
                     />
-                    <div className="fixed inset-x-3 bottom-20 z-50 overflow-hidden rounded-2xl border border-white/15 bg-black/95 p-3 shadow-2xl sm:absolute sm:bottom-full sm:right-0 sm:left-auto sm:mb-2 sm:w-[280px]">
+                    <div className="absolute right-0 bottom-full z-50 mb-2 max-h-[min(70vh,420px)] w-[min(280px,calc(100vw-1.5rem))] overflow-y-auto overflow-x-hidden rounded-2xl border border-white/15 bg-black/95 p-3 shadow-2xl">
                       <div className="mb-3">
                         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Captions</p>
                         <p className="mt-1 text-xs text-white/42">Drag is unlocked. Move captions on the video, then save to lock them.</p>
@@ -1601,6 +1678,8 @@ export function VideoPlayer({
                           fontSize: `${Math.max(13, Math.min(20, captionSettings.size - 4))}px`,
                           fontWeight: captionSettings.weight,
                           opacity: captionSettings.opacity,
+                          letterSpacing: `${captionSettings.letterSpacing}px`,
+                          wordSpacing: `${captionSettings.letterSpacing * 2}px`,
                         }}
                       >
                         Caption preview
@@ -1674,10 +1753,18 @@ export function VideoPlayer({
                       <CaptionSlider
                         label="Box transparency"
                         value={Math.round((1 - captionSettings.boxOpacity) * 100)}
-                        min={20}
+                        min={0}
                         max={100}
                         suffix="%"
                         onChange={(transparency) => setCaptionSettings((current) => ({ ...current, boxOpacity: (100 - transparency) / 100 }))}
+                      />
+                      <CaptionSlider
+                        label="Word spacing"
+                        value={captionSettings.letterSpacing}
+                        min={0}
+                        max={8}
+                        suffix="px"
+                        onChange={(letterSpacing) => setCaptionSettings((current) => ({ ...current, letterSpacing }))}
                       />
 
                       <div className="mt-3 grid grid-cols-3 gap-2">

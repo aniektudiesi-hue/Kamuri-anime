@@ -218,32 +218,41 @@ function ResponsiveHero({ homeData }: { homeData: HomeInitialData }) {
     () => bannerItems.slice(0, 8).map((a) => String(a.mal_id || a.anime_id || a.id || "")).filter(Boolean),
     [bannerItems],
   );
+  const CR_KEYART = "https://imgsrv.crunchyroll.com/cdn-cgi/image/format=auto,quality=90";
   const initialCrData = useMemo(() => {
     const data: HeroCrData = {};
     for (const anime of bannerItems.slice(0, 8)) {
       const id = String(anime.mal_id || anime.anime_id || anime.id || "");
-      const detailBanner = anime.detail_banner || anime.cr_hero || anime.banner;
-      if (!id || !detailBanner) continue;
+      if (!id) continue;
+      let detailBanner = anime.detail_banner || anime.cr_hero || anime.banner;
+      let titleLogo = anime.title_logo;
+      const crIdMatch = (detailBanner || titleLogo || "").match(/keyart\/([A-Z0-9]+)-/i);
+      if (crIdMatch) {
+        const crId = crIdMatch[1];
+        if (!detailBanner) detailBanner = `${CR_KEYART},width=1920/keyart/${crId}-backdrop_wide`;
+        if (!titleLogo) titleLogo = `${CR_KEYART},width=600/keyart/${crId}-title_logo-en-us`;
+      }
+      if (!detailBanner) continue;
       data[id] = {
         detail_banner: detailBanner,
-        title_logo: anime.title_logo,
+        title_logo: titleLogo,
         synopsis: anime.synopsis || anime.overview,
       };
     }
     return data;
   }, [bannerItems]);
   const missingCrIds = useMemo(
-    () => malIds.filter((id) => !initialCrData[id]?.detail_banner || !initialCrData[id]?.title_logo),
+    () => malIds.filter((id) => !initialCrData[id]?.title_logo),
     [malIds, initialCrData],
   );
 
   const crCards = useQuery({
-    queryKey: ["hero-cr-cards", missingCrIds.join(",")],
+    queryKey: ["hero-cr-live", missingCrIds.join(",")],
     queryFn: async () => {
       const results: HeroCrData = {};
       await Promise.allSettled(
         missingCrIds.map(async (mid) => {
-          const card = await fetchCrCard(mid);
+          const card = await fetchCrCard(mid, undefined, true);
           if (card?.detail_banner) {
             results[mid] = { detail_banner: card.detail_banner, title_logo: card.title_logo, synopsis: card.synopsis };
           }

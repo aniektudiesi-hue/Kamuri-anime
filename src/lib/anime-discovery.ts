@@ -248,8 +248,8 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
   };
 }
 
-// Our enriched search backend — root-only (no S2/S3 dupes), CR metadata, synonyms.
-const SEARCH_DISCOVERY_BASE = "https://animetvplus-stream-backup-india.onrender.com";
+// CF Worker — geo-routes to nearest Turso replica, edge-cached.
+const SEARCH_DISCOVERY_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
 
 async function getDiscoveryServerOrigin(): Promise<string> {
   if (typeof window !== "undefined") return "";

@@ -18,6 +18,7 @@ import { historySocketUrl } from "@/lib/history-realtime";
 import { clearCachedStream, readCachedStream } from "@/lib/stream-cache";
 import { useSettings } from "@/lib/settings";
 import { imageCdnUrl } from "@/lib/image-cdn";
+import { cloudinaryEpisodeThumb } from "@/lib/cloudinary-episode-thumbs";
 import {
   DEFAULT_STREAM_PROVIDER_ID,
   STREAM_PROVIDERS,
@@ -818,12 +819,12 @@ function EpisodeSidebar({
                     onFocus={() => prefetchEpisode(ep.episode_number)}
                     onPointerDown={() => prefetchEpisode(ep.episode_number)}
                     onTouchStart={() => prefetchEpisode(ep.episode_number)}
-                    className={`grid h-10 place-items-center rounded-xl text-xs font-bold transition ${
+                    className={`grid h-10 place-items-center rounded-xl text-xs font-bold ring-1 ring-transparent transition ${
                       isActive
                         ? "bg-[#cf2442] text-white shadow-md shadow-[#cf2442]/20"
                         : isPlayed
-                          ? "bg-white/[0.08] text-[#c8ced8] ring-1 ring-white/10 hover:bg-white/[0.12]"
-                          : "bg-[#141828] text-white/70 hover:bg-[#1b2036] hover:text-white"
+                          ? "bg-white/[0.08] text-[#c8ced8] ring-white/10 hover:ring-[#cf2442] hover:text-white"
+                          : "bg-[#141828] text-white/70 hover:ring-[#cf2442] hover:text-white"
                     }`}
                   >
                     {ep.episode_number}
@@ -889,14 +890,18 @@ function EpisodeSidebar({
                     isActive
                       ? "bg-[#cf2442]/10"
                       : isPlayed
-                        ? "bg-white/[0.035] hover:bg-white/[0.06]"
-                        : "hover:bg-white/[0.03]"
+                        ? "bg-white/[0.035] hover:bg-[#cf2442]/[0.06]"
+                        : "hover:bg-[#cf2442]/[0.05]"
                   }`}
                 >
                   {/* Thumbnail */}
-                  <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-xl bg-[#141828]">
+                  <div className={`relative h-16 w-28 shrink-0 overflow-hidden rounded-xl bg-[#141828] ring-1 ring-transparent transition-all duration-200 ${
+                    isActive ? "ring-[#cf2442]" : "group-hover:ring-[#cf2442] group-hover:shadow-[0_0_14px_rgba(207,36,66,0.55)]"
+                  }`}>
                     {ep.thumbnail ? (
                       <Image src={imageCdnUrl(ep.thumbnail, "thumb")} alt="" fill sizes="112px" className="object-cover" />
+                    ) : cloudinaryEpisodeThumb(malId, ep.episode_number) ? (
+                      <Image src={cloudinaryEpisodeThumb(malId, ep.episode_number)} alt="" fill sizes="112px" className="object-cover" unoptimized />
                     ) : (
                       <div className="absolute inset-0 grid place-items-center bg-[#121318] text-[10px] font-black uppercase text-white/35">
                         EP {ep.episode_number}

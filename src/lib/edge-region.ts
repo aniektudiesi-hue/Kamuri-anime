@@ -4,11 +4,15 @@ const ORIGIN_KEY = "anime-tv-edge-origin";
 
 export type RegionId = "india" | "usWest" | "usEast" | "europe";
 
+// All regions now route through the Cloudflare Worker which geo-routes to the
+// nearest Turso replica internally. Single origin = maximally edge-cached.
+const CF_WORKER = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
+
 const REGION_ORIGINS: Record<RegionId, string> = {
-  india: "https://animetvplus-stream-backup-india.onrender.com",
-  usWest: "https://animetvplus-catalog-api-us-west.onrender.com",
-  usEast: "https://animetvplus-catalog-api-us-west.onrender.com", // shares US West until dedicated service exists
-  europe: "https://animetvplus-catalog-api-europe.onrender.com",
+  india: CF_WORKER,
+  usWest: CF_WORKER,
+  usEast: CF_WORKER,
+  europe: CF_WORKER,
 };
 
 const COUNTRY_TO_REGION: Record<string, RegionId> = {
