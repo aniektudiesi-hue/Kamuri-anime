@@ -16,10 +16,30 @@ import { api } from "@/lib/api";
 import { rememberSearchCatalog } from "@/lib/search-index";
 import type { AiringScheduleItem, Anime, HomeInitialData, LibraryItem } from "@/lib/types";
 import { HISTORY_UPDATED_EVENT, animeId, animePath, episodeCount, episodeLabel, posterOf, progressOf, rememberAnime, rememberedAnime, rememberedHistory, titleOf, watchPath } from "@/lib/utils";
+import { CATALOG_API_BASE, mapCatalogList } from "@/lib/catalog-api";
 
 const HOME_CACHE_KEY = "animeTVplus-home-cache-v5";
 const HOME_CACHE_TTL = 1000 * 60 * 60;
 const warmedHomePosters = new Set<string>();
+
+// Emergency client-side refetch when ISR baked in empty sections.
+async function clientFetchHomeData(): Promise<Partial<HomeInitialData>> {
+  const get = async (path: string): Promise<Anime[]> => {
+    try {
+      const r = await fetch(`${CATALOG_API_BASE}${path}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return [];
+      return mapCatalogList(await r.json());
+    } catch { return []; }
+  };
+  const [popular, topRated, recent, thumbnails, banners] = await Promise.all([
+    get("/api/anime/popular?limit=40&page=1"),
+    get("/api/anime/top-rated?limit=40&page=1"),
+    get("/api/anime/new-releases?limit=40&page=1"),
+    get("/api/anime/season/2026/spring?limit=40&page=1"),
+    get("/api/anime/season/2026/spring?limit=10&page=1"),
+  ]);
+  return { popular, topRated, recent, thumbnails, banners };
+}
 
 export function HomePageClient({ initialData }: { initialData: HomeInitialData }) {
   const [homeData, setHomeData] = useState(initialData);
@@ -44,15 +64,26 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
   // poster swap, no image flicker.
 
   useEffect(() => {
+    let filledFromLocalStorage = false;
+    // 1. Try localStorage first (instant, no network).
     try {
       const raw = window.localStorage.getItem(HOME_CACHE_KEY);
-      if (!raw) return;
-      const cached = JSON.parse(raw) as { expiresAt: number; value: HomeInitialData };
-      if (cached.expiresAt > Date.now() && cached.value?.thumbnails?.length) {
-        setHomeData((current) => (current.thumbnails.length ? current : cached.value));
+      if (raw) {
+        const cached = JSON.parse(raw) as { expiresAt: number; value: HomeInitialData };
+        if (cached.expiresAt > Date.now() && cached.value?.thumbnails?.length) {
+          filledFromLocalStorage = true;
+          setHomeData((current) => (current.thumbnails.length ? current : cached.value));
+        }
       }
     } catch {
       // Cache is only a speed hint.
+    }
+    // 2. If ISR baked empty sections (CF Worker down at build time) and
+    //    localStorage is empty/expired, refetch directly from CF Worker.
+    if (!initialData.thumbnails.length && !filledFromLocalStorage) {
+      clientFetchHomeData().then((fresh) => {
+        if (fresh.thumbnails?.length) setHomeData((current) => ({ ...current, ...fresh }));
+      });
     }
   }, []);
 

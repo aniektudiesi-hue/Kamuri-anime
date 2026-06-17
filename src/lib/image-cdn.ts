@@ -119,14 +119,23 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
     const parsed = new URL(normalizeImageOrigin(src));
     const normalizedSrc = parsed.toString();
 
-    if (parsed.hostname === "anime-tv-stream-proxy.animetvplus-stream.workers.dev" && parsed.pathname === "/image") {
-      const nested = parsed.searchParams.get("url") || parsed.searchParams.get("src");
+    // Unwrap CF Worker image-proxy URLs back to the original CDN source.
+    // Worker hostnames should never be the final image destination — they add
+    // ~400-2000ms latency vs loading direct from imgsrv.crunchyroll.com / s4.anilist.co.
+    const isWorkerHost = parsed.hostname.endsWith(".animetvplus-stream.workers.dev");
+    if (isWorkerHost) {
+      // Try every common proxy param name.
+      const nested = parsed.searchParams.get("url") || parsed.searchParams.get("src")
+        || parsed.searchParams.get("u") || parsed.searchParams.get("image");
       if (nested) return imageCdnUrl(nested, variant);
+      // If no nested param, the worker is serving the image directly (e.g. a cached
+      // WebP stored in R2/KV). Return it as-is — it's already at the edge.
+      return normalizedSrc;
     }
     if (parsed.pathname.startsWith("/api/image-db/")) {
       return normalizedSrc;
     }
-    if (parsed.hostname === "cdn.animetvplus.xyz" || parsed.hostname === "anime-tv-stream-proxy.animetvplus-stream.workers.dev") {
+    if (parsed.hostname === "cdn.animetvplus.xyz") {
       return normalizedSrc;
     }
     if (!ALLOWED_SOURCE_HOSTS.some((host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`))) {
