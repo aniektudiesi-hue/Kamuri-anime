@@ -129,7 +129,10 @@ export function mapCatalogAnime(item: CatalogAnime | undefined): Anime {
   const useSeriesCrArt = format === "TV" || format === "ONA";
   const crPoster = useSeriesCrArt ? item?.cr_poster || undefined : undefined;
   const crHero = useSeriesCrArt ? item?.cr_hero || undefined : undefined;
-  const anilistCover = item?.local_cover_webp || item?.cover_image || item?.local_thumbnail_1080_webp || item?.thumbnail_1080_url || item?.local_thumbnail_4k_webp || item?.thumbnail_4k_url || item?.local_banner_webp || item?.banner_image || undefined;
+  // Prefer direct AniList/MAL CDN URLs over local_* proxied variants.
+  // local_* fields go through the CF Worker image proxy which adds 2-5s latency;
+  // cover_image / thumbnail_*_url are direct s4.anilist.co / CDN URLs — instant.
+  const anilistCover = item?.cover_image || item?.thumbnail_1080_url || item?.thumbnail_4k_url || item?.banner_image || item?.local_cover_webp || item?.local_thumbnail_1080_webp || item?.local_thumbnail_4k_webp || item?.local_banner_webp || undefined;
   return {
     mal_id: id,
     anime_id: id,
