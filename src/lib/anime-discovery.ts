@@ -1,4 +1,4 @@
-import type { Anime } from "./types";
+﻿import type { Anime } from "./types";
 import { animeId } from "./utils";
 import { catalogClientGet, mapCatalogList } from "./catalog-api";
 import { catalogRegionHeaders } from "./edge-region";
@@ -248,11 +248,11 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
   };
 }
 
-// CF Worker — geo-routes to nearest Turso replica, edge-cached.
-const SEARCH_DISCOVERY_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
+// CF Worker â€” geo-routes to nearest Turso replica, edge-cached.
+const SEARCH_DISCOVERY_BASE = "https://animetvplus-proxy.amanosan994.workers.dev";
 
 function getDiscoveryServerOrigin(): string {
-  // CF Worker geo-routes internally — no need to read request headers here.
+  // CF Worker geo-routes internally â€” no need to read request headers here.
   // Calling next/headers() would break ISR on the search page (x-vercel-cache: MISS).
   return SEARCH_DISCOVERY_BASE;
 }
@@ -271,7 +271,7 @@ function searchParamsForIntent(intent: DiscoveryIntent, page: number, fmt = ""):
   if (intent.key === "browse:top-rated") params.set("sort", "score");
   else if (intent.key === "browse:new-releases" || intent.key === "browse:airing") params.set("sort", "new");
   // Browse intents (popular/top-rated/database/airing/new-releases) and the
-  // bare "Explore" land here with neither q nor genre → backend browse mode
+  // bare "Explore" land here with neither q nor genre â†’ backend browse mode
   // (root anime sorted by popularity).
   return params.toString();
 }

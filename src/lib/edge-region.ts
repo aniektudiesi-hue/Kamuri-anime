@@ -1,4 +1,4 @@
-const REGION_KEY = "anime-tv-edge-region";
+﻿const REGION_KEY = "anime-tv-edge-region";
 const COUNTRY_KEY = "anime-tv-edge-country";
 const ORIGIN_KEY = "anime-tv-edge-origin";
 
@@ -6,7 +6,7 @@ export type RegionId = "india" | "usWest" | "usEast" | "europe";
 
 // All regions now route through the Cloudflare Worker which geo-routes to the
 // nearest Turso replica internally. Single origin = maximally edge-cached.
-const CF_WORKER = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
+const CF_WORKER = "https://animetvplus-proxy.amanosan994.workers.dev";
 
 const REGION_ORIGINS: Record<RegionId, string> = {
   india: CF_WORKER,
@@ -69,7 +69,7 @@ export function detectServerRegion(headers: Headers): { region: RegionId; origin
   return { region, origin: originForRegion(region) };
 }
 
-// Geo-picked origin first, then every other region as a fallback — so a single
+// Geo-picked origin first, then every other region as a fallback â€” so a single
 // region being down (or cold) never breaks the site; the proxy retries the next.
 export function catalogOriginPool(headers: Headers): { region: RegionId; origins: string[] } {
   const { region, origin } = detectServerRegion(headers);

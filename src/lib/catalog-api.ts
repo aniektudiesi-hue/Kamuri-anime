@@ -1,9 +1,9 @@
-import type { AiringScheduleItem, Anime, EpisodeResponse, StreamResponse, Subtitle } from "./types";
+﻿import type { AiringScheduleItem, Anime, EpisodeResponse, StreamResponse, Subtitle } from "./types";
 import { catalogRegionHeaders } from "./edge-region";
 
-export const CATALOG_API_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
+export const CATALOG_API_BASE = "https://animetvplus-proxy.amanosan994.workers.dev";
 
-// All regions route through the same CF Worker — no need to read request headers.
+// All regions route through the same CF Worker â€” no need to read request headers.
 // Reading next/headers() here would opt every SSR page into dynamic rendering,
 // disabling ISR and causing x-vercel-cache: MISS on every request.
 function getServerOrigin(): string {
@@ -84,7 +84,7 @@ export async function catalogServerGet<T>(path: string, revalidate = 60): Promis
     return catalogClientGet<T>(path).catch(() => undefined);
   }
   try {
-    // NO signal here — Next.js data cache requires fetch options to be stable
+    // NO signal here â€” Next.js data cache requires fetch options to be stable
     // and serializable. Adding signal: AbortController breaks the data cache,
     // causing every SSR to make fresh API calls instead of using cached responses.
     const response = await fetch(`${getServerOrigin()}${path}`, {
@@ -131,7 +131,7 @@ export function mapCatalogAnime(item: CatalogAnime | undefined): Anime {
   const crHero = useSeriesCrArt ? item?.cr_hero || undefined : undefined;
   // Prefer direct AniList/MAL CDN URLs over local_* proxied variants.
   // local_* fields go through the CF Worker image proxy which adds 2-5s latency;
-  // cover_image / thumbnail_*_url are direct s4.anilist.co / CDN URLs — instant.
+  // cover_image / thumbnail_*_url are direct s4.anilist.co / CDN URLs â€” instant.
   const anilistCover = item?.cover_image || item?.thumbnail_1080_url || item?.thumbnail_4k_url || item?.banner_image || item?.local_cover_webp || item?.local_thumbnail_1080_webp || item?.local_thumbnail_4k_webp || item?.local_banner_webp || undefined;
   return {
     mal_id: id,
@@ -141,13 +141,13 @@ export function mapCatalogAnime(item: CatalogAnime | undefined): Anime {
     title_en: item?.english_title || item?.canonical_title || undefined,
     title_jp: item?.native_title || undefined,
     // Prefer the Crunchyroll vertical poster (1560x2340) when this title has CR
-    // metadata — sharper, on-brand thumbnails. Fall back to AniList covers.
+    // metadata â€” sharper, on-brand thumbnails. Fall back to AniList covers.
     image_url: crPoster || anilistCover,
     poster: crPoster || anilistCover,
     banner: item?.detail_banner || crHero || item?.local_banner_webp || item?.banner_image || undefined,
     cr_poster: crPoster,
     cr_hero: crHero,
-    // CR's WIDE catalog thumbnail (1920x1080, /catalog/crunchyroll/<hash>) — the
+    // CR's WIDE catalog thumbnail (1920x1080, /catalog/crunchyroll/<hash>) â€” the
     // native 16:9 promo image used for the search "Top matches" cards.
     cr_wide: useSeriesCrArt ? (item?.thumbnail_1080_url || item?.banner_image || undefined) : undefined,
     detail_banner: item?.detail_banner || crHero || undefined,
@@ -253,7 +253,7 @@ export function crCardQueryKey(malId: string | number, season = 1) {
   return ["cr-card", CR_CARD_QUERY_VERSION, String(malId), season] as const;
 }
 
-// CR Live Engine — direct Crunchyroll API fetch via local dashboard server.
+// CR Live Engine â€” direct Crunchyroll API fetch via local dashboard server.
 // Returns title_logo, detail_banner, seasons with episodes+thumbnails, all
 // without touching the remote database. Falls back to the DB-backed card if
 // the live engine is unreachable.
@@ -318,7 +318,7 @@ export async function fetchCrCard(malId: string, season?: number, full = false):
 
   try {
     // Worker-backed CR card. full=1 returns the entire season tree (seasons +
-    // episodes + thumbnails) from one edge Turso read — instant.
+    // episodes + thumbnails) from one edge Turso read â€” instant.
     const base = typeof window === "undefined" ? getServerOrigin() : "/api/search-proxy";
     const params = new URLSearchParams({ v: "canonical-v12" });
     if (full) params.set("full", "1");
@@ -333,7 +333,7 @@ export async function fetchCrCard(malId: string, season?: number, full = false):
   }
 }
 
-// Lazy per-season episode fetch — hits the worker's indexed cr_episodes lookup
+// Lazy per-season episode fetch â€” hits the worker's indexed cr_episodes lookup
 // (cr_season_id). ~tens of rows, edge-cached, milliseconds. Used when the user
 // opens/switches a CR season so the card payload never carries every episode.
 export async function fetchCrSeasonEpisodes(
@@ -367,7 +367,7 @@ export async function fetchCatalogEpisodes(malId: string, hint = 0): Promise<Epi
   ).catch(() => undefined);
   if (fast?.episodes?.length) {
     // The catalog API already returns exactly the available episodes (with CR
-    // titles + thumbnails). Trust it — do NOT inflate to the planned season total,
+    // titles + thumbnails). Trust it â€” do NOT inflate to the planned season total,
     // which would render unaired episodes as broken placeholders.
     return { ...fast, num_episodes: Number(fast.num_episodes || fast.episodes.length) };
   }
@@ -407,7 +407,7 @@ function hasPlayable(row: { m3u8_url?: string } | undefined) {
 export async function fetchCatalogStream(malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> {
   const epNum = String(episode);
 
-  // 1. DB-first: call CF Worker DIRECTLY (no Vercel proxy hop) — fast edge lookup.
+  // 1. DB-first: call CF Worker DIRECTLY (no Vercel proxy hop) â€” fast edge lookup.
   try {
     const base = typeof window !== "undefined" ? CATALOG_API_BASE : getServerOrigin();
     const resp = await fetch(
@@ -434,7 +434,7 @@ export async function fetchCatalogStream(malId: string, episode: string | number
       }
     }
   } catch {
-    // DB miss or timeout — fall through to live resolver.
+    // DB miss or timeout â€” fall through to live resolver.
   }
 
   // 2. External resolver with 8s hard timeout (Render.com cold start guard).
@@ -448,7 +448,7 @@ export async function fetchCatalogStream(malId: string, episode: string | number
 }
 
 // Persist a live-resolved stream into our backend DB (backup_items) via the
-// catalog proxy → worker → origin POST /api/stream/<mal>/<ep>.
+// catalog proxy â†’ worker â†’ origin POST /api/stream/<mal>/<ep>.
 async function cacheResolvedStream(
   malId: string,
   episode: string,
@@ -510,7 +510,7 @@ function mapResolverSubtitles(value: AnimeSearchStreamPayload["subtitles"]): Sub
 async function fetchAnimeSearchStream(malId: string, episode: string, type: "sub" | "dub" = "sub"): Promise<StreamResponse | undefined> {
   try {
     const qs = new URLSearchParams({ type, embed: "false" });
-    // 8-second hard timeout — Render.com free tier has 90s cold starts;
+    // 8-second hard timeout â€” Render.com free tier has 90s cold starts;
     // better to fail fast and show an error than freeze the player for 3 minutes.
     const res = await fetch(
       `${ANIME_SEARCH_STREAM_BASE}/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}?${qs.toString()}`,

@@ -1,11 +1,11 @@
-const DEFAULT_IMAGE_CDN_BASE = "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
+﻿const DEFAULT_IMAGE_CDN_BASE = "https://anime-tv-stream-proxy.animetvplus-stream.workers.dev";
 const IMAGE_CDN_BASE = (process.env.NEXT_PUBLIC_IMAGE_CDN_BASE || DEFAULT_IMAGE_CDN_BASE).replace(/\/$/, "");
 const IMAGE_CDN_ENABLED = process.env.NEXT_PUBLIC_IMAGE_CDN_ENABLED !== "0";
 const LOCAL_IMAGE_CACHE_ENABLED = process.env.NEXT_PUBLIC_LOCAL_IMAGE_CACHE === "1";
 // Re-proxying every image through the Cloudflare worker added ~400ms/image and
 // produced half-painted thumbnails. Images now load STRAIGHT from the source
 // CDN (Crunchyroll's imgsrv, AniList, MAL) which are already globally edge-cached
-// — the same approach big streaming sites use. Opt back into the worker proxy
+// â€” the same approach big streaming sites use. Opt back into the worker proxy
 // only by setting NEXT_PUBLIC_IMAGE_PROXY=1.
 const IMAGE_PROXY_ENABLED = process.env.NEXT_PUBLIC_IMAGE_PROXY === "1";
 
@@ -18,8 +18,8 @@ function isCrImageHost(hostname: string) {
 // US-side proxy for Crunchyroll art. CR's imgsrv geo-redirects/403s some boxes
 // outside the US, so non-US viewers load CR images through the worker (which
 // fetches from CR and edge-caches the bytes). US / SSR / unknown viewers load
-// straight from CR's global CDN — no proxy hop.
-const CR_PROXY_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev/cr-image";
+// straight from CR's global CDN â€” no proxy hop.
+const CR_PROXY_BASE = "https://animetvplus-proxy.amanosan994.workers.dev/cr-image";
 const COUNTRY_KEY = "anime-tv-edge-country";
 
 function viewerCountry(): string {
@@ -32,7 +32,7 @@ function viewerCountry(): string {
 }
 
 function maybeProxyCr(crUrl: string): string {
-  // imgsrv.crunchyroll.com is on Cloudflare's global CDN — serves fast in all
+  // imgsrv.crunchyroll.com is on Cloudflare's global CDN â€” serves fast in all
   // regions directly. The proxy added 2-3s per image for non-US viewers; direct
   // is faster everywhere. Only proxy if explicitly opted in via env var.
   if (process.env.NEXT_PUBLIC_CR_PROXY === "1") {
@@ -42,7 +42,7 @@ function maybeProxyCr(crUrl: string): string {
   return crUrl;
 }
 
-// Crunchyroll's imgsrv only serves a FIXED WHITELIST of render boxes — asking for
+// Crunchyroll's imgsrv only serves a FIXED WHITELIST of render boxes â€” asking for
 // any other WxH returns 403 (e.g. 320x480/220x330 fail, 240x360/480x720 work).
 // So we snap the requested width to the nearest allowed CR size (>= target, to
 // avoid upscale blur) for the matching aspect family.
@@ -67,7 +67,7 @@ function crResizedUrl(parsed: URL, width: number): string {
   let sizes: [number, number][] | null = null;
   if (Math.abs(ratio - 2 / 3) < 0.06) sizes = CR_PORTRAIT_SIZES;
   else if (Math.abs(ratio - 16 / 9) < 0.12) sizes = CR_LANDSCAPE_SIZES;
-  if (!sizes) return parsed.toString(); // unknown aspect — native size already serves 200
+  if (!sizes) return parsed.toString(); // unknown aspect â€” native size already serves 200
   const pick = sizes.find(([w]) => w >= width) ?? sizes[sizes.length - 1];
   if (pick[0] >= srcW) return parsed.toString(); // never upscale past the source
   parsed.pathname = parsed.pathname.replace(/\/\d+x\d+\//, `/${pick[0]}x${pick[1]}/`);
@@ -120,16 +120,17 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
     const normalizedSrc = parsed.toString();
 
     // Unwrap CF Worker image-proxy URLs back to the original CDN source.
-    // Worker hostnames should never be the final image destination — they add
+    // Worker hostnames should never be the final image destination â€” they add
     // ~400-2000ms latency vs loading direct from imgsrv.crunchyroll.com / s4.anilist.co.
-    const isWorkerHost = parsed.hostname.endsWith(".animetvplus-stream.workers.dev");
+    const isWorkerHost = parsed.hostname.endsWith(".animetvplus-stream.workers.dev")
+      || parsed.hostname === "animetvplus-proxy.amanosan994.workers.dev";
     if (isWorkerHost) {
       // Try every common proxy param name.
       const nested = parsed.searchParams.get("url") || parsed.searchParams.get("src")
         || parsed.searchParams.get("u") || parsed.searchParams.get("image");
       if (nested) return imageCdnUrl(nested, variant);
       // If no nested param, the worker is serving the image directly (e.g. a cached
-      // WebP stored in R2/KV). Return it as-is — it's already at the edge.
+      // WebP stored in R2/KV). Return it as-is â€” it's already at the edge.
       return normalizedSrc;
     }
     if (parsed.pathname.startsWith("/api/image-db/")) {
@@ -142,11 +143,11 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
       return normalizedSrc;
     }
     const width = VARIANT_WIDTH[variant];
-    // Crunchyroll: resize on CR's own edge CDN via the URL path — CR pre-generates
+    // Crunchyroll: resize on CR's own edge CDN via the URL path â€” CR pre-generates
     // these whitelisted render boxes, so they're globally edge-cached and load fast
     // on the FIRST view. (We tried the cdn-cgi/image WebP resizer for smaller bytes,
     // but its on-the-fly transform adds ~2-3.5s of cold latency per never-seen image
-    // — the "images load after 4s" regression — so the pre-sized box wins for UX.)
+    // â€” the "images load after 4s" regression â€” so the pre-sized box wins for UX.)
     if (isCrImageHost(parsed.hostname)) {
       return maybeProxyCr(crResizedUrl(parsed, width));
     }
@@ -154,12 +155,12 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
     if (LOCAL_IMAGE_CACHE_ENABLED) {
       return `/api/image-cache?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=${VARIANT_QUALITY[variant]}`;
     }
-    // Optional Cloudflare worker proxy (opt-in only — off by default because the
+    // Optional Cloudflare worker proxy (opt-in only â€” off by default because the
     // re-proxy hop was the cause of slow, half-rendered images).
     if (IMAGE_PROXY_ENABLED && IMAGE_CDN_ENABLED) {
       return `${IMAGE_CDN_BASE}/image?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=${VARIANT_QUALITY[variant]}`;
     }
-    // AniList / MAL / others: already on fast, edge-cached CDNs — serve directly.
+    // AniList / MAL / others: already on fast, edge-cached CDNs â€” serve directly.
     return normalizedSrc;
   } catch {
     return src;
@@ -169,7 +170,7 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
 // Crunchyroll episode thumbnail in WIDE form WITHOUT cropping: use CR's own
 // Cloudflare image resizer with fit=contain (letterboxes the frame instead of
 // cropping it to fill the box) at the native 640x360 episode-card size. This is a
-// pure URL reshape on CR's edge CDN — no proxy hop, served in ~1 render box, so it
+// pure URL reshape on CR's edge CDN â€” no proxy hop, served in ~1 render box, so it
 // arrives almost instantly. Any CR thumbnail (raw, /imgsrv/display/thumbnail, or
 // an existing cdn-cgi URL) is normalized to the same /catalog/crunchyroll/<hash>
 // asset. Returns "" for non-CR thumbnails so the caller can fall back.
