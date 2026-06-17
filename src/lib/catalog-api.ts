@@ -408,9 +408,41 @@ function hasPlayable(row: { m3u8_url?: string } | undefined) {
 export async function fetchCatalogStream(malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> {
   const epNum = String(episode);
 
-  // Fetch fresh HLS directly from our API (always resolves live, no stale URLs).
+  // 1. Try DB first — CF Worker edge (fast, milliseconds).
+  //    Only hit the external resolver (Render.com, 90-sec cold starts) if DB
+  //    has no saved m3u8 for this episode.
+  try {
+    const payload = await catalogClientGet<CatalogStreamsPayload>(
+      `/api/streams/${encodeURIComponent(malId)}?stream_type=${encodeURIComponent(type)}`,
+      0,
+    );
+    const row = payload?.streams?.find(
+      (s) => String(s.episode ?? 0) === epNum && s.m3u8_url,
+    );
+    if (row?.m3u8_url) {
+      return {
+        m3u8_url: row.m3u8_url,
+        url: row.m3u8_url,
+        stream_url: row.m3u8_url,
+        subtitles: typeof row.subtitles === "string"
+          ? (() => { try { return JSON.parse(row.subtitles as string); } catch { return []; } })()
+          : (row.subtitles as Subtitle[] | undefined) ?? [],
+        server_id: Number(row.server_id || 0) || undefined,
+        mal_id: malId,
+        episode_num: epNum,
+      };
+    }
+  } catch {
+    // DB unavailable — fall through to live resolver.
+  }
+
+  // 2. External resolver fallback (anime-search-api on Render).
   const resolved = await fetchAnimeSearchStream(malId, epNum, type);
-  if (resolved) return resolved;
+  if (resolved) {
+    // Cache the resolved stream back to DB for future fast hits.
+    void cacheResolvedStream(malId, epNum, type, resolved);
+    return resolved;
+  }
 
   return { mal_id: malId, episode_num: epNum };
 }
