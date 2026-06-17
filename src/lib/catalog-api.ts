@@ -84,19 +84,15 @@ export async function catalogServerGet<T>(path: string, revalidate = 60): Promis
     return catalogClientGet<T>(path).catch(() => undefined);
   }
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    try {
-      const response = await fetch(`${getServerOrigin()}${path}`, {
-        headers: { Accept: "application/json" },
-        signal: controller.signal,
-        ...(revalidate <= 0 ? { cache: "no-store" as const } : { next: { revalidate } }),
-      });
-      if (!response.ok) return undefined;
-      return (await response.json()) as T;
-    } finally {
-      clearTimeout(timeout);
-    }
+    // NO signal here — Next.js data cache requires fetch options to be stable
+    // and serializable. Adding signal: AbortController breaks the data cache,
+    // causing every SSR to make fresh API calls instead of using cached responses.
+    const response = await fetch(`${getServerOrigin()}${path}`, {
+      headers: { Accept: "application/json" },
+      ...(revalidate <= 0 ? { cache: "no-store" as const } : { next: { revalidate } }),
+    });
+    if (!response.ok) return undefined;
+    return (await response.json()) as T;
   } catch {
     return undefined;
   }
