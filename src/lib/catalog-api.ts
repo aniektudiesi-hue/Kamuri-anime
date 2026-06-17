@@ -1,14 +1,14 @@
 import type { AiringScheduleItem, Anime, EpisodeResponse, StreamResponse, Subtitle } from "./types";
 import { catalogRegionHeaders } from "./edge-region";
 
+export const CATALOG_API_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
+
 // All regions route through the same CF Worker — no need to read request headers.
 // Reading next/headers() here would opt every SSR page into dynamic rendering,
 // disabling ISR and causing x-vercel-cache: MISS on every request.
 function getServerOrigin(): string {
   return CATALOG_API_BASE;
 }
-
-export const CATALOG_API_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
 
 const SEARCH_API_BASE = CATALOG_API_BASE;
 
