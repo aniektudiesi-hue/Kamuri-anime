@@ -813,7 +813,7 @@ function EpisodeSidebar({
                 const isActive = ep.episode_number === currentEp;
                 const isPlayed = playedEps.includes(ep.episode_number);
                 return (
-                  <Link key={ep.episode_number} href={watchPath(undefined, malId, ep.episode_number)}
+                  <Link key={`ep-${ep.episode_number}`} href={watchPath(undefined, malId, ep.episode_number)}
                     title={ep.title || `Episode ${ep.episode_number}`}
                     onMouseEnter={() => prefetchEpisode(ep.episode_number)}
                     onFocus={() => prefetchEpisode(ep.episode_number)}
