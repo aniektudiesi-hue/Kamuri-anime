@@ -65,22 +65,24 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
 
   useEffect(() => {
     let filledFromLocalStorage = false;
-    // 1. Try localStorage first (instant, no network).
+    // 1. Try localStorage first (instant, zero network latency).
     try {
       const raw = window.localStorage.getItem(HOME_CACHE_KEY);
       if (raw) {
         const cached = JSON.parse(raw) as { expiresAt: number; value: HomeInitialData };
         if (cached.expiresAt > Date.now() && cached.value?.thumbnails?.length) {
           filledFromLocalStorage = true;
-          setHomeData((current) => (current.thumbnails.length ? current : cached.value));
+          // Only restore if current data is missing sections (don't downgrade good ISR data).
+          setHomeData((current) => (current.thumbnails.length && current.popular.length) ? current : cached.value);
         }
       }
     } catch {
       // Cache is only a speed hint.
     }
-    // 2. If ISR baked empty sections (CF Worker down at build time) and
-    //    localStorage is empty/expired, refetch directly from CF Worker.
-    if (!initialData.thumbnails.length && !filledFromLocalStorage) {
+    // 2. ISR baked empty sections (CF Worker down at build time) AND localStorage is
+    //    empty/expired — fetch live directly from CF Worker (no Vercel proxy hop).
+    const sectionsMissing = !initialData.thumbnails.length || !initialData.popular.length;
+    if (sectionsMissing && !filledFromLocalStorage) {
       clientFetchHomeData().then((fresh) => {
         if (fresh.thumbnails?.length) setHomeData((current) => ({ ...current, ...fresh }));
       });
@@ -88,14 +90,22 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
   }, []);
 
   useEffect(() => {
-    setHomeData(initialData);
-    try {
-      window.localStorage.setItem(
-        HOME_CACHE_KEY,
-        JSON.stringify({ expiresAt: Date.now() + HOME_CACHE_TTL, value: initialData }),
-      );
-    } catch {
-      // Best-effort cache.
+    // Only overwrite homeData if incoming initialData actually has content.
+    // When ISR baked empty sections, we don't want this effect to undo the
+    // localStorage restore or client-side fetch that Effect 1 just applied.
+    if (initialData.thumbnails.length && initialData.popular.length) {
+      setHomeData(initialData);
+    }
+    // Always persist to localStorage so repeat visits are instant.
+    if (initialData.thumbnails.length) {
+      try {
+        window.localStorage.setItem(
+          HOME_CACHE_KEY,
+          JSON.stringify({ expiresAt: Date.now() + HOME_CACHE_TTL, value: initialData }),
+        );
+      } catch {
+        // Best-effort cache.
+      }
     }
     rememberSearchCatalog([
       ...initialData.banners,
