@@ -58,8 +58,8 @@ export async function getHomeInitialData(options: HomeInitialDataOptions = {}): 
   const banners = bannersRaw.filter(isRootAnime);
   const thumbnails = thumbnailsRaw.filter(isRootAnime);
   const recent = recentRaw.filter(isRootAnime);
-  const topRated = topRatedRaw;
-  const popular = popularRaw;
+  const topRated = deduplicateByFranchise(topRatedRaw);
+  const popular = deduplicateByFranchise(popularRaw);
   const romance = romanceRaw.filter(isRootAnime);
   const isekai = isekaiRaw.filter(isRootAnime);
   const sports = sportsRaw.filter(isRootAnime);
@@ -115,6 +115,26 @@ const SEQUEL_RE = /\b(season\s*[2-9]|[2-9](st|nd|rd|th)\s+season|final\s+season|
 function isRootAnime(anime: Anime): boolean {
   const t = `${anime.title || ""} ${(anime as Record<string,unknown>).title_en || ""} ${(anime as Record<string,unknown>).canonical_title || ""}`.trim();
   return !SEQUEL_RE.test(t);
+}
+
+// Strip season/part suffixes to get the franchise base name for dedup.
+const STRIP_RE = /[\s:–-]*(season\s*\d+|\d+(st|nd|rd|th)\s+season|final\s+season|part\s*\d+|ii+|cour\s*\d+|\([\d]+\)|chapter\s*\d+)\s*$/i;
+function franchiseKey(anime: Anime): string {
+  const t = (anime.title_en || anime.title || (anime as Record<string,unknown>).canonical_title as string || "").toLowerCase().trim();
+  return t.replace(STRIP_RE, "").trim();
+}
+
+// For "popular" / "topRated" we show all entries but deduplicate by franchise:
+// keep only the first (= highest-ranked) entry per franchise so you don't get
+// "My Hero Academia / MHA Season 2 / MHA Season 3" three times in one row.
+function deduplicateByFranchise(items: Anime[]): Anime[] {
+  const seen = new Set<string>();
+  return items.filter((a) => {
+    const key = franchiseKey(a);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function mergeUniqueAnime(items: Anime[]) {
