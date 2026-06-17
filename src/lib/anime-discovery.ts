@@ -1,7 +1,7 @@
 import type { Anime } from "./types";
 import { animeId } from "./utils";
 import { catalogClientGet, mapCatalogList } from "./catalog-api";
-import { catalogRegionHeaders, detectServerRegion, originForRegion } from "./edge-region";
+import { catalogRegionHeaders } from "./edge-region";
 
 type AniListMedia = {
   idMal: number | null;
@@ -251,15 +251,10 @@ export function resolveDiscoveryIntent(rawQuery: string): DiscoveryIntent {
 // CF Worker — geo-routes to nearest Turso replica, edge-cached.
 const SEARCH_DISCOVERY_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
 
-async function getDiscoveryServerOrigin(): Promise<string> {
-  if (typeof window !== "undefined") return "";
-  try {
-    const { headers } = await import("next/headers");
-    const h = await headers();
-    return detectServerRegion(h).origin;
-  } catch {
-    return SEARCH_DISCOVERY_BASE;
-  }
+function getDiscoveryServerOrigin(): string {
+  // CF Worker geo-routes internally — no need to read request headers here.
+  // Calling next/headers() would break ISR on the search page (x-vercel-cache: MISS).
+  return SEARCH_DISCOVERY_BASE;
 }
 
 function searchParamsForIntent(intent: DiscoveryIntent, page: number, fmt = ""): string {
@@ -298,7 +293,7 @@ export async function fetchAniListDiscovery(
     const qs = searchParamsForIntent(intent, page, fmt);
     // Server-side hits the backend directly; client-side goes through the proxy
     // route to stay same-origin.
-    const base = typeof window === "undefined" ? `${(await getDiscoveryServerOrigin()) || SEARCH_DISCOVERY_BASE}/api/search` : "/api/search-proxy/api/search";
+    const base = typeof window === "undefined" ? `${getDiscoveryServerOrigin()}/api/search` : "/api/search-proxy/api/search";
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
     const json = await fetch(`${base}?${qs}`, {
