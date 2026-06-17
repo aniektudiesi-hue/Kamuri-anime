@@ -407,38 +407,39 @@ function hasPlayable(row: { m3u8_url?: string } | undefined) {
 export async function fetchCatalogStream(malId: string, episode: string | number, type: "sub" | "dub" = "sub"): Promise<StreamResponse> {
   const epNum = String(episode);
 
-  // 1. Try DB first — CF Worker edge (fast, milliseconds).
-  //    Only hit the external resolver (Render.com, 90-sec cold starts) if DB
-  //    has no saved m3u8 for this episode.
+  // 1. DB-first: call CF Worker DIRECTLY (no Vercel proxy hop) — fast edge lookup.
   try {
-    const payload = await catalogClientGet<CatalogStreamsPayload>(
-      `/api/streams/${encodeURIComponent(malId)}?stream_type=${encodeURIComponent(type)}`,
-      0,
+    const base = typeof window !== "undefined" ? CATALOG_API_BASE : getServerOrigin();
+    const resp = await fetch(
+      `${base}/api/streams/${encodeURIComponent(malId)}?stream_type=${encodeURIComponent(type)}`,
+      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(4000) },
     );
-    const row = payload?.streams?.find(
-      (s) => String(s.episode ?? 0) === epNum && s.m3u8_url,
-    );
-    if (row?.m3u8_url) {
-      return {
-        m3u8_url: row.m3u8_url,
-        url: row.m3u8_url,
-        stream_url: row.m3u8_url,
-        subtitles: typeof row.subtitles === "string"
-          ? (() => { try { return JSON.parse(row.subtitles as string); } catch { return []; } })()
-          : (row.subtitles as Subtitle[] | undefined) ?? [],
-        server_id: Number(row.server_id || 0) || undefined,
-        mal_id: malId,
-        episode_num: epNum,
-      };
+    if (resp.ok) {
+      const payload = (await resp.json()) as CatalogStreamsPayload;
+      const row = payload?.streams?.find(
+        (s) => String(s.episode ?? 0) === epNum && s.m3u8_url,
+      );
+      if (row?.m3u8_url) {
+        return {
+          m3u8_url: row.m3u8_url,
+          url: row.m3u8_url,
+          stream_url: row.m3u8_url,
+          subtitles: typeof row.subtitles === "string"
+            ? (() => { try { return JSON.parse(row.subtitles as string); } catch { return []; } })()
+            : (row.subtitles as Subtitle[] | undefined) ?? [],
+          server_id: Number(row.server_id || 0) || undefined,
+          mal_id: malId,
+          episode_num: epNum,
+        };
+      }
     }
   } catch {
-    // DB unavailable — fall through to live resolver.
+    // DB miss or timeout — fall through to live resolver.
   }
 
-  // 2. External resolver fallback (anime-search-api on Render).
+  // 2. External resolver with 8s hard timeout (Render.com cold start guard).
   const resolved = await fetchAnimeSearchStream(malId, epNum, type);
   if (resolved) {
-    // Cache the resolved stream back to DB for future fast hits.
     void cacheResolvedStream(malId, epNum, type, resolved);
     return resolved;
   }
@@ -509,9 +510,11 @@ function mapResolverSubtitles(value: AnimeSearchStreamPayload["subtitles"]): Sub
 async function fetchAnimeSearchStream(malId: string, episode: string, type: "sub" | "dub" = "sub"): Promise<StreamResponse | undefined> {
   try {
     const qs = new URLSearchParams({ type, embed: "false" });
+    // 8-second hard timeout — Render.com free tier has 90s cold starts;
+    // better to fail fast and show an error than freeze the player for 3 minutes.
     const res = await fetch(
       `${ANIME_SEARCH_STREAM_BASE}/api/stream/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}?${qs.toString()}`,
-      { headers: { Accept: "application/json" } },
+      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) },
     );
     if (!res.ok) return undefined;
     const data = (await res.json()) as AnimeSearchStreamPayload;
