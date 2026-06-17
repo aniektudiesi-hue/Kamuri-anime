@@ -290,7 +290,10 @@ export async function fetchAniListDiscovery(
   timeoutMs?: number,
 ): Promise<{ media: Anime[]; hasNextPage: boolean; total: number; count: number; page: number; facets?: DiscoveryFacets }> {
   const isBrowse = !intent.search && !intent.genre && !intent.tag;
-  const effectiveTimeout = timeoutMs ?? (isBrowse ? 25000 : 3500);
+  // A 3.5s search timeout was aborting BEFORE a cold origin replied, so real
+  // matches (e.g. "overflow", which the catalog DOES have) fell through to the
+  // "couldn't find" empty state. Give text/genre search a realistic budget.
+  const effectiveTimeout = timeoutMs ?? (isBrowse ? 25000 : 14000);
   try {
     const qs = searchParamsForIntent(intent, page, fmt);
     // Server-side hits the backend directly; client-side goes through the proxy

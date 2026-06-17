@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Providers } from "@/components/providers";
 import { MaintenanceGate } from "@/components/maintenance-gate";
 import { AdNoticeBanner } from "@/components/ad-notice-banner";
+import { AdsMavenAds } from "@/components/adsmaven-ads";
 import { RegisterPopup } from "@/components/register-popup";
 import { absoluteUrl, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -236,6 +237,11 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://cdn.animetvplus.xyz" />
         <link rel="preconnect" href="https://s4.anilist.co" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://cdn.myanimelist.net" />
+        {/* Crunchyroll image CDNs — warm the TLS handshake early so episode
+            thumbnails / keyart don't each pay a ~500ms connect on first paint. */}
+        <link rel="preconnect" href="https://imgsrv.crunchyroll.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://www.crunchyroll.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://imgsrv.crunchyroll.com" />
         {/* AdMaven placement verification */}
         <meta name="admaven-placement" content="Bqjg8rdw8" />
       </head>
@@ -249,22 +255,24 @@ export default function RootLayout({
         />
         <Providers>{children}</Providers>
         <AdNoticeBanner />
+        <AdsMavenAds />
         <RegisterPopup />
         <MaintenanceGate />
-        {/* Google AdSense */}
+        {/* Google AdSense — lazyOnload so the third-party JS never competes with
+            content for the main thread / network during the LCP+INP window. */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5284738130230191"
           crossOrigin="anonymous"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
-        {/* Google Analytics (GA4) */}
+        {/* Google Analytics (GA4) — deferred to idle for the same reason. */}
         <Script
           async
           src="https://www.googletagmanager.com/gtag/js?id=G-G3YG35B59E"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
-        <Script id="ga4-init" strategy="afterInteractive">
+        <Script id="ga4-init" strategy="lazyOnload">
           {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());

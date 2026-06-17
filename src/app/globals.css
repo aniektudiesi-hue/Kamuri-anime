@@ -346,11 +346,18 @@ html:not([data-theme="light"]) [class*="bg-[#1b2036]"] { background-color: #1111
   transform: translate3d(0,-4px,0) scale(1.012);
 }
 
-/* NOTE: content-visibility:auto was removed here — on fast scroll it un-painted
-   offscreen sections and flashed the black page background ("sab black ho jata
-   hai"). Light containment keeps most of the perf without the blanking. */
+/* Buttery long-list scroll: skip rendering/painting offscreen ROWS entirely so
+   the browser only ever lays out what's near the viewport (scroll 100s of cards
+   at near-zero cost). The earlier "everything flashes black" bug was from a bare
+   content-visibility:auto with NO intrinsic size — offscreen rows collapsed to 0,
+   the scrollbar jumped, and re-entry repainted late. The `auto` keyword in
+   contain-intrinsic-size fixes that: the browser REMEMBERS each row's real
+   rendered height, so an offscreen row holds its space and never re-collapses or
+   re-blanks on scroll-back. content-visibility:auto also pauses the offscreen
+   shimmer animations, removing their per-card repaint cost. */
 .content-visibility-auto {
-  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
 }
 
 .scroll-card {

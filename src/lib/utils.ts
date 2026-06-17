@@ -125,37 +125,89 @@ export function rankAnimeForSearch(items: Anime[], query: string) {
   return [...items].sort((a, b) => scoreSearchItem(b, normalizedQuery) - scoreSearchItem(a, normalizedQuery));
 }
 
+/** Relevance score for a single item against a query — exposed so the search
+ *  page can rank the grid + pick the featured top-3 with the same logic. */
+export function searchRelevanceScore(anime: Anime, rawQuery: string) {
+  return scoreSearchItem(anime, rawQuery.trim().toLowerCase());
+}
+
+/** Just the MATCH tier (1000 exact / 700 prefix / 480 substring / 360 all-words /
+ *  0 none) with no popularity noise — so the search page can sort by match quality
+ *  first, then break ties by CR-mapped + shortest title (the root). */
+export function searchMatchTier(anime: Anime, rawQuery: string): number {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return 0;
+  const hays = [
+    titleOf(anime).toLowerCase(),
+    (anime.title_en || anime.english || "").toLowerCase(),
+    (anime.title_jp || "").toLowerCase(),
+    (anime.name || "").toLowerCase(),
+  ].filter(Boolean);
+  const words = query.split(/\s+/).filter(Boolean);
+  let m = 0;
+  for (const hay of hays) {
+    if (hay === query) m = Math.max(m, 1000);
+    else if (hay.startsWith(query)) m = Math.max(m, 700);
+    else if (hay.includes(query)) m = Math.max(m, 480);
+    else if (words.length > 1 && words.every((w) => hay.includes(w))) m = Math.max(m, 360);
+  }
+  return m;
+}
+
+// TIERED scoring. Match quality (exact > prefix > substring > all-words) is the
+// PRIMARY key and lives in bands of 360-1000; the contextual signal (CR art,
+// airing, recency, popularity) is capped well under one band so it can only
+// break ties WITHIN a match tier — never let a popular airing show outrank an
+// exact-title hit (the old summed-score bug where "one piece"/"attack on titan"
+// could be buried under a trending unrelated title).
+//
+// Season/part/cour/ordinal markers. A title that carries one is a SEASON variant,
+// not the root series ("Attack on Titan Final Season Part 2" vs "Attack on Titan").
+const SEASON_MARKER_RE = /\b(final\s+)?season\b|\b\d+(st|nd|rd|th)\s+season\b|\bpart\s*\d+\b|\bcour\s*\d+\b|\b(2nd|3rd|4th)\b|\s(ii|iii|iv|v|vi|vii)\s*$/i;
 function scoreSearchItem(anime: Anime, query: string) {
-  const title = titleOf(anime).toLowerCase();
-  const english = (anime.title_en || anime.english || "").toLowerCase();
-  const status = (anime.status || "").toLowerCase();
-  const currentYear = new Date().getFullYear();
-  const releaseYear = releaseYearOf(anime);
-  let score = 0;
+  const haystacks = [
+    titleOf(anime).toLowerCase(),
+    (anime.title_en || anime.english || "").toLowerCase(),
+    (anime.title_jp || "").toLowerCase(),
+    (anime.name || "").toLowerCase(),
+  ].filter(Boolean);
 
-  if (english) score += 20;
-
+  let match = 0;
   if (query) {
-    if (english === query || title === query) score += 420;
-    if (english.startsWith(query) || title.startsWith(query)) score += 250;
-    if (english.includes(query) || title.includes(query)) score += 130;
+    const words = query.split(/\s+/).filter(Boolean);
+    for (const hay of haystacks) {
+      if (hay === query) match = Math.max(match, 1000);
+      else if (hay.startsWith(query)) match = Math.max(match, 700);
+      else if (hay.includes(query)) match = Math.max(match, 480);
+      else if (words.length > 1 && words.every((word) => hay.includes(word))) match = Math.max(match, 360);
+    }
   }
 
-  if (status.includes("currently") || status.includes("airing") || status.includes("releasing")) score += 150;
-  if (status.includes("not_yet") || status.includes("upcoming")) score += 95;
-  if (status.includes("finished") || status.includes("complete")) score -= 24;
-
+  // Contextual tie-breakers — capped (~max 88) so they stay inside one match band.
+  let ctx = 0;
+  if (anime.cr_mapped) ctx += 40;
+  const status = (anime.status || "").toLowerCase();
+  if (status.includes("currently") || status.includes("airing") || status.includes("releasing")) ctx += 18;
+  else if (status.includes("not_yet") || status.includes("upcoming")) ctx += 8;
+  const releaseYear = releaseYearOf(anime);
   if (releaseYear) {
-    const age = currentYear - releaseYear;
-    if (age <= 0) score += 85;
-    else if (age === 1) score += 68;
-    else if (age === 2) score += 45;
-    else if (age <= 4) score += 24;
-    else if (age >= 10) score -= 20;
+    const age = new Date().getFullYear() - releaseYear;
+    if (age <= 0) ctx += 16;
+    else if (age <= 2) ctx += 10;
+    else if (age <= 4) ctx += 5;
   }
+  ctx += Math.min(Number(anime.score || 0), 10);
+  if (anime.title_en || anime.english) ctx += 2;
 
-  score += Math.min(Number(anime.score || 0), 10);
-  return score;
+  // Within the SAME match tier, the root series must outrank its own season/part
+  // variants. For "attack" both "Attack on Titan" and "...Final Season Part 2" are
+  // prefix hits (tier 700); without this the newer Part 2 wins on recency/score and
+  // the season-collapse then keeps Part 2 instead of the root. 32 reliably drops a
+  // variant below its root (ctx spread is < 32) yet stays well inside one match band
+  // (gaps are ≥ 120) so it never crosses tiers.
+  if (SEASON_MARKER_RE.test(titleOf(anime).toLowerCase())) ctx -= 32;
+
+  return match + ctx;
 }
 
 function releaseYearOf(anime: Anime) {

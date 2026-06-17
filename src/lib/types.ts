@@ -17,6 +17,7 @@ export type Anime = {
   banner?: string;
   cr_poster?: string;
   cr_hero?: string;
+  cr_wide?: string;
   detail_banner?: string;
   title_logo?: string;
   synopsis?: string;

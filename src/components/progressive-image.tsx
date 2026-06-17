@@ -23,10 +23,10 @@ type Props = {
 
 /**
  * Image loader — renders the full-res image directly with the browser's native
- * progressive decode. We intentionally do NOT load a separate low-res blur
- * preview (that doubled network requests and made loads feel slow) and we do NOT
- * gate visibility behind an onLoad opacity fade. On the pure-black theme an
- * un-painted image area is just black, then the picture pops in as it decodes.
+ * decode. No separate low-res blur preview (that doubled requests). The image is
+ * held at opacity-0 until it has FULLY decoded (onLoad), then fades in over the
+ * shimmer placeholder — so the user never sees a half-streamed image painting
+ * top-to-bottom (the "adhuri image / kat-kat ke load" artifact on slow PNGs).
  */
 export function ProgressiveImage({
   highSrc,
@@ -42,17 +42,24 @@ export function ProgressiveImage({
 }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [currentSrc, setCurrentSrc] = useState(highSrc);
+  // The shimmer is held back ~180ms so cached / prewarmed images (which decode
+  // almost instantly) NEVER flash a "loading" state — search should feel like
+  // nothing loaded at all. Only a genuinely slow image reveals the shimmer.
+  const [showShimmer, setShowShimmer] = useState(false);
 
   useEffect(() => {
     setLoaded(false);
+    setShowShimmer(false);
     setCurrentSrc(highSrc);
+    const timer = window.setTimeout(() => setShowShimmer(true), 180);
+    return () => window.clearTimeout(timer);
   }, [highSrc]);
 
   return (
     <div className={`absolute inset-0 overflow-hidden bg-[#111217] ${className}`}>
       <div
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,#111217_0%,#191b23_42%,#111217_78%)] bg-[length:220%_100%] transition-opacity duration-150 ${loaded ? "opacity-0" : "animate-[shimmer_1.15s_ease-in-out_infinite] opacity-25"}`}
+        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,#111217_0%,#191b23_42%,#111217_78%)] bg-[length:220%_100%] transition-opacity duration-150 ${loaded || !showShimmer ? "opacity-0" : "animate-[shimmer_1.15s_ease-in-out_infinite] opacity-25"}`}
       />
       <Image
         src={currentSrc}
@@ -77,7 +84,7 @@ export function ProgressiveImage({
           setLoaded(true);
           onLoad?.();
         }}
-        className={`object-cover ${imgClassName}`}
+        className={`object-cover transition-opacity duration-300 ease-out ${loaded ? "opacity-100" : "opacity-0"} ${imgClassName}`}
       />
     </div>
   );

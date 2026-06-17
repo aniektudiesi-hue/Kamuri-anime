@@ -128,8 +128,11 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
       return normalizedSrc;
     }
     const width = VARIANT_WIDTH[variant];
-    // Crunchyroll: resize on CR's own edge CDN via the URL path — fastest,
-    // globally cached, no proxy hop. This is the primary art source.
+    // Crunchyroll: resize on CR's own edge CDN via the URL path — CR pre-generates
+    // these whitelisted render boxes, so they're globally edge-cached and load fast
+    // on the FIRST view. (We tried the cdn-cgi/image WebP resizer for smaller bytes,
+    // but its on-the-fly transform adds ~2-3.5s of cold latency per never-seen image
+    // — the "images load after 4s" regression — so the pre-sized box wins for UX.)
     if (isCrImageHost(parsed.hostname)) {
       return maybeProxyCr(crResizedUrl(parsed, width));
     }
@@ -147,6 +150,22 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
   } catch {
     return src;
   }
+}
+
+// Crunchyroll episode thumbnail in WIDE form WITHOUT cropping: use CR's own
+// Cloudflare image resizer with fit=contain (letterboxes the frame instead of
+// cropping it to fill the box) at the native 640x360 episode-card size. This is a
+// pure URL reshape on CR's edge CDN — no proxy hop, served in ~1 render box, so it
+// arrives almost instantly. Any CR thumbnail (raw, /imgsrv/display/thumbnail, or
+// an existing cdn-cgi URL) is normalized to the same /catalog/crunchyroll/<hash>
+// asset. Returns "" for non-CR thumbnails so the caller can fall back.
+const CR_EP_THUMB_BASE = "https://imgsrv.crunchyroll.com/cdn-cgi/image/fit=contain,format=auto,quality=85,width=640,height=360,blur=0";
+
+export function crEpisodeThumbUrl(src: string | undefined): string {
+  if (!src) return "";
+  const match = src.match(/\/catalog\/crunchyroll\/[^?]+?\.(?:jpe?g|png|webp)/i);
+  if (!match) return "";
+  return `${CR_EP_THUMB_BASE}${match[0]}`;
 }
 
 export function directImageUrl(src: string | undefined) {

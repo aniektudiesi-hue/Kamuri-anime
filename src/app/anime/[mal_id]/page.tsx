@@ -12,8 +12,8 @@ import { SidebarLayout } from "@/components/sidebar";
 import { ProgressiveImage } from "@/components/progressive-image";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
-import { CR_CARD_QUERY_VERSION, fetchCrCard, type CrSeason } from "@/lib/catalog-api";
-import { directImageUrl, imageCdnUrl } from "@/lib/image-cdn";
+import { CR_CARD_QUERY_VERSION, fetchCrCard, fetchCrSeasonEpisodes, type CrSeason } from "@/lib/catalog-api";
+import { crEpisodeThumbUrl, directImageUrl, imageCdnUrl } from "@/lib/image-cdn";
 import { cloudinaryEpisodeThumb } from "@/lib/cloudinary-episode-thumbs";
 import { useAuth } from "@/lib/auth";
 import {
@@ -46,6 +46,7 @@ function getRanges(total: number): { label: string; start: number; end: number }
   }
   return ranges;
 }
+
 
 export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: string }> }) {
   const { mal_id: rawMalId } = use(params);
@@ -170,7 +171,23 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     ? `${watchPath(displayAnime, malId, resume.episode)}${resume.progress > 1 ? `?t=${Math.floor(resume.progress)}` : ""}`
     : watchPath(displayAnime, malId, 1);
 
-  const allEpisodes = episodes.data?.episodes ?? [];
+  // Normalize the flat episode list: the backend/worker returns episodes as
+  // `{ ep }` for some titles and `{ episode_number }` for others — reading only
+  // `episode_number` showed "Episode undefined". Coerce to one shape here.
+  const allEpisodes = useMemo<Episode[]>(() => {
+    const raw = (episodes.data?.episodes ?? []) as Array<Episode & { ep?: number | string; stream_ep?: number | string }>;
+    return raw.map((e, i) => {
+      const rawN = Number(e.episode_number ?? e.ep ?? e.stream_ep);
+      const n = Number.isFinite(rawN) ? rawN : i + 1;
+      return {
+        episode_number: n,
+        display_number: e.display_number ?? n,
+        title: e.title || `Episode ${n}`,
+        thumbnail: e.thumbnail,
+        has_stream: e.has_stream,
+      };
+    });
+  }, [episodes.data]);
 
   // Crunchyroll season tree (real seasons + per-episode thumbnails). Cache it so
   // a revisit paints the CR hero instantly instead of re-fetching (which forced
@@ -211,14 +228,31 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
     return crSeasons.find((s) => Number(s.season_number || 0) === Number(activeSeasonNumber) && s.episodes?.length)
       ?? active;
   }, [crSeasons, activeSeasonIndex, activeSeasonNumber]);
+  // The card payload carries season HEADERS only (episodes: []). Lazy-load the
+  // active season's episodes by cr_season_id — one indexed, edge-cached worker
+  // read, milliseconds. Switching seasons just changes activeSeasonId.
+  const activeSeasonId = selectedCrSeason?.cr_season_id || crSeasons[activeSeasonIndex]?.cr_season_id || "";
+  // A split CR season (two dropdown rows sharing one cr_season_id) is disambiguated
+  // by its sequence-number range — so it must be part of the cache key + the fetch.
+  const activeSeqMin = selectedCrSeason?.seq_min;
+  const activeSeqMax = selectedCrSeason?.seq_max;
+  const hasInlineEpisodes = Boolean(selectedCrSeason?.episodes?.length);
+  const seasonEpsQuery = useQuery({
+    queryKey: ["cr-season-eps", activeSeasonId, activeSeqMin ?? null, activeSeqMax ?? null],
+    queryFn: () => fetchCrSeasonEpisodes(malId, activeSeasonId, activeSeqMin, activeSeqMax),
+    enabled: useSeasons && Boolean(activeSeasonId) && !hasInlineEpisodes,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
+    placeholderData: keepPreviousData,
+  });
   const crEpisodeTotal = useMemo(
-    () => crSeasons.reduce((sum, season) => sum + (season.episodes?.length ?? season.episode_count ?? 0), 0),
+    () => crSeasons.reduce((sum, season) => sum + (season.episode_count ?? season.episodes?.length ?? 0), 0),
     [crSeasons],
   );
   const visibleEpisodeTotal = useSeasons ? crEpisodeTotal : episodeTotal;
 
   // Hero banner: ONLY Crunchyroll keyart. Never fall back to AniList backdrop.
-  const instantHero = displayAnime.detail_banner || displayAnime.cr_hero || null;
+  const instantHero = displayAnime.detail_banner || displayAnime.cr_hero || undefined;
   const heroImage = crCard.data?.detail_banner || crCard.data?.hero_banner || instantHero;
   // Construct title_logo from any existing keyart URL pattern so we don't wait for crCard
   const CR_KEYART_BASE = "https://imgsrv.crunchyroll.com/cdn-cgi/image/format=auto,quality=90";
@@ -318,18 +352,25 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
   const seasonEpisodes = useMemo<Episode[]>(() => {
     if (!useSeasons) return [];
     const season = selectedCrSeason || crSeasons[activeSeasonIndex];
-    return (season?.episodes ?? [])
-      .map((episode, i) => {
-        const epNum = Number(episode.stream_ep ?? episode.ep) || (i + 1);
-        return {
-          episode_number: epNum,
-          display_number: epNum,
-          title: episode.title || `Episode ${epNum}`,
-          thumbnail: episode.thumbnail,
-          has_stream: episode.has_stream,
-        };
-      });
-  }, [useSeasons, selectedCrSeason, crSeasons, activeSeasonIndex]);
+    // Primary: episodes inline in the full=1 card payload (instant). Fallback to
+    // the lazily-fetched season episodes if a season ever arrives header-only.
+    const inline = season?.episodes ?? [];
+    const source = inline.length ? inline : (seasonEpsQuery.data ?? []);
+    return source.map((episode, i) => {
+      // Keep Crunchyroll's real episode number (already continuous across seasons).
+      // Use a finite check, NOT `|| (i+1)`, so a PV/recap numbered 0 stays 0 instead
+      // of falling back to 1 and colliding with the real first episode ("E1, E1" bug).
+      const rawNum = Number(episode.stream_ep ?? episode.ep ?? (episode as { episode_number?: number }).episode_number);
+      const epNum = Number.isFinite(rawNum) ? rawNum : (i + 1);
+      return {
+        episode_number: epNum,
+        display_number: epNum,
+        title: episode.title || `Episode ${epNum}`,
+        thumbnail: episode.thumbnail,
+        has_stream: episode.has_stream,
+      };
+    });
+  }, [useSeasons, selectedCrSeason, crSeasons, activeSeasonIndex, seasonEpsQuery.data]);
 
   // Each CR season streams via the MAL id that actually owns its episodes.
   const activeSeasonMal = useSeasons
@@ -343,7 +384,9 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
           (ep) => ep.episode_number >= ranges[activeRange].start && ep.episode_number <= ranges[activeRange].end,
         )
       : allEpisodes;
-  const seasonEpisodesPending = useSeasons && !selectedCrSeason && (crCard.isLoading || crCard.isFetching);
+  const seasonEpisodesPending =
+    (useSeasons && !selectedCrSeason && (crCard.isLoading || crCard.isFetching)) ||
+    (!hasInlineEpisodes && seasonEpsQuery.isLoading);
   const episodeListPending = episodes.isLoading || crPending || seasonEpisodesPending;
   const visibleEpisodes = rangeEpisodes.slice(0, episodeLimit);
 
@@ -606,10 +649,16 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                       <div className={`relative aspect-video w-full overflow-hidden rounded-sm bg-[#151515] transition-shadow duration-200 ${isCurrent ? "shadow-[0_0_0_0.375rem_#c4182a]" : "group-hover:shadow-[0_0_0_0.375rem_#151515]"}`}>
                         {ep.thumbnail ? (
                           <ProgressiveImage
-                            highSrc={imageCdnUrl(ep.thumbnail, "episode-thumb")}
-                            fallbackSrc={directImageUrl(ep.thumbnail)}
+                            highSrc={crEpisodeThumbUrl(ep.thumbnail) || imageCdnUrl(ep.thumbnail, "episode-thumb")}
+                            // CR thumbnail → fall back to its direct URL; a non-CR
+                            // worker cr-thumb often 404s → fall back to the
+                            // cloudinary thumb so it never shows a broken image.
+                            fallbackSrc={crEpisodeThumbUrl(ep.thumbnail) ? directImageUrl(ep.thumbnail) : cloudinaryEpisodeThumb(activeSeasonMal, ep.episode_number)}
                             alt={ep.title || `Episode ${ep.episode_number} thumbnail`}
                             sizes="(max-width: 640px) 50vw, 25vw"
+                            // First rows load eagerly (webp) so the visible episodes
+                            // paint together instead of trickling in on scroll.
+                            priority={idx < 12}
                             imgClassName="object-center transition-opacity duration-300"
                           />
                         ) : (
@@ -638,9 +687,6 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                             </span>
                           </span>
                         ) : null}
-                        <span className="absolute bottom-2 right-2 rounded-[2px] bg-black/80 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase leading-[1] text-[#f2f2f2]">
-                          EP {displayNum}
-                        </span>
                         {isCurrent ? (
                           <span className="absolute left-2 top-2 rounded-[2px] bg-[#c4182a] px-1.5 py-0.5 text-[0.625rem] font-bold uppercase leading-[1] text-white">
                             Resume
@@ -649,7 +695,7 @@ export default function AnimeDetailPage({ params }: { params: Promise<{ mal_id: 
                       </div>
                       <div className="px-[0.375rem] pb-3 pt-3">
                         <h3 className={`line-clamp-2 text-[0.875rem] font-bold leading-[1.25rem] tracking-[-0.03em] ${isCurrent ? "text-[#c4182a]" : "text-[#f2f2f2] group-hover:text-white"}`}>
-                          E{displayNum} - {ep.title || `Episode ${displayNum}`}
+                          {displayNum === 0 ? (ep.title || "PV") : `E${displayNum} - ${ep.title || `Episode ${displayNum}`}`}
                         </h3>
                         <p className="mt-1 text-[0.75rem] leading-[1.125rem] text-[#8c8c8c]">
                           {!canPlay ? "Stream pending" : isCurrent && localProgress > 1 ? `Resume at ${formatClock(localProgress)}` : "Sub | Dub"}

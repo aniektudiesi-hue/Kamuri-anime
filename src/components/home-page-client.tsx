@@ -596,19 +596,19 @@ function AnimeGridCard({ anime, priority }: { anime: Anime; priority?: boolean }
           )}
 
           {count > 0 && (
-            <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/76 px-2 py-1 text-[8px] font-black text-white/88 backdrop-blur-md">
+            <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/85 px-2 py-1 text-[8px] font-black text-white/88">
               EP {count}
             </span>
           )}
 
           {anime.score ? (
-            <span className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-black/76 px-2 py-1 text-[8px] font-black text-[#d8b56a] backdrop-blur-md">
+            <span className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-black/85 px-2 py-1 text-[8px] font-black text-[#d8b56a]">
               <Star size={7} className="fill-[#d8b56a]" />
               {Number(anime.score).toFixed(1)}
             </span>
           ) : null}
 
-          <div className="absolute inset-0 flex items-center justify-center bg-black/42 opacity-0 backdrop-blur-[1px] transition-opacity duration-200 group-hover:opacity-100">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-[#c4182a] shadow-lg shadow-[#c4182a]/30">
               <Play size={14} fill="white" className="text-white" />
             </span>

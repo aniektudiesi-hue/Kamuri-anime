@@ -18,9 +18,12 @@ import {
   resolveDiscoveryIntent,
 } from "@/lib/anime-discovery";
 import { KairoState } from "@/components/mascot/kairo";
+import { SearchFeatured, SearchFeaturedSkeleton, wideImageOf } from "@/components/search-featured";
+import { CR_CARD_QUERY_VERSION, fetchCrCard } from "@/lib/catalog-api";
+import { warmImageCdn } from "@/lib/image-cdn";
 import { localSearchAnime, rememberSearchCatalog } from "@/lib/search-index";
 import type { Anime, LibraryItem } from "@/lib/types";
-import { HISTORY_UPDATED_EVENT, animeId, posterOf, rememberedHistory, titleOf } from "@/lib/utils";
+import { HISTORY_UPDATED_EVENT, animeId, posterOf, rememberAnime, rememberedHistory, searchMatchTier, searchRelevanceScore, titleOf } from "@/lib/utils";
 
 const GENRE_LINKS = new Set([
   "Action",
@@ -68,7 +71,7 @@ export function SearchPageClient({ initialData }: { initialData?: SearchInitialD
   );
 }
 
-const SEARCH_GRID = "grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6";
+const SEARCH_GRID = "grid grid-cols-3 gap-x-4 gap-y-8 sm:grid-cols-4 sm:gap-x-5 md:grid-cols-5 lg:grid-cols-6";
 
 function GridSkeleton({ count = 24 }: { count?: number }) {
   return (
@@ -147,7 +150,7 @@ const SearchField = memo(function SearchField({
       const next = value.trim();
       lastCommitted.current = next;
       onCommit(next);
-    }, 140);
+    }, 260);
     return () => clearTimeout(id);
   }, [value, onCommit]);
   return (
@@ -203,11 +206,15 @@ function SearchContentBody({
   const resetGuardRef = useRef(true);
   useEffect(() => setFormatFilter("ALL"), [intent.key]);
 
-  // On a new query/intent, drop the previous query's accumulated results and
-  // total immediately. Without this the grid keeps showing the OLD query's
-  // cards (and the header/count can diverge from the grid) until the new fetch
-  // lands — the "UI dhoka" / phone "count updates but page doesn't" bug. The
-  // instant local-cache results (instantResults) fill the gap with no flash.
+  // On a new query/intent, reset pagination but KEEP the previous query's
+  // results + total on screen until the new backend response lands, then swap
+  // grid and count together (atomically, via the copy effect below). Wiping to
+  // [] here used to make the grid fall back to the local-cache instantResults
+  // and THEN reshuffle when the remote results arrived — a visible two-phase
+  // churn ("results change on their own after typing", unrelated partial-word
+  // matches flashing in and out). keepPreviousData (on anilistQ) holds the prior
+  // data, and the copy effect only applies data matching the CURRENT intent, so
+  // grid+count never diverge — they update in one clean swap.
   useEffect(() => {
     if (resetGuardRef.current) {
       resetGuardRef.current = false;
@@ -220,8 +227,6 @@ function SearchContentBody({
       }
     }
     setDiscoveryPage(1);
-    setAllAnilist([]);
-    setResultTotal(0);
   }, [intent.key, formatFilter, initialData, initialMatches]);
 
   useEffect(() => {
@@ -285,34 +290,166 @@ function SearchContentBody({
   // result set in one response) — fixed numbers that never grow as pages load.
   const formatCounts: Record<FormatKey, number> = facets ?? { ALL: resultTotal, TV: 0, MOVIE: 0, OVA: 0, ONA: 0, SPECIAL: 0 };
 
-  // Backend already applies the format facet (fmt=) + total/pagination. Here we
-  // only re-rank within the loaded page: CR-mapped first, then TV-first for text
-  // queries, preserving backend relevance order within each bucket.
+  const isTextSearch = Boolean(intent.search);
+
+  // Re-rank the loaded page. For a TEXT query relevance is the PRIMARY key, so a
+  // 100% title match wins even if it's an ONA — we never force a TV result above
+  // an exact match. CR-mapped + TV-first only break ties WITHIN the same relevance
+  // tier. Browse/genre views (no real relevance) keep CR-first then TV-first.
+  // Multi-season TV entries are collapsed to their ROOT series so the grid shows
+  // one card per show (no "Season 2" / "Part 2"); movies/ONA/OVA stay separate.
   const visibleMerged = useMemo(() => {
+    const tier = new Map<Anime, number>();
+    const rel = new Map<Anime, number>();
+    if (q) merged.forEach((a) => { tier.set(a, searchMatchTier(a, q)); rel.set(a, searchRelevanceScore(a, q)); });
+    const titleLen = (a: Anime) => titleOf(a).length;
     const sorted = merged
       .map((a, i) => ({ a, i }))
       .sort((x, y) => {
-        const cr = crRank(x.a) - crRank(y.a);
-        if (cr) return cr;
-        if (q) {
+        if (q && isTextSearch) {
+          // 1) closest MATCH (exact > prefix > substring) — most accurate first.
+          const t = (tier.get(y.a) ?? 0) - (tier.get(x.a) ?? 0);
+          if (t) return t;
+          // 2) Crunchyroll-mapped first, 3) shortest title (the root, e.g. "One
+          // Piece" before "One Piece Film: Red"), 4) popularity, 5) TV-first.
+          const cr = crRank(x.a) - crRank(y.a);
+          if (cr) return cr;
+          const len = titleLen(x.a) - titleLen(y.a);
+          if (len) return len;
+          const r = (rel.get(y.a) ?? 0) - (rel.get(x.a) ?? 0);
+          if (r) return r;
           const fr = formatRank(x.a) - formatRank(y.a);
           if (fr) return fr;
+        } else {
+          const cr = crRank(x.a) - crRank(y.a);
+          if (cr) return cr;
+          if (q) {
+            const fr = formatRank(x.a) - formatRank(y.a);
+            if (fr) return fr;
+          }
         }
         return x.i - y.i;
       })
       .map((o) => o.a);
     const seenIds = new Set<string>();
     const seenTitles = new Set<string>();
-    return sorted.filter((a) => {
+    const seenRoots = new Set<string>();
+    // Normalized titles of TV roots already kept — used to fold "<Root> ... Arc/
+    // Saga" entries (e.g. Demon Slayer's Swordsmith Village / Mugen Train arcs)
+    // into the root series. Items are sorted shortest-title-first, so the bare root
+    // is always seen before its arcs. Gated on the trailing "arc/saga" word so it
+    // never merges genuinely separate franchises (Naruto vs Naruto: Shippuden,
+    // Bleach vs Bleach: Thousand-Year Blood War).
+    const keptTvNorms: string[] = [];
+    const deduped = sorted.filter((a) => {
       const id = animeId(a);
       if (id && seenIds.has(id)) return false;
       const normalTitle = (a.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
       if (normalTitle.length > 3 && seenTitles.has(normalTitle)) return false;
+      // Collapse TV seasons to the root series (only the first/best is kept).
+      if ((a.format || "").toUpperCase() === "TV") {
+        const root = seasonRootKey(titleOf(a));
+        if (root.length > 2) {
+          if (seenRoots.has(root)) return false;
+          seenRoots.add(root);
+        }
+        const isArc = /\b(arc|saga)\s*$/i.test(titleOf(a));
+        if (isArc && keptTvNorms.some((p) => normalTitle.startsWith(p) && normalTitle.length > p.length + 2)) {
+          return false;
+        }
+        if (normalTitle.length > 3) keptTvNorms.push(normalTitle);
+      }
       if (id) seenIds.add(id);
       if (normalTitle.length > 3) seenTitles.add(normalTitle);
       return true;
     });
-  }, [merged, q]);
+    // For a TEXT search, drop backend fuzzy noise (e.g. "God Mars" / "Kaiju No. 8"
+    // for "attack") — keep only genuine matches. A non-matching title scores only
+    // its capped ctx (≤ ~88), far below the 200 floor, so any item that clears it is
+    // a real title/word hit. We keep ALL genuine matches and only fall back to the
+    // unfiltered set when there are NONE — otherwise collapsing a multi-season show
+    // down to one card could drop the genuine count under an arbitrary threshold and
+    // let unrelated trending titles flood back in (the "flips to Kaiju No. 8" bug).
+    if (q && isTextSearch) {
+      const relevant = deduped.filter((a) => (rel.get(a) ?? 0) >= 200);
+      if (relevant.length >= 1) return relevant;
+    }
+    return deduped;
+  }, [merged, q, isTextSearch]);
+
+  // The featured top-3 lead the page. For a TEXT search they must be GENUINELY
+  // relevant — only items that actually match the query (≥ all-words tier) qualify,
+  // so "overflow" never pads the row with unrelated titles. Browse/genre uses the
+  // top-3 by rank. The grid is everything else (by id, so nothing is shown twice).
+  const featuredItems = useMemo(() => {
+    if (!q) return [];
+    if (!isTextSearch) return visibleMerged.slice(0, 3);
+    return visibleMerged.filter((a) => searchRelevanceScore(a, q) >= 360).slice(0, 3);
+  }, [q, isTextSearch, visibleMerged]);
+  const showFeatured = featuredItems.length >= 1;
+  // The wide featured row is DESKTOP-ONLY. So the grid keeps EVERY item (phones
+  // show the full list with no featured row); on desktop the featured items are
+  // hidden from the grid (`lg:hidden`) since they appear in the wide row above.
+  const gridItems = visibleMerged;
+  const featuredIdSet = useMemo(
+    () => (showFeatured ? new Set(featuredItems.map((a) => animeId(a))) : new Set<string>()),
+    [showFeatured, featuredItems],
+  );
+
+  // CR-style sections: with NO format facet active, split the grid (everything
+  // after the featured top-3) into titled groups — Series, Movies, … — like the
+  // Crunchyroll results page. A facet narrows the set to one format, so we render
+  // flat in that case.
+  const gridSections = useMemo(() => {
+    if (formatFilter !== "ALL") return null;
+    const order: { key: FormatKey; label: string }[] = [
+      { key: "TV", label: "Series" },
+      { key: "MOVIE", label: "Movies" },
+      { key: "ONA", label: "ONA" },
+      { key: "OVA", label: "OVA" },
+      { key: "SPECIAL", label: "Specials" },
+    ];
+    const bucket = (a: Anime): FormatKey => {
+      const f = (a.format || "").toUpperCase();
+      if (f === "TV" || f === "MOVIE" || f === "ONA" || f === "OVA") return f;
+      return "SPECIAL";
+    };
+    const groups = new Map<FormatKey, Anime[]>();
+    for (const a of gridItems) {
+      const b = bucket(a);
+      const arr = groups.get(b) ?? [];
+      arr.push(a);
+      groups.set(b, arr);
+    }
+    return order.map((s) => ({ ...s, items: groups.get(s.key) ?? [] })).filter((s) => s.items.length);
+  }, [gridItems, formatFilter]);
+
+  // Auto-start the top-3 in the background the moment they appear: prefetch each
+  // one's full CR season tree (the exact query the detail page reads) and warm
+  // its wide banner, and cache a paint-stub. Opening any featured result is then
+  // instant — season list + banner are already in memory, no spinner.
+  const featuredKey = featuredItems.map((a) => animeId(a)).join(",");
+  useEffect(() => {
+    if (!featuredItems.length || typeof window === "undefined") return;
+    for (const anime of featuredItems) {
+      const malId = animeId(anime);
+      if (!malId) continue;
+      queryClient
+        .prefetchQuery({
+          queryKey: ["cr-card-full", CR_CARD_QUERY_VERSION, malId],
+          queryFn: () => fetchCrCard(malId, 1, true),
+          staleTime: 1000 * 60 * 30,
+        })
+        .catch(() => undefined);
+      // Warm the EXACT image the featured card shows (CR thumbnail / AniList
+      // banner) so it's already cached by paint — never a hero/detail crop.
+      warmImageCdn(wideImageOf(anime) || posterOf(anime, "poster-lg"), "poster-lg");
+      rememberAnime(anime);
+    }
+  // featuredKey collapses the array identity to its ids so this fires only when
+  // the actual top-3 change, not on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [featuredKey, queryClient]);
   const hasMore = Boolean(anilistQ.data?.hasNextPage);
   const hasRenderableResults = merged.length > 0;
   const isLoading = !hasRenderableResults && anilistQ.isLoading && discoveryPage === 1;
@@ -454,20 +591,44 @@ function SearchContentBody({
             </div>
           )}
 
-          {q && !isLoading && merged.length > 0 ? (
-            <h2 className="mb-4 text-xl font-bold tracking-tight text-white">Results</h2>
-          ) : null}
+          {/* Featured top-3 (16:9 wide CR keyart) lead the page, ABOVE the grid.
+              A same-size skeleton reserves the space so nothing jumps while the
+              query resolves. */}
+          {/* Wide featured row — DESKTOP ONLY (phones get the plain grid). */}
+          <div className="hidden lg:block">
+            {q && showFeatured ? (
+              <SearchFeatured items={featuredItems} />
+            ) : q && (isLoading || (merged.length === 0 && anilistQ.isFetching)) ? (
+              <SearchFeaturedSkeleton />
+            ) : null}
+          </div>
 
-          <div ref={resultsScrollRef} className={q ? "min-h-[720px]" : ""} style={{ overflowAnchor: "none" }}>
+          <div ref={resultsScrollRef} className={`mt-3 ${q ? "min-h-[720px]" : ""}`} style={{ overflowAnchor: "none" }}>
             {isLoading ? (
               <GridSkeleton count={24} />
-            ) : merged.length > 0 ? (
+            ) : gridItems.length > 0 ? (
               <>
-                <div className={SEARCH_GRID}>
-                  {visibleMerged.map((anime, i) => (
-                    <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 6} fastImage className="w-full" />
-                  ))}
-                </div>
+                {gridSections ? (
+                  gridSections.map((section, si) => (
+                    <div key={section.key} className={si > 0 ? "mt-9" : ""}>
+                      <h2 className="mb-4 text-xl font-bold tracking-tight text-white">{section.label}</h2>
+                      <div className={SEARCH_GRID}>
+                        {section.items.map((anime, i) => (
+                          <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} priority={si === 0 && i < 6} fastImage className={featuredIdSet.has(animeId(anime)) ? "w-full lg:hidden" : "w-full"} />
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <h2 className="mb-4 text-xl font-bold tracking-tight text-white">Results</h2>
+                    <div className={SEARCH_GRID}>
+                      {gridItems.map((anime, i) => (
+                        <AnimeCard key={`${animeId(anime)}-${i}`} anime={anime} priority={i < 6} fastImage className={featuredIdSet.has(animeId(anime)) ? "w-full lg:hidden" : "w-full"} />
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 {isLoadingMore ? (
                   <div className="mt-6">
@@ -488,6 +649,9 @@ function SearchContentBody({
                   </div>
                 ) : null}
               </>
+            ) : merged.length > 0 ? (
+              // All matches fit in the featured row (≤3 results) — nothing more.
+              null
             ) : q && anilistQ.isFetching ? (
               <GridSkeleton count={12} />
             ) : q ? (
@@ -526,6 +690,22 @@ const FORMAT_FACETS: { key: FormatKey; label: string }[] = [
 // CR-mapped titles sort ahead of everything else.
 function crRank(anime: Anime) {
   return anime.cr_mapped ? 0 : 1;
+}
+
+// Normalize a TV title to its ROOT-series key by stripping trailing season / part
+// / cour markers, so "Attack on Titan", "Attack on Titan Season 2" and "Attack on
+// Titan Final Season" collapse to one. Conservative: it removes ONLY clear season
+// markers — it does NOT cut subtitles after ":" (so "Naruto" and "Naruto:
+// Shippuden" stay distinct).
+function seasonRootKey(title: string): string {
+  let t = (title || "").toLowerCase().trim();
+  t = t.replace(/\b(the\s+)?(final\s+)?season\s*\d*\b.*$/i, "");
+  t = t.replace(/\b\d+(st|nd|rd|th)\s+season\b.*$/i, "");
+  t = t.replace(/\bpart\s*\d+\b.*$/i, "");
+  t = t.replace(/\bcour\s*\d+\b.*$/i, "");
+  t = t.replace(/\b2nd|3rd|4th\b.*$/i, "");
+  t = t.replace(/\s+(ii|iii|iv|v|vi|vii)\s*$/i, "");
+  return t.replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 function HistorySuggestions({ queries }: { queries: string[] }) {

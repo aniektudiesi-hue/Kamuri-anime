@@ -152,6 +152,9 @@ export function mapCatalogAnime(item: CatalogAnime | undefined): Anime {
     banner: item?.detail_banner || crHero || item?.local_banner_webp || item?.banner_image || undefined,
     cr_poster: crPoster,
     cr_hero: crHero,
+    // CR's WIDE catalog thumbnail (1920x1080, /catalog/crunchyroll/<hash>) — the
+    // native 16:9 promo image used for the search "Top matches" cards.
+    cr_wide: useSeriesCrArt ? (item?.thumbnail_1080_url || item?.banner_image || undefined) : undefined,
     detail_banner: item?.detail_banner || crHero || undefined,
     title_logo: item?.title_logo || undefined,
     synopsis: item?.synopsis || undefined,
@@ -218,12 +221,19 @@ export type CrSeason = {
   episode_count?: number;
   is_primary?: boolean;
   owner_mal?: string;
+  cr_season_id?: string;
   season_thumbnail?: string;
+  // When a single CR season is split into multiple dropdown seasons (e.g. AoT
+  // Final Season vs its Final Chapters specials), these bound which slice of the
+  // shared cr_season_id's episodes this season shows.
+  seq_min?: number;
+  seq_max?: number;
   episodes?: CrEpisode[];
 };
 export type CrCard = {
   mal_id: string;
   has_cr: number;
+  title?: string;
   canonical_mal_id?: string;
   cr_series_id?: string;
   image_source?: string;
@@ -243,7 +253,7 @@ export type CrCard = {
 // Single source of truth for the cr-card React Query key. Card prefetch, the
 // detail page, and per-season fetches MUST use this so a version bump can't leave
 // them mismatched (a stale key = prefetch warms a cache nobody reads = slow open).
-export const CR_CARD_QUERY_VERSION = "canonical-v10";
+export const CR_CARD_QUERY_VERSION = "canonical-v12";
 export function crCardQueryKey(malId: string | number, season = 1) {
   return ["cr-card", CR_CARD_QUERY_VERSION, String(malId), season] as const;
 }
@@ -254,6 +264,15 @@ export function crCardQueryKey(malId: string | number, season = 1) {
 // the live engine is unreachable.
 const CR_LIVE_BASE = "http://127.0.0.1:8899";
 
+function mapLiveEps(eps: Array<{ ep?: string | number; seq?: string | number; title?: string; thumb?: string }>): CrEpisode[] {
+  return eps.map((ep) => ({
+    ep: ep.ep ?? ep.seq ?? "",
+    title: ep.title,
+    thumbnail: ep.thumb,
+    has_stream: true,
+  }));
+}
+
 async function fetchCrLive(malId: string): Promise<CrCard | null> {
   try {
     const info = await fetch(`${CR_LIVE_BASE}/api/cr/${encodeURIComponent(malId)}/info?full=1`, {
@@ -262,25 +281,20 @@ async function fetchCrLive(malId: string): Promise<CrCard | null> {
     if (!info || info.error) return null;
 
     const s = info.series || {};
-    const mapEps = (eps: any[]) => eps.map((ep: any) => ({
-      ep: ep.ep ?? ep.seq,
-      title: ep.title,
-      thumbnail: ep.thumb,
-      has_stream: true,
-    }));
-
-    const allEps: any[] = info.all_episodes || [];
-    const seasons: CrSeason[] = (info.seasons || []).map((se: any, i: number) => ({
+    type LiveSeason = { num?: number; title?: string; total?: number };
+    const allEps: Array<{ eps?: Parameters<typeof mapLiveEps>[0] }> = info.all_episodes || [];
+    const seasons: CrSeason[] = (info.seasons || []).map((se: LiveSeason, i: number) => ({
       season_number: se.num,
       title: se.title,
       episode_count: se.total,
       owner_mal: malId,
-      episodes: allEps[i]?.eps?.length ? mapEps(allEps[i].eps) : [],
+      episodes: allEps[i]?.eps?.length ? mapLiveEps(allEps[i].eps!) : [],
     }));
 
     return {
       mal_id: malId,
       has_cr: 1,
+      title: s.title || undefined,
       cr_series_id: info.cr_id,
       detail_banner: s.detail_banner,
       title_logo: s.title_logo,
@@ -288,7 +302,7 @@ async function fetchCrLive(malId: string): Promise<CrCard | null> {
       poster: s.poster,
       synopsis: s.description,
       season_count: info.season_count,
-      total_episodes: seasons.reduce((sum, se) => sum + (se.episodes?.length || se.episode_count || 0), 0),
+      total_episodes: seasons.reduce((sum, se) => sum + (se.episode_count || se.episodes?.length || 0), 0),
       seasons,
       selected_season: seasons[0],
     };
@@ -297,17 +311,21 @@ async function fetchCrLive(malId: string): Promise<CrCard | null> {
   }
 }
 
+// Opt-in dev tool only (NEXT_PUBLIC_CR_LIVE=1): the local CR Live Engine
+// (127.0.0.1:8899). Off in prod, so the card is served from the fast Turso DB.
+const CR_LIVE_ENABLED = process.env.NEXT_PUBLIC_CR_LIVE === "1";
+
 export async function fetchCrCard(malId: string, season?: number, full = false): Promise<CrCard | null> {
-  // Try the CR Live Engine first (direct Crunchyroll API, no DB dependency)
-  if (typeof window !== "undefined" && full) {
+  if (CR_LIVE_ENABLED && full && typeof window !== "undefined") {
     const live = await fetchCrLive(malId);
     if (live) return live;
   }
 
   try {
-    // Fallback: DB-backed enriched backend
+    // Worker-backed CR card. full=1 returns the entire season tree (seasons +
+    // episodes + thumbnails) from one edge Turso read — instant.
     const base = typeof window === "undefined" ? ((await getServerOrigin()) || SEARCH_API_BASE) : "/api/search-proxy";
-    const params = new URLSearchParams({ v: "canonical-v10" });
+    const params = new URLSearchParams({ v: "canonical-v12" });
     if (full) params.set("full", "1");
     else if (season && season > 0) params.set("season", String(season));
     const card = await fetch(`${base}/api/cr/card/${encodeURIComponent(malId)}?${params.toString()}`, {
@@ -317,6 +335,33 @@ export async function fetchCrCard(malId: string, season?: number, full = false):
     return card ?? null;
   } catch {
     return null;
+  }
+}
+
+// Lazy per-season episode fetch — hits the worker's indexed cr_episodes lookup
+// (cr_season_id). ~tens of rows, edge-cached, milliseconds. Used when the user
+// opens/switches a CR season so the card payload never carries every episode.
+export async function fetchCrSeasonEpisodes(
+  malId: string,
+  crSeasonId: string,
+  seqMin?: number,
+  seqMax?: number,
+): Promise<CrEpisode[]> {
+  if (!crSeasonId) return [];
+  try {
+    const params = new URLSearchParams({ cr_season_id: crSeasonId });
+    // Split CR season (e.g. AoT Final Season vs Final Chapters): ask the worker
+    // for only this season's slice so two dropdown rows sharing one cr_season_id
+    // don't both return the whole season.
+    if (seqMin != null) params.set("seq_min", String(seqMin));
+    if (seqMax != null) params.set("seq_max", String(seqMax));
+    const data = await catalogClientGet<{ episodes?: CrEpisode[] }>(
+      `/api/episodes/${encodeURIComponent(malId)}?${params.toString()}`,
+      1000 * 60 * 30,
+    );
+    return data?.episodes ?? [];
+  } catch {
+    return [];
   }
 }
 

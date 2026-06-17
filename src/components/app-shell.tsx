@@ -20,7 +20,7 @@ const AZ = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 function Footer() {
   return (
-    <footer className="mt-12 border-t border-white/[0.055] bg-[#06070d]">
+    <footer className="mt-12 border-t border-white/[0.055] bg-black">
       <div className="border-b border-white/[0.04] py-4">
         <div className="mx-auto max-w-screen-2xl px-4 lg:px-6">
           <div className="flex flex-wrap items-center gap-1">

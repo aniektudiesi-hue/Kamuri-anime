@@ -115,7 +115,7 @@ export function AnimeCard({
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
           {anime.score ? (
-            <div className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-md bg-black/70 px-2 py-1 text-[11px] font-medium backdrop-blur-sm">
+            <div className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-md bg-black/80 px-2 py-1 text-[11px] font-medium">
               <Star size={10} className="fill-[#d8b56a] text-[#d8b56a]" />
               <span className="text-[#d8b56a]">{Number(anime.score).toFixed(1)}</span>
             </div>
@@ -123,12 +123,12 @@ export function AnimeCard({
 
           <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
             {formatLabel ? (
-              <span className="rounded-md bg-[#cf2442]/85 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white backdrop-blur-sm">
+              <span className="rounded-md bg-[#cf2442]/85 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
                 {formatLabel}
               </span>
             ) : null}
             {statusKey ? (
-              <span className="flex items-center rounded-md bg-black/70 px-1.5 py-1 backdrop-blur-sm">
+              <span className="flex items-center rounded-md bg-black/70 px-1.5 py-1">
                 <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[statusKey] || "bg-white/30"} ${statusKey === "currently_airing" ? "animate-pulse" : ""}`} />
               </span>
             ) : null}
