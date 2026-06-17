@@ -32,9 +32,14 @@ function viewerCountry(): string {
 }
 
 function maybeProxyCr(crUrl: string): string {
-  const country = viewerCountry();
-  if (!country || country === "US") return crUrl;
-  return `${CR_PROXY_BASE}?u=${encodeURIComponent(crUrl)}`;
+  // imgsrv.crunchyroll.com is on Cloudflare's global CDN — serves fast in all
+  // regions directly. The proxy added 2-3s per image for non-US viewers; direct
+  // is faster everywhere. Only proxy if explicitly opted in via env var.
+  if (process.env.NEXT_PUBLIC_CR_PROXY === "1") {
+    const country = viewerCountry();
+    if (country && country !== "US") return `${CR_PROXY_BASE}?u=${encodeURIComponent(crUrl)}`;
+  }
+  return crUrl;
 }
 
 // Crunchyroll's imgsrv only serves a FIXED WHITELIST of render boxes — asking for

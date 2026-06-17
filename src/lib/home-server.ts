@@ -51,12 +51,15 @@ export async function getHomeInitialData(options: HomeInitialDataOptions = {}): 
     fetchCatalogSection("/api/anime/genre/slice-of-life", 30, 1, HOME_REVALIDATE_SECONDS),
   ]);
 
-  // Strip sequels from all listing sections — only root (season 1) entries.
+  // Strip sequels from discovery sections so users find season-1 entry points.
+  // "popular" and "topRated" are intentionally NOT filtered — what's popular IS
+  // popular including sequels (JJK S2, AoT Final, etc.). Filtering them made the
+  // section appear empty because currently-trending titles are often sequels.
   const banners = bannersRaw.filter(isRootAnime);
   const thumbnails = thumbnailsRaw.filter(isRootAnime);
   const recent = recentRaw.filter(isRootAnime);
-  const topRated = topRatedRaw.filter(isRootAnime);
-  const popular = popularRaw.filter(isRootAnime);
+  const topRated = topRatedRaw;
+  const popular = popularRaw;
   const romance = romanceRaw.filter(isRootAnime);
   const isekai = isekaiRaw.filter(isRootAnime);
   const sports = sportsRaw.filter(isRootAnime);
