@@ -1,15 +1,11 @@
 import type { AiringScheduleItem, Anime, EpisodeResponse, StreamResponse, Subtitle } from "./types";
-import { catalogRegionHeaders, detectServerRegion, originForRegion } from "./edge-region";
+import { catalogRegionHeaders } from "./edge-region";
 
-async function getServerOrigin(): Promise<string> {
-  if (typeof window !== "undefined") return "";
-  try {
-    const { headers } = await import("next/headers");
-    const h = await headers();
-    return detectServerRegion(h).origin;
-  } catch {
-    return originForRegion("india");
-  }
+// All regions route through the same CF Worker — no need to read request headers.
+// Reading next/headers() here would opt every SSR page into dynamic rendering,
+// disabling ISR and causing x-vercel-cache: MISS on every request.
+function getServerOrigin(): string {
+  return CATALOG_API_BASE;
 }
 
 export const CATALOG_API_BASE = "https://animetvplus-stream-backup.animetvplus-stream.workers.dev";
@@ -91,7 +87,7 @@ export async function catalogServerGet<T>(path: string, revalidate = 60): Promis
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-      const response = await fetch(`${(await getServerOrigin()) || CATALOG_API_BASE}${path}`, {
+      const response = await fetch(`${getServerOrigin()}${path}`, {
         headers: { Accept: "application/json" },
         signal: controller.signal,
         ...(revalidate <= 0 ? { cache: "no-store" as const } : { next: { revalidate } }),
@@ -199,7 +195,7 @@ export async function fetchCatalogSection(path: string, limit = 24, page = 1, re
 export async function fetchCatalogSearch(query: string, limit = 40, page = 1) {
   const params = new URLSearchParams({ q: query, limit: String(limit), page: String(page) });
   // Use our enriched search backend (synonyms + correct season grouping)
-  const base = typeof window === "undefined" ? ((await getServerOrigin()) || SEARCH_API_BASE) : "/api/search-proxy";
+  const base = typeof window === "undefined" ? getServerOrigin() : "/api/search-proxy";
   const payload = await fetch(`${base}/api/search?${params.toString()}`, {
     headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
     ...(typeof window === "undefined" ? { next: { revalidate: 30 } } : {}),
@@ -324,7 +320,7 @@ export async function fetchCrCard(malId: string, season?: number, full = false):
   try {
     // Worker-backed CR card. full=1 returns the entire season tree (seasons +
     // episodes + thumbnails) from one edge Turso read — instant.
-    const base = typeof window === "undefined" ? ((await getServerOrigin()) || SEARCH_API_BASE) : "/api/search-proxy";
+    const base = typeof window === "undefined" ? getServerOrigin() : "/api/search-proxy";
     const params = new URLSearchParams({ v: "canonical-v12" });
     if (full) params.set("full", "1");
     else if (season && season > 0) params.set("season", String(season));

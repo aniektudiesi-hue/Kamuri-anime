@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  experimental: {
+    // Router cache: keep dynamic pages for 5 min (default 30s) so navigating
+    // back to a visited anime detail page is instant without re-fetching.
+    staleTimes: { dynamic: 300, static: 600 },
+  },
   // Hide the floating dev-tools indicator (the bottom-left "N" circle). It is a
   // dev-only overlay and never ships to production, but it breaks the immersive
   // Crunchyroll-style hero while developing.
