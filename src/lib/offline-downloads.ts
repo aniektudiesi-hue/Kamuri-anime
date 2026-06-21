@@ -12,6 +12,8 @@ export type OfflineDownload = {
   title: string;
   poster?: string;
   server?: string;
+  /** Episode thumbnail stored as a blob so it renders with zero network. */
+  thumbnailBlob?: Blob;
   playlistText: string;
   segments: Blob[];
   subtitles: Array<{ label?: string; text: string }>;
@@ -29,8 +31,12 @@ export type OfflineMetadata = {
   episode: number;
   title: string;
   poster?: string;
+  thumbnail?: string;
   server?: string;
 };
+
+/** Offline quality cap (pixel height). 1080p is intentionally never offered. */
+export type DownloadQuality = 720 | 360;
 
 type ProgressivePlaybackOptions = {
   concurrency?: number;
@@ -193,8 +199,9 @@ export async function saveOfflineDownload(
   metadata: OfflineMetadata,
   signal: AbortSignal,
   onProgress: (progress: number, message: string) => void,
+  quality?: DownloadQuality,
 ) {
-  return buildOfflineDownload(stream, metadata, signal, onProgress, STORE);
+  return buildOfflineDownload(stream, metadata, signal, onProgress, STORE, quality);
 }
 
 async function buildOfflineDownload(
@@ -203,6 +210,7 @@ async function buildOfflineDownload(
   signal: AbortSignal,
   onProgress: (progress: number, message: string) => void,
   targetStore: typeof STORE | typeof PREFETCH_STORE,
+  quality?: DownloadQuality,
 ) {
   const src = stream.m3u8_url || stream.stream_url || stream.url;
   if (!src) throw new Error("No stream URL available");
@@ -231,7 +239,7 @@ async function buildOfflineDownload(
   }
 
   onProgress(1, targetStore === PREFETCH_STORE ? "Caching while you watch" : "Preparing offline stream");
-  const mediaPlaylistUrl = await resolveMediaPlaylist(src, signal);
+  const mediaPlaylistUrl = await resolveMediaPlaylist(src, signal, quality);
   const playlistText = await fetchText(mediaPlaylistUrl, signal);
   const { playlistText: offlinePlaylist, resources } = rewritePlaylistForOffline(playlistText, mediaPlaylistUrl);
   if (!resources.length) throw new Error("No video chunks found");
@@ -259,6 +267,7 @@ async function buildOfflineDownload(
   await Promise.all(Array.from({ length: concurrency }, worker));
   onProgress(95, "Saving subtitles");
   const subtitles = await fetchSubtitles(stream.subtitles, signal);
+  const thumbnailBlob = await fetchThumbnailBlob(metadata.thumbnail || metadata.poster, signal);
 
   const item: OfflineDownload = {
     id: offlineId(metadata.malId, metadata.episode),
@@ -267,6 +276,7 @@ async function buildOfflineDownload(
     title: metadata.title,
     poster: metadata.poster,
     server: metadata.server,
+    thumbnailBlob,
     playlistText: offlinePlaylist,
     segments,
     subtitles,
@@ -370,22 +380,40 @@ async function deleteStoredDownload(store: string, id: string) {
   });
 }
 
-async function resolveMediaPlaylist(src: string, signal: AbortSignal) {
+async function resolveMediaPlaylist(src: string, signal: AbortSignal, targetHeight?: DownloadQuality) {
   const text = await fetchText(src, signal);
   if (!text.includes("#EXT-X-STREAM-INF")) return src;
 
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const variants: Array<{ score: number; url: string }> = [];
+  const variants: Array<{ height: number; bandwidth: number; url: string }> = [];
 
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].startsWith("#EXT-X-STREAM-INF")) continue;
     const next = lines.slice(i + 1).find((line) => !line.startsWith("#"));
     if (!next) continue;
-    variants.push({ score: variantScore(lines[i]), url: new URL(next, src).toString() });
+    const height = Number(lines[i].match(/RESOLUTION=\d+x(\d+)/i)?.[1] || 0);
+    const bandwidth = Number(lines[i].match(/BANDWIDTH=(\d+)/i)?.[1] || 0);
+    variants.push({ height, bandwidth, url: new URL(next, src).toString() });
   }
+  if (!variants.length) return src;
 
-  variants.sort((a, b) => b.score - a.score);
-  return variants[0]?.url || src;
+  return pickVariant(variants, targetHeight)?.url || src;
+}
+
+// Choose the rendition closest to the requested cap. We never want the 1080p+
+// ladder for offline (huge files); the UI only offers 720 and 360. Pick the
+// highest variant that is <= target; if every variant is bigger, take the
+// smallest available so the file stays as light as possible.
+function pickVariant(
+  variants: Array<{ height: number; bandwidth: number; url: string }>,
+  targetHeight?: DownloadQuality,
+) {
+  const sorted = [...variants].sort((a, b) => a.height - b.height || a.bandwidth - b.bandwidth);
+  if (!targetHeight) return sorted[sorted.length - 1];
+  const atOrBelow = sorted.filter((v) => v.height > 0 && v.height <= targetHeight + 8);
+  if (atOrBelow.length) return atOrBelow[atOrBelow.length - 1];
+  // No labelled resolutions at/under the cap — fall back to the lightest stream.
+  return sorted[0];
 }
 
 function rewritePlaylistForOffline(playlistText: string, playlistUrl: string) {
@@ -445,7 +473,7 @@ async function ensureOfflineStreamWorker(signal: AbortSignal) {
   if (!("serviceWorker" in navigator) || !("caches" in window)) {
     throw new Error("Progressive offline playback is not supported in this browser");
   }
-  await navigator.serviceWorker.register("/offline-stream-sw.js");
+  await navigator.serviceWorker.register("/app-sw.js");
   await navigator.serviceWorker.ready;
   if (navigator.serviceWorker.controller) return;
   await new Promise<void>((resolve, reject) => {
@@ -476,6 +504,17 @@ async function fetchSubtitles(subtitles: Subtitle[] | undefined, signal: AbortSi
     return [{ label: selected.label || "English", text: await fetchText(selected.file, signal) }];
   } catch {
     return [];
+  }
+}
+
+async function fetchThumbnailBlob(url: string | undefined, signal: AbortSignal) {
+  if (!url) return undefined;
+  try {
+    const response = await fetch(url, { signal });
+    if (!response.ok) return undefined;
+    return await response.blob();
+  } catch {
+    return undefined;
   }
 }
 
