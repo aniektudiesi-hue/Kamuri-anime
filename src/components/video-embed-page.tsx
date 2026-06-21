@@ -17,10 +17,12 @@ export function VideoEmbedPage({
   malId,
   episode,
   anime,
+  type = "sub",
 }: {
   malId: string;
   episode: string;
   anime?: Anime;
+  type?: "sub" | "dub";
 }) {
   const episodeNumber = Number(episode);
   const title = titleOf(anime) === "Untitled" ? `Anime ${malId}` : titleOf(anime);
@@ -28,8 +30,8 @@ export function VideoEmbedPage({
 
   const streamQueries = useQueries({
     queries: STREAM_PROVIDERS.map((provider) => ({
-      queryKey: streamProviderQueryKey(provider, malId, episode, "sub"),
-      queryFn: () => fetchStreamProvider(provider, { malId, episode, type: "sub" }),
+      queryKey: streamProviderQueryKey(provider, malId, episode, type),
+      queryFn: () => fetchStreamProvider(provider, { malId, episode, type }),
       enabled: Boolean(malId) && Number.isFinite(episodeNumber),
       retry: provider.retry,
       staleTime: 1000 * 60 * 25,

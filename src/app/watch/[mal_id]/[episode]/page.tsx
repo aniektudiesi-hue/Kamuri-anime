@@ -10,8 +10,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import { AppShell } from "@/components/app-shell";
 import { api } from "@/lib/api";
 import { fetchAnimeMetadataByMalId } from "@/lib/anime-metadata";
-import { VideoPlayer } from "@/components/video-player";
-import { VastPreroll } from "@/components/vast-preroll";
+import { IframePlayer } from "@/components/iframe-player";
 import { useAuth } from "@/lib/auth";
 import { shareWatching } from "@/lib/chat";
 import { historySocketUrl } from "@/lib/history-realtime";
@@ -50,6 +49,7 @@ const EpisodeDownloadButton = dynamic(
   () => import("@/components/episode-download-button").then((module) => module.EpisodeDownloadButton),
   { ssr: false },
 );
+const USE_IFRAME_PLAYER = true;
 
 function getPlayed(malId: string): number[] {
   try { return JSON.parse(sessionStorage.getItem(`played_${malId}`) || "[]"); }
@@ -117,7 +117,7 @@ export default function WatchPage({
     queries: STREAM_PROVIDERS.map((provider) => ({
       queryKey: streamProviderQueryKey(provider, malId, episode, type),
       queryFn: () => fetchStreamProvider(provider, { malId, episode, type }),
-      enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
+      enabled: !USE_IFRAME_PLAYER && Boolean(malId) && Number.isFinite(episodeNum) && (
         provider.id === DEFAULT_STREAM_PROVIDER_ID || secondaryDataEnabled
       ) && (
         type !== "dub" || provider.id === "hd1"
@@ -207,7 +207,10 @@ export default function WatchPage({
 
   const animeTitle = titleOf(displayAnime);
   const animePoster = posterOf(displayAnime);
-  const blockedAdultShow = isAdultRestrictedAnime(displayAnime);
+  // 18+ titles are blocked ONLY while age restriction is on (the default). Turning
+  // on "Stream 18+ anime" in Settings flips settings.ageRestriction off and lifts
+  // the block on every title.
+  const blockedAdultShow = settings.ageRestriction && isAdultRestrictedAnime(displayAnime);
   const noStreamTitle = blockedAdultShow ? "This title is not available here." : "Episode not available yet.";
   const noStreamMessage = blockedAdultShow
     ? "We do not stream 18+ restricted anime on animeTVplus."
@@ -395,6 +398,7 @@ export default function WatchPage({
   useEffect(() => {
     if (!malId || !Number.isFinite(episodeNum)) return;
     router.prefetch(watchPath(displayAnime, malId, episodeNum + 1));
+    if (USE_IFRAME_PLAYER) return;
     const id = window.setTimeout(() => {
       queryClient.prefetchQuery({ queryKey: ["episodes", malId, 0], queryFn: () => api.episodes(malId), staleTime: 1000 * 60 * 20 });
       const primary = STREAM_PROVIDERS[streamProviderIndex(DEFAULT_STREAM_PROVIDER_ID)] ?? STREAM_PROVIDERS[0];
@@ -416,6 +420,10 @@ export default function WatchPage({
   const hasNext = maxEpisode ? episodeNum < maxEpisode : true;
   const nextHref = hasNext ? watchPath(displayAnime, malId, episodeNum + 1) : undefined;
   const displayTitle = animeTitle === "Untitled" ? `Anime ${malId}` : animeTitle;
+  const currentEpisodeThumb = imageCdnUrl(
+    episodes.data?.episodes?.find((ep) => Number(ep.episode_number) === episodeNum)?.thumbnail || "",
+    "thumb",
+  );
 
   function shareCurrentWatch() {
     const timestamp = Math.floor(latestPlaybackTimeRef.current || initialTime || 0);
@@ -474,10 +482,27 @@ export default function WatchPage({
         </div>
 
         <div className="flex gap-5">
-          {/* ── Left: Player + controls ── */}
+          {/* Left: Player + controls */}
           <div className="min-w-0 flex-1">
             {/* Player */}
-            {streamError ? (
+            {blockedAdultShow ? (
+              <div className="grid aspect-video place-items-center border border-red-500/10 bg-red-950/10 text-center">
+                <div>
+                  <AlertTriangle className="mx-auto mb-3 text-red-400" size={32} />
+                  <p className="font-bold text-white">{noStreamTitle}</p>
+                  <p className="mt-1 text-sm text-white/35">{noStreamMessage}</p>
+                </div>
+              </div>
+            ) : USE_IFRAME_PLAYER ? (
+              <IframePlayer
+                malId={malId}
+                episode={episode}
+                type={type}
+                title={`${displayTitle} - Episode ${episodeNum}`}
+                poster={animePoster}
+                initialTime={initialTime}
+              />
+            ) : streamError ? (
               <div className="grid aspect-video place-items-center border border-red-500/10 bg-red-950/10 text-center">
                 <div>
                   <AlertTriangle className="mx-auto mb-3 text-red-400" size={32} />
@@ -492,32 +517,34 @@ export default function WatchPage({
                   </button>
                 </div>
               </div>
-            ) : !adDone ? (
-              // Pre-roll ad first; player mounts (and autoplays) once it's done.
-              <div className="relative aspect-video w-full overflow-hidden bg-black">
-                <VastPreroll
-                  onDone={() => {
-                    try { window.localStorage.setItem("atv-last-ad", String(Date.now())); } catch { /* ignore */ }
-                    setAdDone(true);
-                  }}
-                />
-              </div>
             ) : (
-              <VideoPlayer
-                key={playerEpisodeKey}
-                stream={selectedStreamForPlayer}
-                poster={animePoster}
-                serverId={activeServerId}
-                title={`${displayTitle} · Episode ${episodeNum}`}
-                initialTime={initialTime}
-                autoPlay
-                deepBuffer={settings.autoFetchWhileWatching}
-                loading={streamsLoading && !selectedStream}
-                nextHref={nextHref}
-                onProgress={saveWatchProgress}
-                onFatalError={handlePlayerFatalError}
-              />
+              <div />
             )}
+
+            {USE_IFRAME_PLAYER ? (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/55">Audio</p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-white/35">Sent to player request</p>
+                </div>
+                <div className="flex gap-2">
+                  {(["sub", "dub"] as const).map((audioType) => (
+                    <button
+                      key={audioType}
+                      type="button"
+                      onClick={() => setType(audioType)}
+                      className={`h-9 rounded-xl px-4 text-sm font-black uppercase transition ${
+                        type === audioType
+                          ? "bg-[#cf2442] text-white shadow-lg shadow-[#cf2442]/20"
+                          : "border border-white/[0.07] bg-[#141828] text-white/70 hover:border-white/[0.14] hover:text-white"
+                      }`}
+                    >
+                      {audioType}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {/* Episode nav strip */}
             <div className="mt-3 flex items-center justify-between gap-3">
@@ -538,7 +565,7 @@ export default function WatchPage({
               <div className="hidden items-center gap-2 rounded-2xl border border-white/[0.06] bg-[#0d1020] px-4 py-2 sm:flex">
                 <Radio size={13} className="text-[#c8ced8] animate-pulse" />
                 <span className="text-xs font-semibold text-white/70">
-                  {displayTitle} · Ep {episodeNum}
+                  {displayTitle} - Ep {episodeNum}
                 </span>
               </div>
 
@@ -566,7 +593,7 @@ export default function WatchPage({
             </div>
 
             {/* Server + Audio bar */}
-            <div className={`mt-3 grid gap-3 ${showAudioControls && activeServerId === DEFAULT_STREAM_PROVIDER_ID ? "xl:grid-cols-[1fr_auto_auto]" : "xl:grid-cols-[1fr_auto]"}`}>
+            {!USE_IFRAME_PLAYER ? <div className={`mt-3 grid gap-3 ${showAudioControls && activeServerId === DEFAULT_STREAM_PROVIDER_ID ? "xl:grid-cols-[1fr_auto_auto]" : "xl:grid-cols-[1fr_auto]"}`}>
               {/* Servers */}
               <div className="rounded-2xl border border-white/[0.055] bg-[#0d1020] p-3.5">
                 <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-white/70">Stream Server</p>
@@ -668,10 +695,11 @@ export default function WatchPage({
                   episode={episodeNum}
                   title={displayTitle}
                   poster={animePoster}
+                  thumbnail={currentEpisodeThumb}
                   server={activeServerId}
                 />
               ) : null}
-            </div>
+            </div> : null}
 
             {/* Mobile episode list */}
             <div className="mt-4 xl:hidden">
@@ -688,7 +716,7 @@ export default function WatchPage({
             </div>
           </div>
 
-          {/* ── Right: Episode list with thumbnails ── */}
+          {/* Right: Episode list with thumbnails */}
           <div className="hidden min-h-[720px] w-[340px] shrink-0 xl:block">
             <div className="sticky top-[84px]">
               <EpisodeSidebar
@@ -779,6 +807,7 @@ function EpisodeSidebar({
     const primary = STREAM_PROVIDERS[streamProviderIndex(DEFAULT_STREAM_PROVIDER_ID)] ?? STREAM_PROVIDERS[0];
     const episode = String(ep);
     router.prefetch(watchPath(undefined, malId, ep));
+    if (USE_IFRAME_PLAYER) return;
     queryClient.fetchQuery({
       queryKey: streamProviderQueryKey(primary, malId, episode, "sub"),
       queryFn: () => fetchStreamProvider(primary, { malId, episode, type: "sub" }),
@@ -792,7 +821,7 @@ function EpisodeSidebar({
         <div className="flex items-center justify-between border-b border-white/[0.055] px-4 py-3">
           <h2 className="text-sm font-black text-white">Episodes</h2>
           <span className="rounded-lg bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold text-white/70">
-            {maxEpisode ? `${maxEpisode} total` : "…"}
+            {maxEpisode ? `${maxEpisode} total` : "..."}
           </span>
         </div>
         {ranges.length > 0 && (
@@ -842,7 +871,7 @@ function EpisodeSidebar({
       <div className="flex items-center justify-between border-b border-white/[0.055] px-4 py-3">
         <div>
           <h2 className="text-sm font-black text-white">Episodes</h2>
-          <p className="text-[11px] text-white/70">{maxEpisode ? `${maxEpisode} total` : "Loading…"}</p>
+          <p className="text-[11px] text-white/70">{maxEpisode ? `${maxEpisode} total` : "Loading..."}</p>
         </div>
         <span className="rounded-lg bg-[#cf2442]/14 px-2.5 py-1 text-[10px] font-bold text-white/60 ring-1 ring-[#cf2442]/20">
           Ep {currentEp}
@@ -958,7 +987,7 @@ function EpisodeSidebar({
                     )}
                     {isPlayed && !isActive && (
                       <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white/[0.08] px-1.5 py-0.5 text-[9px] font-bold text-[#c8ced8]">
-                        ✓ Played
+                        Played
                       </span>
                     )}
                   </div>

@@ -43,12 +43,16 @@ export async function generateMetadata({
 
 export default async function EmbedPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ mal_id: string; episode: string }>;
+  searchParams: Promise<{ type?: string }>;
 }) {
   const { mal_id: malId, episode } = await params;
+  const { type: rawType } = await searchParams;
+  const type = rawType === "dub" ? "dub" : "sub";
   const anime = await getKnownAnimeById(malId);
 
-  return <VideoEmbedPage malId={malId} episode={episode} anime={anime} />;
+  return <VideoEmbedPage malId={malId} episode={episode} anime={anime} type={type} />;
 }
 

@@ -204,7 +204,7 @@ export const api = {
   recentlyAdded: async () => listFromPayload<Anime>(await request("/home/recently-added")),
   topRated: async () => listFromPayload<Anime>(await request("/home/top-rated")),
   search: async (query: string) => fetchCatalogSearch(query),
-  suggest: async (query: string) => fetchCatalogSearch(query, 8),
+  suggest: async (query: string) => fetchCatalogSearch(query, 4),
   episodes: (malId: string, hint = 0) => {
     return fetchCatalogEpisodes(malId, hint);
   },

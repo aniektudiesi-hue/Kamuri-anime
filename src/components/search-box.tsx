@@ -11,6 +11,8 @@ import { Kairo } from "@/components/mascot/kairo";
 import { localSearchAnime, mergeSearchResults, rememberSearchCatalog } from "@/lib/search-index";
 import { animeId, animePath, episodeLabel, posterOf, rankAnimeForSearch, rememberAnime, titleOf } from "@/lib/utils";
 
+const MAX_SUGGESTIONS = 4;
+
 export function SearchBox() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -52,14 +54,14 @@ export function SearchBox() {
     };
   }, [suggestions.isFetching, suggestions.data]);
 
-  const instantItems = useMemo(() => localSearchAnime(trimmed, 7), [trimmed]);
+  const instantItems = useMemo(() => localSearchAnime(trimmed, MAX_SUGGESTIONS), [trimmed]);
   const hasInstantPosters = useMemo(() => instantItems.some((anime) => Boolean(posterOf(anime, "poster-xs"))), [instantItems]);
   const items = useMemo(() => {
     // When the API (root-only, deduped) has responded, show ONLY its results.
     // Do NOT merge the local instant cache here — it can hold stale child-season
     // ("Season 2/3") entries that the API now hides, which would leak back in.
-    if (suggestions.data?.length) return rankAnimeForSearch(suggestions.data, trimmed).slice(0, 7);
-    if (hasInstantPosters) return rankAnimeForSearch(instantItems, trimmed).slice(0, 7);
+    if (suggestions.data?.length) return rankAnimeForSearch(suggestions.data, trimmed).slice(0, MAX_SUGGESTIONS);
+    if (hasInstantPosters) return rankAnimeForSearch(instantItems, trimmed).slice(0, MAX_SUGGESTIONS);
     return [];
   }, [hasInstantPosters, instantItems, suggestions.data, trimmed]);
 
@@ -222,7 +224,7 @@ export function SearchBox() {
               <div className="pb-1.5">
                 {items.map((anime, index) => {
                   const id = animeId(anime);
-                  const poster = posterOf(anime);
+                  const poster = posterOf(anime, "poster-xs");
                   return (
                     <button
                       type="button"
@@ -235,7 +237,31 @@ export function SearchBox() {
                       }`}
                     >
                       <div className="relative h-[52px] w-10 shrink-0 overflow-hidden rounded-md bg-white/[0.05] ring-1 ring-white/[0.06]">
-                        {poster ? <Image src={poster} alt="" fill sizes="36px" className="object-cover" /> : null}
+                        {poster ? (
+                          index < 2 ? (
+                            <Image
+                              src={poster}
+                              alt=""
+                              fill
+                              sizes="40px"
+                              className="object-cover"
+                              priority
+                              fetchPriority="high"
+                              unoptimized
+                            />
+                          ) : (
+                            <Image
+                              src={poster}
+                              alt=""
+                              fill
+                              sizes="40px"
+                              className="object-cover"
+                              loading="lazy"
+                              fetchPriority="auto"
+                              unoptimized
+                            />
+                          )
+                        ) : null}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-1 text-sm font-medium text-white/85">{titleOf(anime)}</p>
