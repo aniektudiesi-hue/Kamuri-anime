@@ -47,10 +47,10 @@ export function rawPosterOf(anime: Anime | undefined) {
   );
 }
 
-export function bannerOf(anime: Anime | undefined, variant: "banner-sm" | "banner-lg" = "banner-lg") {
+export function bannerOf(anime: Anime | undefined, variant: "banner-md" | "banner-sm" | "banner-lg" = "banner-lg") {
   const format = String(anime?.format || "").toUpperCase();
   const useSeriesCrArt = format === "TV" || format === "ONA" || !format;
-  return imageCdnUrl((useSeriesCrArt ? anime?.cr_hero : "") || anime?.banner || anime?.detail_banner || anime?.img_url || anime?.image || posterOf(anime, "poster-lg"), variant);
+  return imageCdnUrl(anime?.detail_banner || (useSeriesCrArt ? anime?.cr_hero : "") || anime?.cr_wide || anime?.banner || "", variant);
 }
 
 export function episodeCount(anime: Anime | undefined) {
@@ -144,12 +144,24 @@ export function searchMatchTier(anime: Anime, rawQuery: string): number {
     (anime.name || "").toLowerCase(),
   ].filter(Boolean);
   const words = query.split(/\s+/).filter(Boolean);
+  // Strip stop words (len < 3) for the all-words check so "eminence of shadow"
+  // still matches "The Eminence in Shadow" even though "of" ≠ "in".
+  const meaningful = words.filter((w) => w.length >= 3);
+  // Punctuation-insensitive form so "re zero" matches "Re:Zero", "demon slayer"
+  // matches "Demon Slayer: Kimetsu no Yaiba", etc. — the #1 cause of a real title
+  // scoring low or missing was just a colon/dash/comma in the catalog name.
+  const norm = (s: string) => s.replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  const nQuery = norm(query);
   let m = 0;
   for (const hay of hays) {
     if (hay === query) m = Math.max(m, 1000);
     else if (hay.startsWith(query)) m = Math.max(m, 700);
     else if (hay.includes(query)) m = Math.max(m, 480);
-    else if (words.length > 1 && words.every((w) => hay.includes(w))) m = Math.max(m, 360);
+    const nh = norm(hay);
+    if (nh === nQuery) m = Math.max(m, 1000);
+    else if (nh.startsWith(nQuery)) m = Math.max(m, 700);
+    else if (nh.includes(nQuery)) m = Math.max(m, 480);
+    else if (meaningful.length > 0 && meaningful.every((w) => nh.includes(w))) m = Math.max(m, 360);
   }
   return m;
 }
@@ -179,7 +191,7 @@ function scoreSearchItem(anime: Anime, query: string) {
       if (hay === query) match = Math.max(match, 1000);
       else if (hay.startsWith(query)) match = Math.max(match, 700);
       else if (hay.includes(query)) match = Math.max(match, 480);
-      else if (words.length > 1 && words.every((word) => hay.includes(word))) match = Math.max(match, 360);
+      else if (words.filter((w) => w.length >= 3).length > 0 && words.filter((w) => w.length >= 3).every((word) => hay.includes(word))) match = Math.max(match, 360);
     }
   }
 

@@ -1,7 +1,6 @@
-﻿import type { Anime } from "./types";
+import type { Anime } from "./types";
 import { animeId } from "./utils";
 import { catalogClientGet, mapCatalogList } from "./catalog-api";
-import { catalogRegionHeaders } from "./edge-region";
 
 type AniListMedia = {
   idMal: number | null;
@@ -257,11 +256,19 @@ function getDiscoveryServerOrigin(): string {
   return SEARCH_DISCOVERY_BASE;
 }
 
+// Punctuation like ",", "-", ":" inside a query trips up the backend's text
+// match (e.g. "re:zero", "fruits basket: the final", "demon slayer - hashira").
+// Strip it to spaces so the query is just clean words — the client-side ranking
+// already normalizes titles the same way, so matching stays consistent.
+function sanitizeSearchQuery(value: string): string {
+  return value.replace(/[,:;/\\|._\-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function searchParamsForIntent(intent: DiscoveryIntent, page: number, fmt = ""): string {
   const params = new URLSearchParams({ limit: "60", page: String(page) });
   const genre = intent.genre || intent.tag;
   if (intent.search) {
-    params.set("q", intent.search);
+    params.set("q", sanitizeSearchQuery(intent.search) || intent.search);
   } else if (genre) {
     params.set("genre", genre);
   }
@@ -277,6 +284,8 @@ function searchParamsForIntent(intent: DiscoveryIntent, page: number, fmt = ""):
 }
 
 export type DiscoveryFacets = { ALL: number; TV: number; MOVIE: number; OVA: number; ONA: number; SPECIAL: number };
+const DISCOVERY_FORMATS = ["ALL", "TV", "MOVIE", "ONA", "OVA", "SPECIAL"] as const;
+export type DiscoveryFormat = (typeof DISCOVERY_FORMATS)[number];
 
 export async function fetchAniListDiscovery(
   intent: DiscoveryIntent,
@@ -291,13 +300,15 @@ export async function fetchAniListDiscovery(
   const effectiveTimeout = timeoutMs ?? (isBrowse ? 25000 : 14000);
   try {
     const qs = searchParamsForIntent(intent, page, fmt);
-    // Server-side hits the backend directly; client-side goes through the proxy
-    // route to stay same-origin.
-    const base = typeof window === "undefined" ? `${getDiscoveryServerOrigin()}/api/search` : "/api/search-proxy/api/search";
+    // Both server AND client hit the edge worker directly. The worker is
+    // CORS-enabled + geo-edge-routed, so client search no longer detours through a
+    // US-pinned Vercel serverless proxy (the "slow in prod, fast on localhost" gap).
+    // No region header — it isn't CORS-allowed and the worker geo-routes internally.
+    const base = `${getDiscoveryServerOrigin()}/api/search`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
     const json = await fetch(`${base}?${qs}`, {
-      headers: { Accept: "application/json", ...(typeof window === "undefined" ? {} : catalogRegionHeaders()) },
+      headers: { Accept: "application/json" },
       signal: controller.signal,
       ...(typeof window === "undefined" ? { next: { revalidate: 30 } } : {}),
     })
@@ -314,6 +325,41 @@ export async function fetchAniListDiscovery(
   } catch {
     return { media: [], hasNextPage: false, total: 0, count: 0, page };
   }
+}
+
+export async function fetchSearchAllFormats(
+  intent: DiscoveryIntent,
+  page = 1,
+  timeoutMs = 14000,
+): Promise<{ media: Anime[]; hasNextPage: boolean; total: number; count: number; page: number; facets?: DiscoveryFacets }> {
+  const results = await Promise.all(DISCOVERY_FORMATS.map((fmt) => fetchAniListDiscovery(intent, page, fmt, timeoutMs)));
+  const byId = new Map<string, Anime>();
+  const facets: DiscoveryFacets = { ALL: 0, TV: 0, MOVIE: 0, OVA: 0, ONA: 0, SPECIAL: 0 };
+
+  for (const [index, result] of results.entries()) {
+    const fmt = DISCOVERY_FORMATS[index];
+    if (fmt === "ALL") {
+      if (result.facets) Object.assign(facets, result.facets);
+      facets.ALL = Math.max(facets.ALL, result.total || result.media.length);
+    } else {
+      facets[fmt] = Math.max(facets[fmt], result.total || result.media.length);
+    }
+    for (const anime of result.media) {
+      const id = animeId(anime);
+      if (!id || byId.has(id)) continue;
+      byId.set(id, anime);
+    }
+  }
+
+  facets.ALL = Math.max(facets.ALL, byId.size);
+  return {
+    media: Array.from(byId.values()),
+    hasNextPage: results.some((result) => result.hasNextPage),
+    total: Math.max(facets.ALL, ...results.map((result) => result.total || result.media.length), byId.size),
+    count: byId.size,
+    page,
+    facets,
+  };
 }
 
 export async function fetchJikanDiscovery(
@@ -374,7 +420,9 @@ function mapAniList(item: AniListMedia): Anime {
     mal_id: item.idMal ? String(item.idMal) : String(item.id),
     title: item.title.english || item.title.romaji || item.title.native || "Untitled",
     title_en: item.title.english || undefined,
-    image_url: item.coverImage.extraLarge || item.coverImage.large,
+    // Prefer `large` — `extraLarge` 404s for many titles (breaking images) and is
+    // heavier; imageCdnUrl downshifts to `medium` for grid cards anyway.
+    image_url: item.coverImage.large || item.coverImage.extraLarge,
     banner: item.bannerImage || undefined,
     score: item.averageScore ? item.averageScore / 10 : undefined,
     episodes: item.episodes ?? undefined,

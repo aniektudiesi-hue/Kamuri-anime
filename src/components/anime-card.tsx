@@ -82,8 +82,8 @@ export function AnimeCard({
     }
     // Client-side navigation (the <Link> handles it) — instant and keeps the
     // React Query cache, so going back/forward never black-screens or refetches.
-    // Just trigger the buffer overlay; do NOT full-reload with location.assign.
-    window.dispatchEvent(new CustomEvent("atv:route-buffer-start"));
+    // No full-screen route buffer: the destination renders its own skeletons, so
+    // navigation feels instant/native instead of flashing a logo overlay.
   }
 
   return (

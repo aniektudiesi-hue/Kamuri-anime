@@ -57,6 +57,25 @@ const CR_LANDSCAPE_SIZES: [number, number][] = [[320, 180], [640, 360], [1200, 6
  * requested variant width to the nearest allowed CR size for the source's aspect
  * (2:3 posters / 16:9 thumbs); unknown aspects fall back to the native URL.
  */
+// AniList cover size folders are interchangeable in the URL path (same filename),
+// so we just swap the segment. Grid/row cards (≤360px) use `medium` (fast); larger
+// posters use `large` (sharp). extraLarge is never emitted — it 404s for many
+// titles. AniList banners have no native size variant and are often 1900px wide,
+// so compact rows route banners through the local WebP cache at the target width.
+function anilistResized(parsed: URL, width: number): string {
+  const coverMatch = parsed.pathname.match(/\/cover\/(?:medium|large|extraLarge)\//);
+  if (!coverMatch) {
+    if (parsed.pathname.includes("/banner/") && width <= 960) {
+      const quality = width <= 640 ? 72 : 76;
+      return `/api/image-cache?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=${quality}`;
+    }
+    return parsed.toString();
+  }
+  const size = width <= 360 ? "medium" : "large";
+  parsed.pathname = parsed.pathname.replace(/\/cover\/(?:medium|large|extraLarge)\//, `/cover/${size}/`);
+  return parsed.toString();
+}
+
 function crResizedUrl(parsed: URL, width: number): string {
   const match = parsed.pathname.match(/\/(\d+)x(\d+)\//);
   if (!match) return parsed.toString();
@@ -74,15 +93,30 @@ function crResizedUrl(parsed: URL, width: number): string {
   return parsed.toString();
 }
 
-export type ImageVariant = "poster-xs" | "poster-sm" | "poster-md" | "poster-lg" | "banner-sm" | "banner-lg" | "thumb" | "episode-thumb";
+// Crunchyroll cdn-cgi WEBP transform for POSTERS — fit=contain, format=auto,
+// quality=85, at CR's own poster widths (240/480/960). Extracts the
+// /catalog/crunchyroll/<hash>.<ext> asset from any CR poster URL and rebuilds it.
+// Returns "" if the asset can't be parsed so the caller falls back to the
+// pre-sized box.
+function crCdnCgiPoster(parsed: URL, width: number): string {
+  const asset = parsed.pathname.match(/\/catalog\/crunchyroll\/[^?]+?\.(?:jpe?g|png|webp)/i);
+  if (!asset) return "";
+  const box = width <= 240 ? 240 : width <= 480 ? 480 : 960;
+  return `https://imgsrv.crunchyroll.com/cdn-cgi/image/fit=contain,format=auto,quality=85,width=${box}${asset[0]}`;
+}
+
+export type ImageVariant = "poster-xs" | "poster-sm" | "poster-md" | "poster-lg" | "banner-md" | "banner-sm" | "banner-lg" | "thumb" | "episode-thumb";
 
 const VARIANT_WIDTH: Record<ImageVariant, number> = {
   "poster-xs": 80,
   "poster-sm": 220,
-  "poster-md": 320,
+  // Row/grid cards top out around 222 CSS px. Asking CR for 320 forced the next
+  // whitelist bucket (480x720), roughly 4x the pixels needed for cards.
+  "poster-md": 240,
   "poster-lg": 480,
+  "banner-md": 640,
   "banner-sm": 960,
-  "banner-lg": 1600,
+  "banner-lg": 1200,
   thumb: 360,
   "episode-thumb": 320,
 };
@@ -92,11 +126,36 @@ const VARIANT_QUALITY: Record<ImageVariant, number> = {
   "poster-sm": 76,
   "poster-md": 80,
   "poster-lg": 84,
+  "banner-md": 76,
   "banner-sm": 78,
   "banner-lg": 82,
   thumb: 76,
   "episode-thumb": 58,
 };
+
+// Network-aware sizing. FAST LOAD IS THE PRIORITY: on a constrained connection
+// (Save-Data on, or a 2g/3g effectiveType) we request a SMALLER render box so the
+// image arrives sooner; on 4g / wifi / unknown we serve the full box for quality.
+// Client-only — SSR and the prerendered first paint use 1.0 (the common 4g/wifi
+// case), so most users hydrate with no change; a Save-Data/slow user simply
+// re-requests the smaller (faster) box, which is exactly what they want.
+function networkScale(): number {
+  if (typeof navigator === "undefined") return 1;
+  const conn = (navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string };
+  }).connection;
+  if (!conn) return 1;
+  if (conn.saveData) return 0.5;
+  switch (conn.effectiveType) {
+    case "slow-2g":
+    case "2g":
+      return 0.5;
+    case "3g":
+      return 0.7;
+    default:
+      return 1;
+  }
+}
 
 const ALLOWED_SOURCE_HOSTS = [
   "127.0.0.1",
@@ -142,23 +201,43 @@ export function imageCdnUrl(src: string | undefined, variant: ImageVariant = "po
     if (!ALLOWED_SOURCE_HOSTS.some((host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`))) {
       return normalizedSrc;
     }
-    const width = VARIANT_WIDTH[variant];
+    // Downshift the requested width on slow/Save-Data connections (snaps CR to a
+    // smaller whitelisted box, and shrinks the proxy/local-cache width) so images
+    // load fast; full size on 4g/wifi. quality is nudged down a touch too.
+    const scale = networkScale();
+    const width = Math.max(1, Math.round(VARIANT_WIDTH[variant] * scale));
+    const quality = scale < 1 ? Math.round(VARIANT_QUALITY[variant] * 0.9) : VARIANT_QUALITY[variant];
     // Crunchyroll: resize on CR's own edge CDN via the URL path â€” CR pre-generates
     // these whitelisted render boxes, so they're globally edge-cached and load fast
     // on the FIRST view. (We tried the cdn-cgi/image WebP resizer for smaller bytes,
     // but its on-the-fly transform adds ~2-3.5s of cold latency per never-seen image
     // â€” the "images load after 4s" regression â€” so the pre-sized box wins for UX.)
     if (isCrImageHost(parsed.hostname)) {
+      // Posters: CR's own cdn-cgi webp transform (fit=contain, format=auto) at the
+      // exact 240/480/960 widths CR uses on its site — smaller bytes, crisp posters.
+      if (variant.startsWith("poster")) {
+        const cdnCgi = crCdnCgiPoster(parsed, width);
+        if (cdnCgi) return cdnCgi;
+      }
       return maybeProxyCr(crResizedUrl(parsed, width));
+    }
+    // AniList covers come in pre-generated size folders: medium (~230px, ~75KB),
+    // large (~460px, ~265KB), extraLarge (404s for many titles!). The default
+    // `large` is ~5x heavier/slower than a CR thumbnail — the "AniList images load
+    // 5x slower" complaint — and any extraLarge URL is the "breaking images". Snap
+    // grid cards to `medium`, cap at `large`, and NEVER emit extraLarge. Pure path
+    // rewrite: AniList edge-serves each size directly (no proxy, no cold transform).
+    if (parsed.hostname === "s4.anilist.co") {
+      return anilistResized(parsed, width);
     }
     // Optional self-hosted WebP cache (opt-in).
     if (LOCAL_IMAGE_CACHE_ENABLED) {
-      return `/api/image-cache?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=${VARIANT_QUALITY[variant]}`;
+      return `/api/image-cache?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=${quality}`;
     }
     // Optional Cloudflare worker proxy (opt-in only â€” off by default because the
     // re-proxy hop was the cause of slow, half-rendered images).
     if (IMAGE_PROXY_ENABLED && IMAGE_CDN_ENABLED) {
-      return `${IMAGE_CDN_BASE}/image?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=${VARIANT_QUALITY[variant]}`;
+      return `${IMAGE_CDN_BASE}/image?url=${encodeURIComponent(parsed.toString())}&w=${width}&q=${quality}`;
     }
     // AniList / MAL / others: already on fast, edge-cached CDNs â€” serve directly.
     return normalizedSrc;
