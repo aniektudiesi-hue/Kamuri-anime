@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { catalogOriginPool } from "@/lib/edge-region";
 
 export const dynamic = "force-dynamic";
+export const runtime = "edge";
 
 const RETRYABLE_STATUS = new Set([500, 502, 503, 504, 521, 522, 523, 524, 525, 526]);
 

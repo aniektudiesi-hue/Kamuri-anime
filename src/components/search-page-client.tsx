@@ -382,7 +382,7 @@ const SearchField = memo(function SearchField({
       const next = value.trim();
       lastCommitted.current = next;
       onCommit(next);
-    }, 260);
+    }, 140);
     return () => clearTimeout(id);
   }, [value, onCommit]);
 

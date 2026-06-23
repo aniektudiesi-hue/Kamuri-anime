@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { catalogOriginPool } from "@/lib/edge-region";
 
 export const dynamic = "force-dynamic";
+// Run at the Vercel edge so requests are handled in the PoP nearest to the
+// viewer instead of a single US-East serverless region.  Eliminates the
+// cross-continent hop that was the main search latency driver.
+export const runtime = "edge";
 
 const RETRYABLE_STATUS = new Set([500, 502, 503, 504, 521, 522, 523, 524, 525, 526]);
 
