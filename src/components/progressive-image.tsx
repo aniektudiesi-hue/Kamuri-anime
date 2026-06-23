@@ -51,7 +51,7 @@ export function ProgressiveImage({
     setLoaded(false);
     setShowShimmer(false);
     setCurrentSrc(highSrc);
-    const timer = window.setTimeout(() => setShowShimmer(true), 180);
+    const timer = window.setTimeout(() => setShowShimmer(true), 80);
     return () => window.clearTimeout(timer);
   }, [highSrc]);
 
@@ -69,7 +69,10 @@ export function ProgressiveImage({
         priority={priority}
         unoptimized
         fetchPriority={priority ? "high" : "auto"}
-        decoding="async"
+        // sync decode on priority images so the browser commits the pixels to
+        // the frame immediately (no "ghost slot" flash); async elsewhere avoids
+        // blocking the main thread for off-screen thumbnails.
+        decoding={priority ? "sync" : "async"}
         loading={loading ?? (priority ? "eager" : "lazy")}
         onError={() => {
           if (fallbackSrc && currentSrc !== fallbackSrc) {
@@ -84,7 +87,7 @@ export function ProgressiveImage({
           setLoaded(true);
           onLoad?.();
         }}
-        className={`object-cover transition-opacity duration-300 ease-out ${loaded ? "opacity-100" : "opacity-0"} ${imgClassName}`}
+        className={`object-cover transition-opacity duration-150 ease-out ${loaded ? "opacity-100" : "opacity-0"} ${imgClassName}`}
       />
     </div>
   );

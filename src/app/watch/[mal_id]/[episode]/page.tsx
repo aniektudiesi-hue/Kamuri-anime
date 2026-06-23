@@ -792,9 +792,17 @@ function EpisodeSidebar({
   const currentRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
-    if (currentRef.current) {
-      currentRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
+    const el = currentRef.current;
+    if (!el) return;
+    // Defer one animation frame so the sidebar's overflow-y-auto container
+    // has been painted and is the effective scroll ancestor.  Without the
+    // defer, the effect fires before CSS hydrates and scrollIntoView uses
+    // the document as the scroll root, pulling the whole page down to the
+    // episode row (the "redirected to footer" bug on navigation).
+    const raf = requestAnimationFrame(() => {
+      el.scrollIntoView({ block: "nearest", behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [currentEp]);
 
   const visibleEpisodes = ranges.length && episodesData
