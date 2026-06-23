@@ -55,3 +55,10 @@ next-env.d.ts
 public/cr-img/
 public/cr-keyart/
 public/image-cache/
+
+# local/native build artifacts
+/android/
+/capacitor-www/
+/capacitor.config.ts
+/db
+/db-wal

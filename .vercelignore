@@ -13,3 +13,8 @@ public/image-cache
 .next-image-check
 .claude
 *.log
+android
+capacitor-www
+capacitor.config.ts
+db
+db-wal

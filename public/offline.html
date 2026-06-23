@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Downloads · ANIME TV+</title>
+<link rel="icon" href="/favicon.ico" />
+<script src="/hls.min.js"></script>
+<style>
+  :root { --red: #cf2442; --bg: #050506; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none; }
+  a { color: inherit; text-decoration: none; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center;
+    gap: 12px; padding: 16px 18px calc(14px); background: linear-gradient(180deg, #0b0b0e, rgba(5,5,6,0.92));
+    border-bottom: 1px solid rgba(255,255,255,0.06); backdrop-filter: blur(8px); }
+  header img { height: 26px; width: auto; }
+  header .sub { margin-left: auto; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.45);
+    border: 1px solid rgba(255,255,255,0.12); padding: 5px 10px; border-radius: 999px; }
+  .offline-dot { display:inline-block; width:7px; height:7px; border-radius:999px; background:#3ad07a; margin-right:6px; vertical-align:middle;}
+  .offline .offline-dot { background:#f0a; }
+  main { padding: 16px 16px 40px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 14px; }
+  @media (min-width: 620px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 900px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  .card { min-width: 0; }
+  .thumb { position: relative; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden;
+    background: #111; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .thumb .play { position: absolute; inset: 0; display: grid; place-items: center; }
+  .thumb .play span { width: 44px; height: 44px; border-radius: 999px; background: rgba(0,0,0,0.55);
+    display: grid; place-items: center; backdrop-filter: blur(4px); }
+  .thumb .del { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px;
+    border-radius: 999px; background: rgba(0,0,0,0.6); border: 0; color: #fff; display: grid;
+    place-items: center; }
+  .meta { padding: 8px 4px 0; }
+  .meta h3 { margin: 0; font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  .meta p { margin: 3px 0 0; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.42); }
+  .empty { text-align: center; padding: 80px 24px; color: rgba(255,255,255,0.5); }
+  .empty h2 { color: #fff; font-size: 20px; margin: 18px 0 6px; }
+  .empty a { display: inline-block; margin-top: 18px; background: var(--red); color: #fff;
+    font-weight: 800; padding: 12px 22px; border-radius: 14px; }
+  /* Player */
+  #player { position: fixed; inset: 0; z-index: 50; background: #000; display: none; }
+  #player.open { display: block; }
+  #player video { width: 100%; height: 100%; background: #000; }
+  #player .close { position: absolute; top: 14px; left: 14px; z-index: 2; width: 42px; height: 42px;
+    border-radius: 999px; background: rgba(0,0,0,0.55); border: 0; color: #fff; font-size: 20px;
+    display: grid; place-items: center; backdrop-filter: blur(4px); }
+  #player .title { position: absolute; top: 20px; left: 68px; right: 16px; z-index: 2;
+    font-size: 15px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<header>
+  <img src="/logo-full.webp" alt="ANIME TV+" onerror="this.style.display='none'" />
+  <span class="sub" id="status"><span class="offline-dot"></span><span id="statusText">Offline ready</span></span>
+</header>
+<main>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" style="display:none">
+    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#cf2442" stroke-width="1.6"
+      style="margin:0 auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    <h2>No downloads yet</h2>
+    <p>Episodes you save for offline will appear here.</p>
+    <a href="/">Open ANIME TV+</a>
+  </div>
+</main>
+
+<div id="player">
+  <button class="close" id="close" aria-label="Close">✕</button>
+  <div class="title" id="playerTitle"></div>
+  <video id="video" controls autoplay playsinline></video>
+</div>
+
+<script>
+(function () {
+  var DB = "anime-tv-offline", VER = 2, STORE = "episodes";
+  var urls = [], hls = null;
+
+  function open() {
+    return new Promise(function (res, rej) {
+      var r = indexedDB.open(DB, VER);
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
+  }
+  function all() {
+    return open().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
+        tx.onsuccess = function () { res(tx.result || []); };
+        tx.onerror = function () { rej(tx.error); };
+      });
+    });
+  }
+  function del(id) {
+    return open().then(function (db) {
+      return new Promise(function (res) {
+        var tx = db.transaction(STORE, "readwrite");
+        tx.objectStore(STORE).delete(id);
+        tx.oncomplete = res; tx.onerror = res;
+      });
+    });
+  }
+  function bytes(n) {
+    if (!n) return ""; var mb = n / 1048576;
+    return mb < 1024 ? mb.toFixed(1) + " MB" : (mb / 1024).toFixed(2) + " GB";
+  }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+
+  function render(items) {
+    var grid = document.getElementById("grid"), empty = document.getElementById("empty");
+    if (!items.length) { grid.style.display = "none"; empty.style.display = "block"; return; }
+    items.sort(function (a, b) { return String(b.downloadedAt).localeCompare(String(a.downloadedAt)); });
+    grid.innerHTML = "";
+    items.forEach(function (it) {
+      var thumb = it.thumbnailBlob ? URL.createObjectURL(it.thumbnailBlob) : (it.poster || "");
+      var card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML =
+        '<div class="thumb">' +
+          (thumb ? '<img src="' + thumb + '" alt="">' : '') +
+          '<div class="play"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></span></div>' +
+          '<button class="del" aria-label="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>' +
+        '</div>' +
+        '<div class="meta"><h3>' + esc(it.title) + '</h3>' +
+          '<p>E' + it.episode + (it.size ? ' &middot; ' + bytes(it.size) : '') + '</p></div>';
+      card.querySelector(".play").addEventListener("click", function () { play(it); });
+      card.querySelector("img") && card.querySelector("img").addEventListener("click", function () { play(it); });
+      card.querySelector(".del").addEventListener("click", function (e) {
+        e.stopPropagation();
+        del(it.id).then(load);
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  function play(item) {
+    revoke();
+    var playlist = item.playlistText || "";
+    (item.segments || []).forEach(function (blob, i) {
+      var u = URL.createObjectURL(blob); urls.push(u);
+      playlist = playlist.split("__SEGMENT_" + i + "__").join(u);
+    });
+    var playlistUrl = URL.createObjectURL(new Blob([playlist], { type: "application/vnd.apple.mpegurl" }));
+    urls.push(playlistUrl);
+
+    var video = document.getElementById("video");
+    // clear old tracks
+    Array.prototype.slice.call(video.querySelectorAll("track")).forEach(function (t) { video.removeChild(t); });
+    (item.subtitles || []).forEach(function (s, i) {
+      var vurl = URL.createObjectURL(new Blob([s.text], { type: "text/vtt" })); urls.push(vurl);
+      var track = document.createElement("track");
+      track.kind = "subtitles"; track.label = s.label || ("Subtitles " + (i + 1));
+      track.srclang = "en"; track.src = vurl; if (i === 0) track.default = true;
+      video.appendChild(track);
+    });
+
+    document.getElementById("playerTitle").textContent = item.title + " · E" + item.episode;
+    document.getElementById("player").classList.add("open");
+
+    if (window.Hls && Hls.isSupported()) {
+      hls = new Hls({ enableWorker: true });
+      hls.loadSource(playlistUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () { video.play().catch(function () {}); });
+    } else {
+      video.src = playlistUrl; video.play().catch(function () {});
+    }
+  }
+
+  function revoke() {
+    if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
+    urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+    urls = [];
+  }
+  function closePlayer() {
+    var video = document.getElementById("video");
+    video.pause(); video.removeAttribute("src"); video.load();
+    document.getElementById("player").classList.remove("open");
+    revoke();
+  }
+  document.getElementById("close").addEventListener("click", closePlayer);
+
+  function setStatus() {
+    var on = navigator.onLine;
+    document.getElementById("statusText").textContent = on ? "Online" : "Offline ready";
+    document.getElementById("status").classList.toggle("offline", !on);
+  }
+  window.addEventListener("online", setStatus);
+  window.addEventListener("offline", setStatus);
+
+  function load() {
+    all().then(render).catch(function () { render([]); });
+  }
+  setStatus();
+  load();
+})();
+</script>
+</body>
+</html>
