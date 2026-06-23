@@ -50,6 +50,8 @@ const EpisodeDownloadButton = dynamic(
   { ssr: false },
 );
 const USE_IFRAME_PLAYER = true;
+const PLAYER_COUNTDOWN_SECONDS = 7;
+const PLAYER_COUNTDOWN_CAP_MS = 10 * 60 * 1000;
 
 function getPlayed(malId: string): number[] {
   try { return JSON.parse(sessionStorage.getItem(`played_${malId}`) || "[]"); }
@@ -79,11 +81,13 @@ export default function WatchPage({
   const [server, setServer] = useState<StreamProviderId>(DEFAULT_STREAM_PROVIDER_ID);
   const [serverMenuOpen, setServerMenuOpen] = useState(false);
   const [type, setType] = useState<"sub" | "dub">("sub");
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
   const [known, setKnown] = useState<Anime | undefined>();
   const [localResumeItem, setLocalResumeItem] = useState<Record<string, unknown> | undefined>();
   const [playedEps, setPlayedEps] = useState<number[]>([]);
   const [secondaryDataEnabled, setSecondaryDataEnabled] = useState(false);
   const [adDone, setAdDone] = useState(true); // gated true until the cap check decides
+  const [adCountdown, setAdCountdown] = useState(PLAYER_COUNTDOWN_SECONDS);
   const { token } = useAuth();
   const settings = useSettings();
   const queryClient = useQueryClient();
@@ -114,10 +118,10 @@ export default function WatchPage({
   }, [episode, malId]);
 
   const streamQueries = useQueries({
-    queries: STREAM_PROVIDERS.map((provider) => ({
+    queries: USE_IFRAME_PLAYER ? [] : STREAM_PROVIDERS.map((provider) => ({
       queryKey: streamProviderQueryKey(provider, malId, episode, type),
       queryFn: () => fetchStreamProvider(provider, { malId, episode, type }),
-      enabled: !USE_IFRAME_PLAYER && Boolean(malId) && Number.isFinite(episodeNum) && (
+      enabled: Boolean(malId) && Number.isFinite(episodeNum) && (
         provider.id === DEFAULT_STREAM_PROVIDER_ID || secondaryDataEnabled
       ) && (
         type !== "dub" || provider.id === "hd1"
@@ -153,11 +157,33 @@ export default function WatchPage({
   useEffect(() => {
     try {
       const last = Number(window.localStorage.getItem("atv-last-ad") || 0);
-      setAdDone(Date.now() - last < 10 * 60 * 1000);
+      setAdDone(Date.now() - last < PLAYER_COUNTDOWN_CAP_MS);
+      setAdCountdown(PLAYER_COUNTDOWN_SECONDS);
     } catch {
       setAdDone(false);
+      setAdCountdown(PLAYER_COUNTDOWN_SECONDS);
     }
   }, [playerEpisodeKey]);
+
+  useEffect(() => {
+    if (adDone) return;
+    setAdCountdown(PLAYER_COUNTDOWN_SECONDS);
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      const remaining = Math.max(0, PLAYER_COUNTDOWN_SECONDS - Math.floor((Date.now() - startedAt) / 1000));
+      setAdCountdown(remaining);
+      if (remaining <= 0) {
+        window.clearInterval(interval);
+        try {
+          window.localStorage.setItem("atv-last-ad", String(Date.now()));
+        } catch {
+          // Storage can be unavailable in restricted browser modes.
+        }
+        setAdDone(true);
+      }
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [adDone]);
   const firstAvailableServerId = availableServers[0]?.id;
   const streamsLoading = !selectedStream && streamQueries.some((q) => q.isLoading || q.isFetching);
   const allSettled = streamQueries.every((q) => q.isSuccess || q.isError);
@@ -207,14 +233,28 @@ export default function WatchPage({
 
   const animeTitle = titleOf(displayAnime);
   const animePoster = posterOf(displayAnime);
-  // 18+ titles are blocked ONLY while age restriction is on (the default). Turning
-  // on "Stream 18+ anime" in Settings flips settings.ageRestriction off and lifts
-  // the block on every title.
-  const blockedAdultShow = settings.ageRestriction && isAdultRestrictedAnime(displayAnime);
-  const noStreamTitle = blockedAdultShow ? "This title is not available here." : "Episode not available yet.";
-  const noStreamMessage = blockedAdultShow
-    ? "We do not stream 18+ restricted anime on animeTVplus."
-    : "This episode is not available on our servers yet. Please try again later.";
+  const adultShow = isAdultRestrictedAnime(displayAnime);
+  const showAdultWarning = adultShow && settings.ageRestriction && !adultConfirmed;
+  const noStreamTitle = "Episode not available yet.";
+  const noStreamMessage = "This episode is not available on our servers yet. Please try again later.";
+
+  useEffect(() => {
+    setAdultConfirmed(false);
+    try {
+      setAdultConfirmed(sessionStorage.getItem(`atv-adult-ok:${malId}`) === "1");
+    } catch {
+      setAdultConfirmed(false);
+    }
+  }, [episode, malId]);
+
+  function continueAdultPlayback() {
+    setAdultConfirmed(true);
+    try {
+      sessionStorage.setItem(`atv-adult-ok:${malId}`, "1");
+    } catch {
+      // Session storage can be unavailable in restricted contexts.
+    }
+  }
 
   useEffect(() => {
     if (titleOf(displayAnime) !== "Untitled") {
@@ -485,23 +525,43 @@ export default function WatchPage({
           {/* Left: Player + controls */}
           <div className="min-w-0 flex-1">
             {/* Player */}
-            {blockedAdultShow ? (
-              <div className="grid aspect-video place-items-center border border-red-500/10 bg-red-950/10 text-center">
-                <div>
-                  <AlertTriangle className="mx-auto mb-3 text-red-400" size={32} />
-                  <p className="font-bold text-white">{noStreamTitle}</p>
-                  <p className="mt-1 text-sm text-white/35">{noStreamMessage}</p>
-                </div>
+            {USE_IFRAME_PLAYER ? (
+              <div className="relative">
+                <IframePlayer
+                  malId={malId}
+                  episode={episode}
+                  type={type}
+                  title={`${displayTitle} - Episode ${episodeNum}`}
+                  poster={animePoster}
+                  initialTime={initialTime}
+                />
+                {!adDone ? (
+                  <div className="absolute inset-0 z-20 grid place-items-center bg-black/78 backdrop-blur-sm">
+                    <div className="grid h-24 w-24 place-items-center rounded-full border border-white/15 bg-white/[0.06] text-center shadow-[0_20px_80px_rgba(0,0,0,0.55)]">
+                      <span className="text-4xl font-black text-white">{adCountdown}</span>
+                    </div>
+                  </div>
+                ) : null}
+                {showAdultWarning ? (
+                  <div className="absolute inset-0 z-30 grid place-items-center bg-black/82 px-4 text-center backdrop-blur-md">
+                    <div className="max-w-md rounded-2xl border border-red-400/20 bg-[#10070a]/95 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.62)]">
+                      <AlertTriangle className="mx-auto mb-3 text-red-300" size={34} />
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-red-300">Mature content</p>
+                      <h2 className="mt-2 text-2xl font-black text-white">18+ title warning</h2>
+                      <p className="mt-3 text-sm font-semibold leading-6 text-white/62">
+                        This title may contain mature themes. Continue only if you want to play this episode.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={continueAdultPlayback}
+                        className="mt-5 h-12 w-full rounded-xl bg-[#cf2442] text-sm font-black text-white shadow-lg shadow-[#cf2442]/20 transition hover:bg-[#dc2d4b]"
+                      >
+                        Continue and play
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            ) : USE_IFRAME_PLAYER ? (
-              <IframePlayer
-                malId={malId}
-                episode={episode}
-                type={type}
-                title={`${displayTitle} - Episode ${episodeNum}`}
-                poster={animePoster}
-                initialTime={initialTime}
-              />
             ) : streamError ? (
               <div className="grid aspect-video place-items-center border border-red-500/10 bg-red-950/10 text-center">
                 <div>
@@ -794,11 +854,11 @@ function EpisodeSidebar({
   useEffect(() => {
     const el = currentRef.current;
     if (!el) return;
-    // Defer one animation frame so the sidebar's overflow-y-auto container
-    // has been painted and is the effective scroll ancestor.  Without the
-    // defer, the effect fires before CSS hydrates and scrollIntoView uses
-    // the document as the scroll root, pulling the whole page down to the
-    // episode row (the "redirected to footer" bug on navigation).
+    // Defer one animation frame so the sidebar overflow-y-auto container has
+    // been painted and is the effective scroll ancestor.  Without the defer,
+    // the effect fires before CSS hydrates and scrollIntoView treats the
+    // document as the scroll root, pulling the whole page down to the episode
+    // row on every navigation (the "redirected to footer" bug).
     const raf = requestAnimationFrame(() => {
       el.scrollIntoView({ block: "nearest", behavior: "instant" });
     });
