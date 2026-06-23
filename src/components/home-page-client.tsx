@@ -143,7 +143,6 @@ export function HomePageClient({ initialData }: { initialData: HomeInitialData }
   return (
     <AppShell>
       <ResponsiveHero homeData={homeData} />
-      <ContinueWatchingSection />
 
       <div className="mx-auto max-w-screen-2xl px-4 lg:px-8">
         {/* Most Popular — the 24 most-watched titles */}
