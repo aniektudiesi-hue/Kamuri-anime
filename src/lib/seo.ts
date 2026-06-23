@@ -9,12 +9,14 @@ export function buildPageMetadata({
   path,
   image,
   index = true,
+  keywords,
 }: {
   title: string;
   description: string;
   path: string;
   image?: string;
   index?: boolean;
+  keywords?: string[];
 }): Metadata {
   const canonical = absoluteUrl(path);
   const metaTitle = cleanText(title, SITE_NAME);
@@ -24,7 +26,7 @@ export function buildPageMetadata({
   return {
     title: metaTitle,
     description: metaDescription,
-    keywords: SITE_KEYWORDS,
+    keywords: keywords ?? SITE_KEYWORDS,
     alternates: { canonical },
     openGraph: {
       type: "website",
